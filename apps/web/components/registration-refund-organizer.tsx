@@ -91,13 +91,19 @@ export default function RegistrationRefundOrganizer({ eventId }: { eventId: stri
   }
 
   async function decide(item: Item, decision: 'APPROVE' | 'REJECT') {
+    const note = (notes[item.id] ?? '').trim().replace(/\s+/gu, ' ');
+    if (note.length < 10 || note.length > 500) {
+      setError('A justificativa precisa ter entre 10 e 500 caracteres.');
+      return;
+    }
+    if (busyId) return;
     setBusyId(item.id);
     setError('');
     setNotice('');
     try {
       const next = await api<Item>(`/events/${encodeURIComponent(eventId)}/refunds/requests/${encodeURIComponent(item.id)}/decision`, {
         method: 'POST',
-        body: JSON.stringify({ decision, note: notes[item.id] ?? '' }),
+        body: JSON.stringify({ decision, note }),
       });
       setItems((current) => current.map((row) => row.id === item.id ? { ...row, status: next.status, statusLabel: next.statusLabel, decisionNote: next.decisionNote } : row));
       setNotice(decision === 'APPROVE' ? 'Pedido aprovado e aguardando processamento. O dinheiro não foi devolvido.' : 'Pedido recusado.');
