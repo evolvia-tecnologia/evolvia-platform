@@ -224,8 +224,10 @@ function PreparationDesk({ eventId, code }: { eventId: string; code: string }) {
       })
       .catch((reason) => {
         if (!active || version !== loadVersion.current) return;
-        setRows([]);
-        setError(reason instanceof Error ? reason.message : 'Não foi possível carregar esta preparação.');
+        // An unknown server state must never be presented as an empty list:
+        // block writes until the existing preparations are loaded successfully.
+        setRows(null);
+        setError('Não foi possível consultar as preparações. Recarregue o painel antes de registrar.');
       });
     return () => { active = false; };
   }, [eventId, code]);
@@ -249,6 +251,7 @@ function PreparationDesk({ eventId, code }: { eventId: string; code: string }) {
     {current && <p role="status">Preparação registrada para {current.accountLabel}. Nenhum dado é enviado ao provedor.</p>}
     <form onSubmit={(event) => {
       event.preventDefault();
+      if (rows === null || busy) return;
       void run(async () => {
         const created = await api<{ code: string; accountLabel: string }>(`/events/${eventId}/integrations/preparations`, {
           method: 'POST',
@@ -256,7 +259,7 @@ function PreparationDesk({ eventId, code }: { eventId: string; code: string }) {
         });
         setAccountLabel('');
         setRows((existing) => {
-          if (!existing) return existing;
+          if (!existing) return null;
           const next = existing.filter((row) => row.code !== created.code);
           return [{ code: created.code, accountLabel: created.accountLabel, createdAt: new Date().toISOString() }, ...next];
         });
