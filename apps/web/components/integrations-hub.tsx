@@ -209,6 +209,7 @@ function PreparationDesk({ eventId, code }: { eventId: string; code: string }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+  const [loadAttempt, setLoadAttempt] = useState(0);
   const loadVersion = useRef(0);
 
   useEffect(() => {
@@ -230,7 +231,7 @@ function PreparationDesk({ eventId, code }: { eventId: string; code: string }) {
         setError('Não foi possível consultar as preparações. Recarregue o painel antes de registrar.');
       });
     return () => { active = false; };
-  }, [eventId, code]);
+  }, [eventId, code, loadAttempt]);
 
   const current = rows?.find((row) => row.code === code) ?? null;
 
@@ -247,6 +248,7 @@ function PreparationDesk({ eventId, code }: { eventId: string; code: string }) {
   return <section className={styles.foundation} aria-label="Preparação deste conector">
     <p>O nome da conta fica só neste evento. Isto não instala o conector nem autoriza envio.</p>
     {error && <p className={styles.error} role="alert">{error}</p>}
+    {rows === null && error && <button type="button" disabled={busy} onClick={() => { setError(''); setLoadAttempt((value) => value + 1); }}>Tentar carregar novamente</button>}
     {notice && <p role="status">{notice}</p>}
     {current && <p role="status">Preparação registrada para {current.accountLabel}. Nenhum dado é enviado ao provedor.</p>}
     <form onSubmit={(event) => {
