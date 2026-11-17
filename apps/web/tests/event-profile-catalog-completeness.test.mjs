@@ -164,9 +164,10 @@ test('consultas do contrato resolvem os 20 tipos e recusam valores desconhecidos
 });
 
 test('Wizard e Home continuam consumindo o mesmo catálogo, sem segunda fonte', async () => {
-  const [wizard, home] = await Promise.all([
+  const [wizard, home, picker] = await Promise.all([
     readFile(new URL('../components/event-wizard.tsx', import.meta.url), 'utf8'),
     readFile(new URL('../app/page.tsx', import.meta.url), 'utf8'),
+    readFile(new URL('../components/public-profile-picker.tsx', import.meta.url), 'utf8'),
   ]);
 
   assert.match(wizard, /import \{ EVENT_PROFILE_GROUPS \} from '\.\.\/lib\/event-profile-catalog'/u);
@@ -176,14 +177,17 @@ test('Wizard e Home continuam consumindo o mesmo catálogo, sem segunda fonte', 
   assert.match(wizard, /<strong>\{profile\.title\}<\/strong>/u);
   assert.doesNotMatch(wizard, /EVENT_PROFILE_GROUPS\s*=/u);
 
-  assert.match(home, /import \{ EVENT_PROFILE_GROUPS, findEventProfileGroup \} from '\.\.\/lib\/event-profile-catalog'/u);
-  assert.match(home, /EVENT_PROFILE_GROUPS\.map\(\(group\) =>/u);
+  assert.match(home, /import \{ findEventProfileGroup \} from '\.\.\/lib\/event-profile-catalog'/u);
+  assert.match(home, /<PublicProfilePicker /u);
+  assert.match(picker, /import \{ EVENT_PROFILE_GROUPS, findEventProfileGroup \} from '\.\.\/lib\/event-profile-catalog'/u);
+  assert.match(picker, /EVENT_PROFILE_GROUPS\.map\(\(group\) =>/u);
   assert.equal(
     listEventProfileOptions().some((option) => option.value === 'Corrida' && option.title === 'Corrida'),
     true,
     'A EVA e a Home usam este catálogo e precisam oferecer Corrida.',
   );
-  assert.match(home, /group\.options\.map\(\(profile\) =>/u);
+  assert.match(picker, /family\.options\.map\(\(profile\) =>/u);
   assert.match(home, /findEventProfileGroup\(parsed\.eventType\)/u);
   assert.doesNotMatch(home, /EVENT_PROFILE_GROUPS\s*=/u);
+  assert.doesNotMatch(picker, /EVENT_PROFILE_GROUPS\s*=/u);
 });

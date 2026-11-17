@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useRef, useState } from 'react';
 import { api, getToken } from '../lib/api';
+import { CONFIRMATION_UNKNOWN, confirmationAccepted, confirmationFailureGuidance, deskResultStillVisible, emissionSequence, labelWithoutEmission, openLabelPrint, type PrintIssue } from '../lib/credential-print-confirmation';
 import {
   publicDeskFreeConfirmLabel,
   publicDeskNewLabel,
@@ -342,8 +343,13 @@ export default function EventDesk({ eventId }: { eventId: string }) {
 
 function EventDeskSession({ eventId }: { eventId: string }) {
   const selectionVersion = useRef(0);
+  const printVersion = useRef(0);
   const pendingAction = useRef(false);
   const busyRequest = useRef(0);
+  const kitMutationPending = useRef(false);
+  const kitRevision = useRef(0);
+  const sessionActive = useRef(true);
+  const [kitBusy, setKitBusy] = useState(false);
   const editFormRef = useRef<HTMLFormElement>(null);
   const printButtonRef = useRef<HTMLButtonElement>(null);
   const [context, setContext] = useState<Context | null>(null);
@@ -354,6 +360,8 @@ function EventDeskSession({ eventId }: { eventId: string }) {
   const [people, setPeople] = useState<Person[]>([]);
   const [busyId, setBusyId] = useState('');
   const [badge, setBadge] = useState<Badge | null>(null);
+  const [printIssue, setPrintIssue] = useState<PrintIssue | null>(null);
+  const [confirmingPrint, setConfirmingPrint] = useState(false);
   const [activityId, setActivityId] = useState('');
   const [categoryId, setCategoryId] = useState('');
   const [lotId, setLotId] = useState('');
@@ -381,6 +389,7 @@ function EventDeskSession({ eventId }: { eventId: string }) {
   const [searchReversingId, setSearchReversingId] = useState('');
   const [searchReverseReason, setSearchReverseReason] = useState('');
   const [kit, setKit] = useState<KitView | null>(null);
+  const [kitBalanceStale, setKitBalanceStale] = useState<'delivery' | 'reversal' | null>(null);
   const [deliveredSizeId, setDeliveredSizeId] = useState('');
   const [confirmSizeChange, setConfirmSizeChange] = useState(false);
   useEffect(() => {
@@ -425,7 +434,10 @@ function EventDeskSession({ eventId }: { eventId: string }) {
       guard?.remove();
     };
   }, [badge]);
-  useEffect(() => () => { selectionVersion.current += 1; }, []);
+  useEffect(() => {
+    sessionActive.current = true;
+    return () => { sessionActive.current = false; selectionVersion.current += 1; };
+  }, []);
   const shirtsOn = Boolean(kit?.shirtsEnabled && kit.sizes.length > 0);
   useEffect(() => { setReversalReason(''); setConfirmSizeChange(false); }, [selectedId]);
 
@@ -445,10 +457,11 @@ function EventDeskSession({ eventId }: { eventId: string }) {
   useEffect(() => {
     if (!eventId || !context?.capabilities.includes('material_delivery')) return;
     let active = true;
+    const revision = kitRevision.current;
     api<KitView>(`/events/${encodeURIComponent(eventId)}/desk/kit`)
-      .then((next) => { if (active) setKit(next); })
+      .then((next) => { if (active && revision === kitRevision.current) setKit(next); })
       .catch((reason: unknown) => {
-        if (active) setError(reason instanceof Error ? reason.message : 'Não foi possível abrir o kit.');
+        if (active && revision === kitRevision.current) setError(reason instanceof Error ? reason.message : 'Não foi possível abrir o kit.');
       });
     return () => { active = false; };
   }, [eventId, context]);
@@ -471,6 +484,7 @@ function EventDeskSession({ eventId }: { eventId: string }) {
   const lot = category?.lots.find((item) => item.id === lotId);
   const organizer = context?.role === 'OWNER' || context?.role === 'ADMIN' || context?.role === 'MANAGER';
   const selected = people.find((person) => person.reservationId === selectedId) ?? null;
+  const selectedSizeUnavailable = Boolean(deliveredSizeId) && (kit?.sizes.find(size => size.id === deliveredSizeId)?.available ?? 0) <= 0;
   const preferenceSizeId = selected?.shirtPreference?.sizeId ?? '';
   const activePreferenceId = kit?.sizes.some((size) => size.id === preferenceSizeId) ? preferenceSizeId : '';
   useEffect(() => { setDeliveredSizeId(activePreferenceId); setConfirmSizeChange(false); }, [selectedId, activePreferenceId]);
@@ -483,7 +497,7 @@ function EventDeskSession({ eventId }: { eventId: string }) {
   function invalidateSelection() {
     selectionVersion.current += 1;
     pendingAction.current = false;
-    setBusyId(''); setBadge(null); setRoster(null); setEdit(null);
+    setBusyId(''); setBadge(null); setPrintIssue(null); setConfirmingPrint(false); setRoster(null); setEdit(null);
     return selectionVersion.current;
   }
 
@@ -508,7 +522,12 @@ function EventDeskSession({ eventId }: { eventId: string }) {
   }
 
   async function run(person: Person, path: string, body: unknown, success: string): Promise<boolean> {
-    if (pendingAction.current) return false;
+    const material = path === 'material' || path === 'material/reverse';
+    if (pendingAction.current || (material && kitMutationPending.current)) return false;
+    if (material) {
+      kitMutationPending.current = true;
+      setKitBusy(true);
+    }
     pendingAction.current = true;
     const version = selectionVersion.current;
     const requestId = ++busyRequest.current;
@@ -517,23 +536,7 @@ function EventDeskSession({ eventId }: { eventId: string }) {
       const result = await api<Record<string, unknown>>(`/events/${encodeURIComponent(eventId)}/desk/${path}`, {
         method: 'POST', body: JSON.stringify(body),
       });
-      if (version !== selectionVersion.current) return false;
-      if (path === 'badge') { setRoster(null); setBadge(result as unknown as Badge); }
-      const repeated = result.alreadyCheckedIn === true || result.alreadyDelivered === true || result.alreadyRecorded === true;
-      setNotice(repeated ? `${success} Este registro já existia.` : success);
-      if (path === 'check-in') {
-        setPeople((current) => current.map((item) => item.reservationId === person.reservationId
-          ? { ...item, checkedInAt: String(result.checkedInAt ?? item.checkedInAt), checkInReversedAt: null } : item));
-      }
-      if (path === 'check-in/reverse') {
-        setPeople((current) => current.map((item) => item.reservationId === person.reservationId
-          ? { ...item, checkedInAt: null, checkInReversedAt: String(result.reversedAt ?? new Date().toISOString()) } : item));
-        setReversalReason('');
-      }
-      if (path === 'material' || path === 'material/reverse') {
-        const nextKit = await api<KitView>(`/events/${encodeURIComponent(eventId)}/desk/kit`).catch(() => null);
-        if (nextKit) setKit(nextKit);
-      }
+      if (!sessionActive.current) return false;
       if (path === 'material') {
         setPeople((current) => current.map((item) => item.reservationId === person.reservationId
           ? {
@@ -546,6 +549,39 @@ function EventDeskSession({ eventId }: { eventId: string }) {
       if (path === 'material/reverse') {
         setPeople((current) => current.map((item) => item.reservationId === person.reservationId
           ? { ...item, materialDeliveredAt: null, materialReversedAt: String(result.reversedAt ?? new Date().toISOString()), deliveredSizeLabel: null } : item));
+        if (version === selectionVersion.current) setReversalReason('');
+      }
+      if (material) {
+        kitRevision.current += 1;
+        try {
+          const nextKit = await api<KitView>(`/events/${encodeURIComponent(eventId)}/desk/kit`);
+          if (!sessionActive.current) return false;
+          setKit(nextKit);
+          setKitBalanceStale(null);
+        } catch {
+          if (!sessionActive.current) return false;
+          setKit(null);
+          setKitBalanceStale(path === 'material' ? 'delivery' : 'reversal');
+        }
+      }
+      if (version !== selectionVersion.current) return false;
+      if (path === 'badge') {
+        printVersion.current += 1;
+        setConfirmingPrint(false);
+        setRoster(null);
+        const sequence = emissionSequence(result);
+        setPrintIssue(sequence ? { reservationId: person.reservationId, sequence } : null);
+        setBadge(labelWithoutEmission(result) as unknown as Badge);
+      }
+      const repeated = result.alreadyCheckedIn === true || result.alreadyDelivered === true || result.alreadyRecorded === true;
+      setNotice(repeated ? `${success} Este registro já existia.` : success);
+      if (path === 'check-in') {
+        setPeople((current) => current.map((item) => item.reservationId === person.reservationId
+          ? { ...item, checkedInAt: String(result.checkedInAt ?? item.checkedInAt), checkInReversedAt: null } : item));
+      }
+      if (path === 'check-in/reverse') {
+        setPeople((current) => current.map((item) => item.reservationId === person.reservationId
+          ? { ...item, checkedInAt: null, checkInReversedAt: String(result.reversedAt ?? new Date().toISOString()) } : item));
         setReversalReason('');
       }
       if (path === 'day-presence') {
@@ -565,10 +601,47 @@ function EventDeskSession({ eventId }: { eventId: string }) {
       setError(reason instanceof Error ? reason.message : 'Não foi possível concluir.');
       return false;
     } finally {
+      if (material) {
+        kitMutationPending.current = false;
+        if (sessionActive.current) setKitBusy(false);
+      }
       if (version === selectionVersion.current && requestId === busyRequest.current) {
         pendingAction.current = false;
         setBusyId('');
       }
+    }
+  }
+
+  async function confirmIssuedLabel() {
+    if (!printIssue || confirmingPrint) return;
+    const issue = printIssue;
+    const version = selectionVersion.current;
+    const issuedVersion = printVersion.current;
+    const issueStillVisible = () => issuedVersion === printVersion.current && deskResultStillVisible(version, selectionVersion.current);
+    setConfirmingPrint(true);
+    setError('');
+    try {
+      const result = await api(`/events/${encodeURIComponent(eventId)}/credential-prints/confirm`, {
+        method: 'POST',
+        body: JSON.stringify({ reservationId: issue.reservationId, sequence: issue.sequence }),
+      });
+      if (!issueStillVisible()) return;
+      const accepted = confirmationAccepted(issue, result);
+      if (!accepted) {
+        setNotice('');
+        setError(CONFIRMATION_UNKNOWN);
+        return;
+      }
+      setError('');
+      setNotice(accepted.repeated
+        ? 'Esta sequência já estava confirmada no servidor. Nada foi gravado de novo.'
+        : 'O servidor registrou esta sequência como impressa. A tela não prova que o papel saiu da impressora.');
+    } catch (reason) {
+      if (!issueStillVisible()) return;
+      setNotice('');
+      setError(confirmationFailureGuidance(reason instanceof Error ? reason.message : null));
+    } finally {
+      if (issueStillVisible()) setConfirmingPrint(false);
     }
   }
 
@@ -655,9 +728,10 @@ function EventDeskSession({ eventId }: { eventId: string }) {
   async function openEdit(person: Person) {
     if (pendingAction.current) return;
     pendingAction.current = true;
+    selectionVersion.current += 1;
     const version = selectionVersion.current;
     const requestId = ++busyRequest.current;
-    setBadge(null); setRoster(null);
+    setBadge(null); setPrintIssue(null); setConfirmingPrint(false); setRoster(null);
     setBusyId(person.reservationId); setError(''); setNotice('');
     try {
       const record = await api<EditRecord>(`/events/${encodeURIComponent(eventId)}/desk/registrations/${encodeURIComponent(person.reservationId)}`);
@@ -765,10 +839,10 @@ function EventDeskSession({ eventId }: { eventId: string }) {
       {error && <p className={styles.error} role="alert">{error}</p>}
       {notice && <p className={styles.notice} role="status">{notice}</p>}
 
-      {mode === 'kit' && capabilities.has('material_delivery') && <KitStockPanel
+      {mode === 'kit' && capabilities.has('material_delivery') && !kitBusy && <KitStockPanel
         eventId={eventId}
         organizer={organizer}
-        onChange={setKit}
+        onChange={(next) => { kitRevision.current += 1; setKit(next); setKitBalanceStale(null); }}
         onError={(message) => { setError(message); setNotice(''); }}
         onSaved={(message) => { setNotice(message); setError(''); }}
       />}
@@ -786,7 +860,7 @@ function EventDeskSession({ eventId }: { eventId: string }) {
         canMarkPresence={capabilities.has('access_control')}
         canPrintBadge={capabilities.has('credential')}
         onPrintBadge={(reservationId) => void run({ reservationId, protocol: '', name: '', category: '', status: 'CONFIRMED', checkedInAt: null, checkInReversedAt: null, materialDeliveredAt: null, materialReversedAt: null, shirtPreference: null, deliveredSizeLabel: null, presenceDays: [], presentToday: false }, 'badge', { reservationId }, 'Credencial pronta para impressão.')}
-        onPrintList={(title, lines) => { setBadge(null); setRoster({ title, lines }); }}
+        onPrintList={(title, lines) => { invalidateSelection(); setRoster({ title, lines }); }}
       />}
 
       {mode === 'kiosk' && <fieldset className={styles.register}>
@@ -928,16 +1002,26 @@ function EventDeskSession({ eventId }: { eventId: string }) {
             {capabilities.has('access_control') && selected.status === 'CONFIRMED' && !selected.checkedInAt && <button type="button" disabled={!published || busyId === selected.reservationId} onClick={() => void run(selected, 'check-in', { reservationId: selected.reservationId }, 'Entrada do evento registrada.')}>Registrar entrada</button>}
             {capabilities.has('access_control') && selected.status === 'CONFIRMED' && selected.checkedInAt && <button type="button" disabled={!published || busyId === selected.reservationId || reversalReason.trim().length < 3} onClick={() => void run(selected, 'check-in/reverse', { reservationId: selected.reservationId, reason: reversalReason.trim() }, 'Entrada desfeita. O registro permanece na auditoria.')}>Desfazer entrada</button>}
             {capabilities.has('credential') && selected.status === 'CONFIRMED' && <button type="button" disabled={!published || busyId === selected.reservationId} onClick={() => void run(selected, 'badge', { reservationId: selected.reservationId }, 'Credencial pronta para impressão.')}>Imprimir credencial</button>}
-            {capabilities.has('material_delivery') && kit && selected.status === 'CONFIRMED' && !selected.materialDeliveredAt && !shirtsOn && <button type="button" disabled={!published || busyId === selected.reservationId} onClick={() => void run(selected, 'material', { reservationId: selected.reservationId }, 'Retirada de material registrada.')}>Registrar material</button>}
-            {capabilities.has('material_delivery') && selected.status === 'CONFIRMED' && selected.materialDeliveredAt && <button type="button" disabled={!published || busyId === selected.reservationId || reversalReason.trim().length < 3} onClick={() => void run(selected, 'material/reverse', { reservationId: selected.reservationId, reason: reversalReason.trim() }, 'Retirada desfeita. O registro permanece na auditoria.')}>Desfazer material</button>}
+            {capabilities.has('material_delivery') && kit && selected.status === 'CONFIRMED' && !selected.materialDeliveredAt && !shirtsOn && <button type="button" disabled={!published || kitBusy || busyId === selected.reservationId} onClick={() => void run(selected, 'material', { reservationId: selected.reservationId }, 'Retirada de material registrada.')}>Registrar material</button>}
+            {capabilities.has('material_delivery') && selected.status === 'CONFIRMED' && selected.materialDeliveredAt && <button type="button" disabled={!published || kitBusy || busyId === selected.reservationId || reversalReason.trim().length < 3} onClick={() => void run(selected, 'material/reverse', { reservationId: selected.reservationId, reason: reversalReason.trim() }, 'Retirada desfeita. O registro permanece na auditoria.')}>Desfazer material</button>}
             {capabilities.has('access_control') && selected.status === 'CONFIRMED' && !selected.presentToday && <button type="button" disabled={!published || busyId === selected.reservationId} onClick={() => void run(selected, 'day-presence', { reservationId: selected.reservationId }, 'Presença de hoje marcada.')}>Marcar presença de hoje</button>}
             {capabilities.has('access_control') && selected.status === 'CONFIRMED' && selected.presentToday && <button type="button" disabled={!published || busyId === selected.reservationId || reversalReason.trim().length < 3} onClick={() => void run(selected, 'day-presence/reverse', { reservationId: selected.reservationId, reason: reversalReason.trim() }, 'Presença de hoje desfeita. O registro permanece na auditoria.')}>Desfazer presença de hoje</button>}
             {(capabilities.has('credential') || capabilities.has('registration')) && <button type="button" disabled={!published || busyId === selected.reservationId} onClick={() => void openEdit(selected)}>Alterar cadastro</button>}
           </div>
+          {kitBusy && <p role="status">Atualizando a retirada e o saldo do kit. Aguarde para registrar outra operação de material.</p>}
+          {kitBalanceStale === 'delivery' && <p className={styles.error} role="alert">O saldo do kit não pôde ser relido. A retirada já registrada permanece. Atualize o posto antes de outra entrega.</p>}
+          {kitBalanceStale === 'reversal' && <p className={styles.error} role="alert">O saldo do kit não pôde ser relido. O estorno já registrado permanece. Atualize o posto antes de outra entrega.</p>}
           {capabilities.has('material_delivery') && shirtsOn && kit && selected.status === 'CONFIRMED' && !selected.materialDeliveredAt && <form className={styles.kit} onSubmit={(event) => {
             event.preventDefault();
             const preference = selected.shirtPreference;
-            const changed = Boolean(preference && deliveredSizeId && deliveredSizeId !== preference.sizeId);
+            const selectedSize = kit.sizes.find((size) => size.id === deliveredSizeId) ?? null;
+            if (!selectedSize || selectedSize.available <= 0) {
+              setError(selectedSize
+                ? 'Este tamanho está esgotado no posto. Escolha um tamanho com saldo.'
+                : 'Escolha um tamanho com saldo antes de registrar a entrega.');
+              return;
+            }
+            const changed = Boolean(preference && deliveredSizeId !== preference.sizeId);
             if (changed && !confirmSizeChange) {
               setError('Confirme a troca do tamanho solicitado antes de registrar a entrega.');
               return;
@@ -949,16 +1033,17 @@ function EventDeskSession({ eventId }: { eventId: string }) {
             }, 'Kit registrado.');
           }}>
             <label>Tamanho entregue
-              <select value={deliveredSizeId} onChange={(event) => { setDeliveredSizeId(event.target.value); setConfirmSizeChange(false); }} required>
+              <select value={deliveredSizeId} onChange={(event) => { setDeliveredSizeId(event.target.value); setConfirmSizeChange(false); setError(''); }} required>
                 <option value="">Selecione</option>
-                {kit.sizes.map((size) => <option key={size.id} value={size.id}>{size.label} · {size.available} disponíveis</option>)}
+                {kit.sizes.map((size) => <option key={size.id} value={size.id} disabled={size.available <= 0}>{size.available > 0 ? `${size.label} · ${size.available} disponíveis` : `${size.label} · esgotado`}</option>)}
               </select>
             </label>
+            {selectedSizeUnavailable && <p>Este tamanho está esgotado no posto. A entrega só segue com um tamanho que ainda tem saldo.</p>}
             {selected.shirtPreference && deliveredSizeId && deliveredSizeId !== selected.shirtPreference.sizeId && <label className={styles.kitCheck}>
               <input type="checkbox" checked={confirmSizeChange} onChange={(event) => setConfirmSizeChange(event.target.checked)} />
               Confirmo a troca do tamanho solicitado
             </label>}
-            <button type="submit" disabled={!published || busyId === selected.reservationId}>Registrar kit</button>
+            <button type="submit" disabled={!published || kitBusy || busyId === selected.reservationId || selectedSizeUnavailable}>Registrar kit</button>
           </form>}
           {capabilities.has('access_control') && context.activities.length > 0 && selected.status === 'CONFIRMED' && <form className={styles.activity} onSubmit={(event) => {
             event.preventDefault();
@@ -1020,9 +1105,15 @@ function EventDeskSession({ eventId }: { eventId: string }) {
       <CredentialLabel label={badge} preview />
       <button ref={printButtonRef} type="button"
         disabled={credentialLabelLayout(badge).fitWarning}
-        onClick={() => { if (!credentialLabelLayout(badge).fitWarning) window.print(); }}>
+        onClick={() => { openLabelPrint(credentialLabelLayout(badge).fitWarning, () => window.print()); }}>
         Imprimir etiqueta
       </button>
+      <p>Abrir a impressão não confirma que o papel saiu.</p>
+      {credentialLabelLayout(badge).fitWarning
+        ? <p role="alert">Etiqueta ilegível não pode ser confirmada como impressa.</p>
+        : printIssue
+          ? <button type="button" disabled={confirmingPrint} onClick={() => void confirmIssuedLabel()}>{confirmingPrint ? 'Confirmando…' : 'A etiqueta saiu'}</button>
+          : <p>Esta resposta não trouxe a sequência da emissão. A confirmação no servidor fica indisponível.</p>}
       {!credentialLabelLayout(badge).fitWarning && <CredentialLabel label={badge} />}
     </section>}
   </div>
@@ -1033,6 +1124,3 @@ function EventDeskSession({ eventId }: { eventId: string }) {
     ]} />
   </>;
 }
-
-
-
