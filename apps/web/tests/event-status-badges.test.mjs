@@ -2,10 +2,11 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 
-const [globals, labels, painel, workspace, dashboard, releaseGate, tokens] = await Promise.all([
+const [globals, labels, painel, card, workspace, dashboard, releaseGate, tokens] = await Promise.all([
   readFile(new URL('../app/globals.css', import.meta.url), 'utf8'),
   readFile(new URL('../lib/event-status-labels.ts', import.meta.url), 'utf8'),
   readFile(new URL('../app/painel/page.tsx', import.meta.url), 'utf8'),
+  readFile(new URL('../components/organizer-event-card.tsx', import.meta.url), 'utf8'),
   readFile(new URL('../components/event-workspace.tsx', import.meta.url), 'utf8'),
   readFile(new URL('../components/event-admin-dashboard.tsx', import.meta.url), 'utf8'),
   readFile(new URL('../components/publication-release-gate.tsx', import.meta.url), 'utf8'),
@@ -17,7 +18,8 @@ const organizerStatuses = [...statusBlock.matchAll(/^\s{2}([A-Z_]+):/gmu)].map((
 
 test('as oito situações saem de um único módulo', () => {
   assert.match(labels, /export function eventStatusLabel/u);
-  for (const source of [painel, workspace, dashboard]) {
+  assert.match(painel, /OrganizerEventCard/u);
+  for (const source of [card, workspace, dashboard]) {
     assert.match(source, /eventStatusLabel/u);
     assert.doesNotMatch(source, /const statusLabels/u);
   }
