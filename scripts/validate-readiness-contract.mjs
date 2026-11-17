@@ -87,12 +87,14 @@ assert.ok(
   !nginxHttp.includes(LEGACY_DOMAIN) && !nginxHttps.includes(LEGACY_DOMAIN),
   'As configurações Nginx canônicas não podem voltar a servir o domínio legado.',
 );
-assert.ok(
-  !workflow.includes('bash infra/certbot/diagnose-dev-tls.sh'),
+assert.doesNotMatch(
+  workflow,
+  /diagnose-dev-tls/iu,
   'O workflow não pode voltar a executar o diagnóstico do alias legado.',
 );
-assert.ok(
-  !workflow.includes('Comprovar certificado e redirecionamento do alias dev'),
+assert.doesNotMatch(
+  workflow,
+  /alias\s+dev/iu,
   'O workflow não pode voltar a exigir a comprovação do alias legado.',
 );
 
