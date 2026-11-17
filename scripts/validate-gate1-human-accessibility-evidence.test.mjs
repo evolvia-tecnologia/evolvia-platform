@@ -63,8 +63,10 @@ test('rota ausente, check falso e domínio não canônico impedem aprovação', 
     gate: 'gate-1',
     status: 'PASSED',
     blockers: [],
+    // Host fictício: .invalid é reservado pela RFC 2606 e nunca resolve. A
+    // rejeição aqui é por não ser o domínio canônico, não por ser este host.
     attempts: [passingAttempt({
-      environmentUrl: 'https://dev.evolviatecnologia.com/',
+      environmentUrl: 'https://nao-canonico.invalid/',
       routes: REQUIRED_ROUTES.slice(1),
       checks,
     })],
