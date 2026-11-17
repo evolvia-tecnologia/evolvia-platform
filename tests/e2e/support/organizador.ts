@@ -1,0 +1,106 @@
+import type { Page } from '@playwright/test';
+import { ambiente, entrar } from './ambiente';
+
+export const eventos = {
+  presencial: process.env.EVOLVIA_E2E_EVENTO_PRESENCIAL_ID ?? ambiente.eventoId,
+  online: process.env.EVOLVIA_E2E_EVENTO_ONLINE_ID ?? '',
+};
+
+export const temEventoPresencial = Boolean(eventos.presencial);
+export const temEventoOnline = Boolean(eventos.online);
+
+/** Dados ficticios, estaveis por execucao, nunca PII real. */
+export function ficticio(prefixo: string): string {
+  const carimbo = new Date().toISOString().slice(0, 16).replace(/[-:T]/gu, '');
+  return `${prefixo}-TESTE-${carimbo}`;
+}
+
+export const painel = {
+  visaoGeral: (id: string) => `/eventos/${encodeURIComponent(id)}/painel`,
+  categoriasLotes: (id: string) => `/eventos/${encodeURIComponent(id)}/painel/inscricoes/categorias-lotes`,
+  ficha: (id: string) => `/eventos/${encodeURIComponent(id)}/painel/inscricoes/ficha`,
+  beneficios: (id: string) => `/eventos/${encodeURIComponent(id)}/painel/inscricoes/beneficios`,
+  financeiro: (id: string) => `/eventos/${encodeURIComponent(id)}/painel/financeiro`,
+  transmissao: (id: string) => `/eventos/${encodeURIComponent(id)}/painel/transmissao`,
+  credenciamento: (id: string) => `/eventos/${encodeURIComponent(id)}/painel/check-in`,
+};
+
+/**
+ * Entra e abre uma secao do painel, deixando a navegacao do evento acessivel.
+ *
+ * Por que nao espera a navegacao direto: em event-workspace.tsx o <aside> da
+ * navegacao recebe aria-hidden={true} quando `mobileNavigation` e true e
+ * `menuOpen` e false, isto e, em qualquer viewport de 900px ou menos com o
+ * menu fechado. Com aria-hidden no ancestral, o <nav aria-label="Navegacao do
+ * evento"> sai da arvore de acessibilidade e getByRole('navigation') nunca o
+ * encontra: nos projetos mobile-320 e mobile-390 todo teste estourava os 30s
+ * no beforeEach, produzindo vermelho falso contra um comportamento correto.
+ *
+ * Entao: espera a casca, abre o menu se houver botao para abrir, e exige a
+ * navegacao depois. A assercao nao foi afrouxada — a navegacao continua
+ * obrigatoria, agora no estado em que o produto de fato a oferece.
+ */
+export async function abrirPainel(page: Page, caminho: string): Promise<void> {
+  await entrar(page);
+  await page.goto(caminho);
+
+  // A casca aparece antes da navegacao e distingue painel de acesso operacional.
+  await page.locator('[data-shell="panel"], [data-shell="operation"]').first()
+    .waitFor({ timeout: 30_000 });
+
+  /**
+   * Em tela estreita o menu comeca recolhido. O rotulo do botao alterna entre
+   * "Mostrar menu lateral" e "Ocultar menu lateral", logo a presenca do
+   * primeiro e o sinal de que a navegacao esta fora da arvore.
+   *
+   * Era `if (await mostrarMenu.count())`, e isso tinha a corrida que a revisao
+   * independente apontou na #571: count() nao espera. Se o botao renderizasse
+   * depois da medicao, o clique nao acontecia, a navegacao ficava com
+   * aria-hidden e o waitFor abaixo estourava os 30s -- vermelho falso por
+   * timeout, contra um produto correto.
+   *
+   * Teto curto de propsito: a casca ja esta renderizada neste ponto, entao o
+   * botao existe (tela estreita) ou nao existe (desktop). Em desktop paga-se
+   * 1,5s por teste, que e o preco de nao depender de corrida.
+   */
+  const mostrarMenu = page.getByRole('button', { name: /mostrar menu lateral/iu }).first();
+  try {
+    await mostrarMenu.waitFor({ state: 'visible', timeout: 1_500 });
+    await mostrarMenu.click();
+  } catch {
+    // Desktop: o botao nao existe e a navegacao ja esta na arvore.
+  }
+
+  await page.getByRole('navigation', { name: /navega(ç|c)(ã|a)o do evento/iu })
+    .waitFor({ timeout: 30_000 });
+}
+
+/** Reabre em sessao limpa: prova persistencia no servidor, nao em cache local. */
+export async function reabrirComNovaSessao(page: Page, caminho: string): Promise<void> {
+  await page.context().clearCookies();
+  await page.evaluate(() => { try { localStorage.clear(); sessionStorage.clear(); } catch { /* bloqueado */ } });
+  await abrirPainel(page, caminho);
+}
+
+/** PDF minimo valido, gerado em memoria: nenhum binario entra no repositorio. */
+export function pdfFicticio(titulo: string): Buffer {
+  const conteudo = `BT /F1 12 Tf 60 760 Td (${titulo}) Tj ET`;
+  const objetos = [
+    '<< /Type /Catalog /Pages 2 0 R >>',
+    '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
+    '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R >>',
+    `<< /Length ${conteudo.length} >>\nstream\n${conteudo}\nendstream`,
+    '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>',
+  ];
+  let pdf = '%PDF-1.4\n';
+  const posicoes: number[] = [];
+  objetos.forEach((corpo, indice) => {
+    posicoes.push(pdf.length);
+    pdf += `${indice + 1} 0 obj\n${corpo}\nendobj\n`;
+  });
+  const inicioXref = pdf.length;
+  pdf += `xref\n0 ${objetos.length + 1}\n0000000000 65535 f \n`;
+  for (const pos of posicoes) pdf += `${String(pos).padStart(10, '0')} 00000 n \n`;
+  pdf += `trailer\n<< /Size ${objetos.length + 1} /Root 1 0 R >>\nstartxref\n${inicioXref}\n%%EOF\n`;
+  return Buffer.from(pdf, 'latin1');
+}
