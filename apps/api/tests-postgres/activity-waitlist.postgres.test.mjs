@@ -320,77 +320,105 @@ test('fila acima de 500 limita os nomes dentro da atividade e preserva a outra',
   );
 });
 
-test('duas sessões disputam a última vaga e o cancelamento ocorre durante a corrida', async () => {
-  const holder = namedClient('fila-hold');
-  const clientA = namedClient('fila-a');
-  const clientB = namedClient('fila-b');
-  let release;
-  const seen = new Promise((resolve) => { release = resolve; });
-  let markHeld;
-  const held = new Promise((resolve) => { markHeld = resolve; });
-  const holding = holder.$transaction(async (tx) => {
-    const locked = await tx.$queryRaw`
-      SELECT id FROM "EventActivityWaitlistEntry"
-      WHERE id IN (${`q${run}seatA1`}, ${`q${run}seatB1`})
-      FOR UPDATE
-    `;
-    assert.equal(locked.length, 2);
-    markHeld();
-    await seen;
-  }, { maxWait: 5000, timeout: 20000 });
-  try {
-    await held;
-    const pending = Promise.all([
-      new ActivityWaitlistService(clientA, {}, new AuthorizationService(clientA))
-        .promote(ownerId, home.eventId, `q${run}seatA1`).then(() => 'ok', (error) => error.message),
-      new ActivityWaitlistService(clientB, {}, new AuthorizationService(clientB))
-        .promote(ownerId, home.eventId, `q${run}seatB1`).then(() => 'ok', (error) => error.message),
-    ]);
-    const inside = await waitForTransactions(['fila-a', 'fila-b']);
-    assert.equal(new Set(inside.map((row) => Number(row.pid))).size, 2);
-    await prisma.eventRegistrationReservation.update({
-      where: { id: cancelledId },
-      data: { status: 'CANCELLED', confirmedAt: null },
+test('duas sessões disputam a última vaga e o cancelamento ocorre durante a corrida', async (t) => {
+  // Cada rodada usa inscrições e atividade distintas. Não reaproveita estado
+  // cancelado/promovido e não aceita uma execução favorável como prova.
+  for (let iteration = 0; iteration < 20; iteration += 1) {
+    await t.test(`disputa ${iteration + 1}/20`, async () => {
+      let activityId = seatActivity.id;
+      let entryA = `q${run}seatA1`;
+      let entryB = `q${run}seatB1`;
+      let entryC = `q${run}seatC1`;
+      let cancelledReservationId = cancelledId;
+      if (iteration > 0) {
+        const raceActivity = await activity(home, `Última vaga ${iteration + 1}`, new Date('2026-11-01T16:00:00Z'));
+        activityId = raceActivity.id;
+        const a = reservation(home, 10000 + iteration * 3, 'CONFIRMED');
+        const b = reservation(home, 10001 + iteration * 3, 'CONFIRMED');
+        const c = reservation(home, 10002 + iteration * 3, 'CONFIRMED');
+        await prisma.eventRegistrationReservation.createMany({ data: [a, b, c] });
+        entryA = `q${run}race${iteration}a`;
+        entryB = `q${run}race${iteration}b`;
+        entryC = `q${run}race${iteration}c`;
+        cancelledReservationId = c.id;
+        await prisma.eventActivityWaitlistEntry.createMany({ data: [
+          queueRow(home, entryA, a.id, activityId),
+          queueRow(home, entryB, b.id, activityId),
+          queueRow(home, entryC, c.id, activityId),
+        ] });
+      }
+      const holder = namedClient(`fila-hold-${run}-${iteration}`);
+      const clientA = namedClient(`fila-a-${run}-${iteration}`);
+      const clientB = namedClient(`fila-b-${run}-${iteration}`);
+      let release;
+      const seen = new Promise((resolve) => { release = resolve; });
+      let markHeld;
+      const held = new Promise((resolve) => { markHeld = resolve; });
+      const holding = holder.$transaction(async (tx) => {
+        const locked = await tx.$queryRaw`
+          SELECT id FROM "EventActivityWaitlistEntry"
+          WHERE id IN (${entryA}, ${entryB})
+          FOR UPDATE
+        `;
+        assert.equal(locked.length, 2);
+        markHeld();
+        await seen;
+      }, { maxWait: 5000, timeout: 20000 });
+      try {
+        await held;
+        const pending = Promise.all([
+          new ActivityWaitlistService(clientA, {}, new AuthorizationService(clientA))
+            .promote(ownerId, home.eventId, entryA).then(() => 'ok', (error) => error.message),
+          new ActivityWaitlistService(clientB, {}, new AuthorizationService(clientB))
+            .promote(ownerId, home.eventId, entryB).then(() => 'ok', (error) => error.message),
+        ]);
+        const inside = await waitForTransactions([`fila-a-${run}-${iteration}`, `fila-b-${run}-${iteration}`]);
+        assert.equal(new Set(inside.map((row) => Number(row.pid))).size, 2);
+        await prisma.eventRegistrationReservation.update({
+          where: { id: cancelledReservationId },
+          data: { status: 'CANCELLED', confirmedAt: null },
+        });
+        const cancelledResult = await waitlist.promote(ownerId, home.eventId, entryC)
+          .then(() => 'ok', (error) => error.message);
+        release();
+        const raced = [...await pending, cancelledResult];
+        await holding;
+        const enrolled = await prisma.eventActivityEnrollment.findMany({
+          where: { activityId: activityId, organizationId: home.organizationId },
+          select: { reservationId: true, status: true },
+        });
+        const promoted = await prisma.eventActivityWaitlistEntry.findMany({
+          where: { activityId: activityId, status: 'PROMOTED' },
+          select: { id: true },
+        });
+        const cancelledEntry = await prisma.eventActivityWaitlistEntry.findUnique({ where: { id: entryC } });
+        const audits = await prisma.auditLog.findMany({
+          where: {
+            eventId: home.eventId,
+            action: 'activity.waitlist_promoted',
+            entityId: { in: [entryA, entryB, entryC] },
+          },
+          select: { entityId: true, actorUserId: true, metadata: true },
+        });
+        assert.equal(enrolled.length, 1);
+        assert.equal(enrolled[0].status, 'ENROLLED');
+        assert.notEqual(enrolled[0].reservationId, cancelledReservationId);
+        assert.equal(promoted.length, 1);
+        assert.equal(cancelledEntry.status, 'WAITING');
+        assert.equal(raced.filter((item) => item === 'ok').length, 1);
+        assert.match(raced[2], /não está confirmada/u);
+        assert.match(raced.find((item) => item !== 'ok' && !item.includes('confirmada')) ?? '', /Não há vaga restante/u);
+        assert.equal(audits.length, 1);
+        assert.equal(audits[0].entityId, promoted[0].id);
+        assert.equal(audits[0].actorUserId, ownerId);
+        assert.equal(JSON.stringify(audits).includes('@'), false);
+        assert.equal(await prisma.eventActivityEnrollment.count({ where: { reservationId: cancelledReservationId } }), 0);
+      } finally {
+        release?.();
+        await holding.catch(() => undefined);
+        await Promise.all([holder, clientA, clientB].map((client) => client.$disconnect()));
+      }
     });
-    const cancelledResult = await waitlist.promote(ownerId, home.eventId, `q${run}seatC1`)
-      .then(() => 'ok', (error) => error.message);
-    release();
-    const raced = [...await pending, cancelledResult];
-    await holding;
-    const enrolled = await prisma.eventActivityEnrollment.findMany({
-      where: { activityId: seatActivity.id, organizationId: home.organizationId },
-      select: { reservationId: true, status: true },
-    });
-    const promoted = await prisma.eventActivityWaitlistEntry.findMany({
-      where: { activityId: seatActivity.id, status: 'PROMOTED' },
-      select: { id: true },
-    });
-    const cancelledEntry = await prisma.eventActivityWaitlistEntry.findUnique({ where: { id: `q${run}seatC1` } });
-    const audits = await prisma.auditLog.findMany({
-      where: {
-        eventId: home.eventId,
-        action: 'activity.waitlist_promoted',
-        entityId: { in: [`q${run}seatA1`, `q${run}seatB1`, `q${run}seatC1`] },
-      },
-      select: { entityId: true, actorUserId: true, metadata: true },
-    });
-    assert.equal(enrolled.length, 1);
-    assert.equal(enrolled[0].status, 'ENROLLED');
-    assert.notEqual(enrolled[0].reservationId, cancelledId);
-    assert.equal(promoted.length, 1);
-    assert.equal(cancelledEntry.status, 'WAITING');
-    assert.equal(raced.filter((item) => item === 'ok').length, 1);
-    assert.match(raced[2], /não está confirmada/u);
-    assert.match(raced.find((item) => item !== 'ok' && !item.includes('confirmada')) ?? '', /Não há vaga restante/u);
-    assert.equal(audits.length, 1);
-    assert.equal(audits[0].entityId, promoted[0].id);
-    assert.equal(audits[0].actorUserId, ownerId);
-    assert.equal(JSON.stringify(audits).includes('@'), false);
-    assert.equal(await prisma.eventActivityEnrollment.count({ where: { reservationId: cancelledId } }), 0);
-  } finally {
-    release?.();
-    await holding.catch(() => undefined);
-    await Promise.all([holder, clientA, clientB].map((client) => client.$disconnect()));
   }
 });
 
