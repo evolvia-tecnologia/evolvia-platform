@@ -8,7 +8,7 @@ const data=s=>'data:text/javascript;base64,'+Buffer.from(s).toString('base64');
 const hooksUrl=data(`let slots=[],cursor=0,effects=[];export const reset=()=>{cursor=0};export const unmount=()=>{slots.forEach(s=>s?.cleanup?.());slots=[];effects=[]};export const run=()=>{const list=effects;effects=[];list.forEach(f=>f())};export function useState(init){const i=cursor++,target=slots;if(!(i in target))target[i]=typeof init==='function'?init():init;return[target[i],v=>{target[i]=typeof v==='function'?v(target[i]):v}]};export function useRef(init){const i=cursor++;if(!(i in slots))slots[i]={current:init};return slots[i]};export function useEffect(fn,deps){const i=cursor++,old=slots[i];if(!old||deps.some((v,k)=>v!==old.deps[k])){const entry={deps};slots[i]=entry;effects.push(()=>{old?.cleanup?.();entry.cleanup=fn()})}}`);
 const apiUrl=data(`export const calls=[];export const getToken=()=> 'fixture';export const api=(path,options)=>new Promise((resolve,reject)=>calls.push({path,options,resolve,reject}));`);
 const compile=path=>ts.transpileModule(readFileSync(new URL(path,import.meta.url),'utf8'),{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX}}).outputText;
-const modules={react:hooksUrl,'react/jsx-runtime':data('export const jsx=(type,props)=>({type,props});export const jsxs=jsx;export const Fragment=\"fragment\";'),'../lib/api':apiUrl,'../lib/public-registration-cta':data(compile('../lib/public-registration-cta.ts')),'../lib/registration-input':data(compile('../lib/registration-input.ts')),'./event-desk.module.css':data('export default new Proxy({},{get:(_,key)=>key})')};
+const modules={react:hooksUrl,'react/jsx-runtime':data('export const jsx=(type,props)=>({type,props});export const jsxs=jsx;export const Fragment=\"fragment\";'),'../lib/api':apiUrl,'../lib/public-registration-cta':data(compile('../lib/public-registration-cta.ts')),'../lib/registration-input':data(compile('../lib/registration-input.ts')),'../lib/credential-print-confirmation':data(compile('../lib/credential-print-confirmation.ts')),'./event-desk.module.css':data('export default new Proxy({},{get:(_,key)=>key})')};
 for(const name of ['international-phone-input','check-in-console','credential-label','credential-label-settings','credential-category-templates','credential-operations','eva-screen-support','kit-report','kit-stock-panel','print-surface'])modules['./'+name]=data('export default '+JSON.stringify(name));
 modules['./credential-label']=data('export default "credential-label";export const credentialLabelLayout=()=>({fitWarning:Boolean(globalThis.__labelFitWarning)});');
 const {default:View}=await import(data(compile('../components/event-desk.tsx').replace(/from ['"]([^'"]+)['"]/g,(_,key)=>'from '+JSON.stringify(modules[key]))));
@@ -157,6 +157,172 @@ test('Ctrl/Cmd+P e menu do navegador não imprimem etiqueta ilegível',async()=>
   assert.equal(inserted.length,0,'CSS temporário deve ser removido no unmount');
  }finally{delete globalThis.__labelFitWarning;hooks.unmount();delete globalThis.window;delete globalThis.document;}
 });
+
+
+
+const printSheet = (tree) => nodes(tree).find((node) => node.type === 'section' && node.props?.['aria-label'] === 'Credencial para impressão');
+const sheetButton = (tree, name) => nodes(printSheet(tree)).find((node) => node.type === 'button' && text(node) === name);
+
+test('a sequência da emissão confirma no servidor e a impressão do navegador não', async () => {
+  try {
+    delete globalThis.__labelFitWarning;
+    let prints = 0;
+    let tree = await boot();
+    globalThis.window.print = () => { prints += 1; };
+    button(tree, 'Imprimir credencial').props.onClick();
+    const badgeCall = api.calls.at(-1);
+    assert.match(badgeCall.path, /\/desk\/badge$/);
+    badgeCall.resolve({ ...readableBadge, emissao: { sequence: 7, concluida: false } });
+    await tick();
+    tree = render();
+    assert.equal(prints, 0);
+    assert.ok(sheetButton(tree, 'A etiqueta saiu'));
+    const before = api.calls.length;
+    sheetButton(tree, 'Imprimir etiqueta').props.onClick();
+    assert.equal(prints, 1);
+    assert.equal(api.calls.length, before, 'abrir a impressão do navegador não confirma papel');
+    sheetButton(tree, 'A etiqueta saiu').props.onClick();
+    const confirm = api.calls.at(-1);
+    assert.match(confirm.path, /\/events\/event-a\/credential-prints\/confirm$/);
+    assert.equal(confirm.options.method, 'POST');
+    assert.deepEqual(JSON.parse(confirm.options.body), { reservationId: 'person-a', sequence: 7 });
+    confirm.resolve({ sequence: 7, acaoExigida: 'credencial_imprimir', concluida: true, repetida: false });
+    await tick();
+    tree = render();
+    assert.match(text(tree), /O servidor registrou esta sequência como impressa/);
+    sheetButton(tree, 'A etiqueta saiu').props.onClick();
+    api.calls.at(-1).resolve({ sequence: 7, acaoExigida: 'credencial_reimprimir', concluida: true, repetida: true });
+    await tick();
+    tree = render();
+    assert.match(text(tree), /Nada foi gravado de novo/);
+  } finally {
+    hooks.unmount();
+    delete globalThis.window;
+  }
+});
+
+const personButton = (tree, name) => nodes(tree).find((node) => node.type === 'button' && node.props.className === 'secondaryAction' && text(node) === name);
+
+test('trocar de participante durante a confirmação não leva o aviso para a pessoa seguinte', async () => {
+  try {
+    delete globalThis.__labelFitWarning;
+    let tree = await boot();
+    button(tree, 'Imprimir credencial').props.onClick();
+    api.calls.at(-1).resolve({ ...readableBadge, emissao: { sequence: 7, concluida: false } });
+    await tick();
+    tree = render();
+    sheetButton(tree, 'A etiqueta saiu').props.onClick();
+    const confirm = api.calls.at(-1);
+    assert.deepEqual(JSON.parse(confirm.options.body), { reservationId: 'person-a', sequence: 7 });
+    personButton(tree, 'Cris').props.onClick();
+    tree = render();
+    assert.equal(printSheet(tree), undefined, 'a troca tira a etiqueta da tela antes da resposta');
+    confirm.resolve({ sequence: 7, acaoExigida: 'credencial_imprimir', concluida: true, repetida: false });
+    await tick();
+    tree = render();
+    assert.doesNotMatch(text(tree), /O servidor registrou esta sequência como impressa/);
+    assert.doesNotMatch(text(tree), /Nada foi gravado de novo/);
+    assert.equal(printSheet(tree), undefined);
+    assert.ok(nodes(tree).some((node) => node.type === 'h3' && text(node) === 'Cris'));
+
+    button(tree, 'Imprimir credencial').props.onClick();
+    api.calls.at(-1).resolve({ ...readableBadge, name: 'Cris', emissao: { sequence: 2, concluida: false } });
+    await tick();
+    tree = render();
+    sheetButton(tree, 'A etiqueta saiu').props.onClick();
+    const late = api.calls.at(-1);
+    assert.deepEqual(JSON.parse(late.options.body), { reservationId: 'person-b', sequence: 2 });
+    personButton(tree, 'Bia').props.onClick();
+    late.reject(Error('Esta credencial já foi impressa. Confirmar outra impressão exige permissão de reimpressão.'));
+    await tick();
+    tree = render();
+    assert.doesNotMatch(text(tree), /Confirmar outra impressão exige permissão de reimpressão/);
+    assert.doesNotMatch(text(tree), /Não foi possível saber se o servidor registrou/);
+    assert.equal(printSheet(tree), undefined);
+    assert.ok(nodes(tree).some((node) => node.type === 'h3' && text(node) === 'Bia'));
+  } finally {
+    hooks.unmount();
+    delete globalThis.window;
+  }
+});
+
+test('fechar a impressão não confirma, a falha reenvia a mesma sequência e a repetida não cria outra', async () => {
+  try {
+    delete globalThis.__labelFitWarning;
+    let prints = 0;
+    let tree = await boot();
+    globalThis.window.print = () => { prints += 1; };
+    button(tree, 'Imprimir credencial').props.onClick();
+    api.calls.at(-1).resolve({ ...readableBadge, emissao: { sequence: 7, concluida: false } });
+    await tick();
+    tree = render();
+    const beforePrint = api.calls.length;
+    sheetButton(tree, 'Imprimir etiqueta').props.onClick();
+    if (typeof globalThis.window.onafterprint === 'function') globalThis.window.onafterprint();
+    assert.equal(prints, 1);
+    assert.equal(api.calls.length, beforePrint, 'fechar ou abortar o diálogo não confirma papel');
+
+    sheetButton(tree, 'A etiqueta saiu').props.onClick();
+    const failed = api.calls.at(-1);
+    assert.deepEqual(JSON.parse(failed.options.body), { reservationId: 'person-a', sequence: 7 });
+    failed.reject(new Error('rede'));
+    await tick();
+    tree = render();
+    assert.match(text(tree), /Envie a mesma confirmação outra vez/);
+    assert.equal(sheetButton(tree, 'A etiqueta saiu').props.disabled, false);
+
+    sheetButton(tree, 'A etiqueta saiu').props.onClick();
+    const retry = api.calls.at(-1);
+    assert.deepEqual(JSON.parse(retry.options.body), { reservationId: 'person-a', sequence: 7 });
+    retry.resolve({ sequence: 7, acaoExigida: 'credencial_imprimir', concluida: true, repetida: true });
+    await tick();
+    tree = render();
+    assert.match(text(tree), /Nada foi gravado de novo/);
+    const confirmations = api.calls.slice(beforePrint).filter((call) => String(call.path).endsWith('/credential-prints/confirm'));
+    assert.equal(confirmations.length, 2);
+    for (const call of confirmations) {
+      assert.deepEqual(JSON.parse(call.options.body), { reservationId: 'person-a', sequence: 7 });
+    }
+  } finally {
+    hooks.unmount();
+    delete globalThis.window;
+  }
+});
+
+test('sem sequência, com resposta estranha ou com etiqueta ilegível a confirmação não acontece', async () => {
+  try {
+    delete globalThis.__labelFitWarning;
+    let tree = await boot();
+    button(tree, 'Imprimir credencial').props.onClick();
+    api.calls.at(-1).resolve(readableBadge);
+    await tick();
+    tree = render();
+    assert.equal(sheetButton(tree, 'A etiqueta saiu'), undefined);
+    assert.match(text(printSheet(tree)), /não trouxe a sequência da emissão/);
+
+    button(tree, 'Imprimir credencial').props.onClick();
+    api.calls.at(-1).resolve({ ...readableBadge, emissao: { sequence: 3, concluida: false } });
+    await tick();
+    tree = render();
+    sheetButton(tree, 'A etiqueta saiu').props.onClick();
+    api.calls.at(-1).resolve({ sequence: 9, acaoExigida: 'credencial_imprimir', concluida: true, repetida: false });
+    await tick();
+    tree = render();
+    assert.match(text(tree), /não confirmou esta sequência/);
+    assert.ok(sheetButton(tree, 'A etiqueta saiu'), 'a mesma emissão continua disponível');
+
+    globalThis.__labelFitWarning = true;
+    tree = render();
+    assert.equal(sheetButton(tree, 'A etiqueta saiu'), undefined);
+    assert.match(text(printSheet(tree)), /Etiqueta ilegível não pode ser confirmada como impressa/);
+    assert.equal(sheetButton(tree, 'Imprimir etiqueta').props.disabled, true);
+  } finally {
+    delete globalThis.__labelFitWarning;
+    hooks.unmount();
+    delete globalThis.window;
+  }
+});
+
 
 test('tamanho publicado na ficha segue até a retirada e não reserva outra peça', async () => {
   const published = {
@@ -433,6 +599,150 @@ test('estorno confirmado com saldo recusado não diz que a retirada permanece', 
     tree = render();
     assert.equal(form(tree, 'kit'), undefined, 'sem saldo relido a próxima pessoa não registra outra retirada');
     assert.equal(api.calls.length, callsAfter);
+  } finally {
+    hooks.unmount();
+    delete globalThis.window;
+  }
+});
+
+test('nova emissão enquanto a anterior aguarda confirmação', async () => {
+ try {
+ let tree = await boot();
+ const issue = async (sequence) => {
+   const trigger = button(tree, 'Imprimir credencial');
+   assert.equal(Boolean(trigger.props.disabled), false);
+   trigger.props.onClick();
+   api.calls.at(-1).resolve({...readableBadge, emissao: {sequence, concluida: false}});
+   await tick();
+   tree = render();
+ };
+ await issue(7);
+ sheetButton(tree, 'A etiqueta saiu').props.onClick();
+ const pending = api.calls.at(-1);
+ assert.equal(JSON.parse(pending.options.body).sequence, 7);
+ tree = render();
+ await issue(8);
+ pending.resolve({sequence:7, acaoExigida:'credencial_imprimir', concluida:true, repetida:false});
+ await tick(); tree = render();
+ assert.ok(sheetButton(tree, 'A etiqueta saiu'));
+ assert.equal(text(tree).includes('O servidor registrou esta sequência como impressa'), false, 'sequência 8 ainda não confirmada exibe sucesso da 7');
+ } finally { hooks.unmount(); delete globalThis.window; }
+});
+
+test('trocar participante durante a retirada mantém a próxima entrega bloqueada até reler o saldo do evento', async () => {
+  try {
+    const athlete = person('person-a', 'Bia');
+    const next = person('person-b', 'Cris');
+    athlete.shirtPreference = next.shirtPreference = { sizeId: 'size-m', label: 'M' };
+    const kitStock = available => ({
+      name: 'Kit', shirtsEnabled: true,
+      sizes: [{ id: 'size-m', label: 'M', forecast: 1, available, delivered: 1 - available }],
+    });
+    const start = api.calls.length;
+    let tree = await boot(['material_delivery'], [athlete, next]);
+    api.calls.slice(start).find(call => call.path.endsWith('/desk/kit')).resolve(kitStock(1));
+    await tick();
+    render(); hooks.run(); tree = render();
+    form(tree, 'kit').props.onSubmit({ preventDefault() {} });
+    const delivery = api.calls.at(-1);
+    assert.equal(JSON.parse(delivery.options.body).reservationId, 'person-a');
+    nodes(tree).find(node => node.type === 'button' && /Cris/.test(text(node))).props.onClick();
+    render(); hooks.run(); tree = render();
+    const previous = api.calls.length;
+    form(tree, 'kit').props.onSubmit({ preventDefault() {} });
+    assert.equal(api.calls.length, previous, 'a segunda seleção deve aguardar a mutação de estoque em andamento');
+    delivery.resolve({ deliveredAt: '2026-11-11T20:00:00Z', sizeLabel: 'M' });
+    await tick();
+    const refreshed = api.calls.at(-1);
+    assert.match(refreshed.path, /\/desk\/kit$/);
+    assert.equal(button(render(), 'Registrar kit').props.disabled, true);
+    refreshed.resolve(kitStock(0));
+    await tick();
+    tree = render();
+    assert.match(text(form(tree, 'kit')), /M · esgotado/);
+    assert.equal(button(tree, 'Registrar kit').props.disabled, true);
+    assert.doesNotMatch(text(tree), /Kit registrado/);
+    nodes(tree).find(node => node.type === 'button' && /Bia/.test(text(node))).props.onClick();
+    assert.match(text(render()), /Material retirado/);
+  } finally {
+    hooks.unmount();
+    delete globalThis.window;
+  }
+});
+
+test('estorno pendente preserva o motivo da próxima pessoa e uma leitura inicial atrasada não repõe o saldo', async () => {
+  try {
+    const items = [person('person-a', 'Bia'), person('person-b', 'Cris')];
+    for (const item of items) item.materialDeliveredAt = '2026-11-11T19:00:00Z';
+    const start = api.calls.length;
+    let tree = await boot(['material_delivery'], items);
+    const initial = api.calls.slice(start).find(call => call.path.endsWith('/desk/kit'));
+    const reason = current => nodes(current).find(node => node.props?.id === 'desk-reversal-reason');
+    reason(tree).props.onChange({ target: { value: 'Retirada duplicada' } });
+    button(render(), 'Desfazer material').props.onClick();
+    const reversal = api.calls.at(-1);
+    nodes(render()).find(node => node.type === 'button' && /Cris/.test(text(node))).props.onClick();
+    render(); hooks.run(); tree = render();
+    reason(tree).props.onChange({ target: { value: 'Motivo exclusivo de Cris' } });
+    reversal.resolve({ reversedAt: '2026-11-11T20:00:00Z' });
+    await tick();
+    const refreshed = api.calls.at(-1);
+    assert.notEqual(refreshed, initial);
+    assert.match(refreshed.path, /\/desk\/kit$/);
+    refreshed.reject(new Error('saldo indisponível'));
+    await tick();
+    initial.resolve({ name: 'Kit antigo', shirtsEnabled: false, sizes: [] });
+    await tick();
+    tree = render();
+    assert.equal(reason(tree).props.value, 'Motivo exclusivo de Cris');
+    assert.doesNotMatch(text(tree), /Retirada desfeita/);
+    assert.match(text(tree), /O estorno já registrado permanece/);
+    nodes(tree).find(node => node.type === 'button' && /Bia/.test(text(node))).props.onClick();
+    tree = render();
+    assert.equal(button(tree, 'Registrar material'), undefined, 'o saldo inicial não reabre a retirada');
+    assert.equal(button(tree, 'Desfazer material'), undefined, 'o estorno pertence à primeira pessoa');
+  } finally {
+    hooks.unmount();
+    delete globalThis.window;
+  }
+});
+
+test('imprimir lista durante emissão permite preparar a etiqueta seguinte', async () => {
+  try {
+    const tree = await boot();
+    button(tree, 'Lista para impressão').props.onClick();
+    const operations = () => nodes(render()).find(node => node.type === 'credential-operations').props;
+    operations().onPrintBadge('person-a');
+    const first = api.calls.at(-1);
+    operations().onPrintList('Lista QA', ['Linha']);
+    operations().onPrintBadge('person-b');
+    const next = api.calls.at(-1);
+    assert.notEqual(next, first);
+    assert.equal(JSON.parse(next.options.body).reservationId, 'person-b');
+    first.resolve(readableBadge);
+    await tick();
+    assert.equal(nodes(render()).filter(node => node.type === 'credential-label').length, 0);
+    next.resolve({ ...readableBadge, name: 'Cris' });
+    await tick();
+    assert.ok(nodes(render()).some(node => node.type === 'credential-label'));
+  } finally {
+    hooks.unmount();
+    delete globalThis.window;
+  }
+});
+
+test('saldo atualizado no painel tem precedência sobre a leitura inicial do posto', async () => {
+  try {
+    const start = api.calls.length;
+    const tree = await boot(['material_delivery']);
+    const initial = api.calls.slice(start).find(call => call.path.endsWith('/desk/kit'));
+    button(tree, 'Kit e camisas').props.onClick();
+    const stock = nodes(render()).find(node => node.type === 'kit-stock-panel');
+    stock.props.onChange({ name: 'Kit', shirtsEnabled: true, sizes: [{ id: 'size-m', label: 'M', available: 0 }] });
+    initial.resolve({ name: 'Kit antigo', shirtsEnabled: false, sizes: [] });
+    await tick();
+    button(render(), 'Buscar participante').props.onClick();
+    assert.match(text(render()), /M · esgotado/);
   } finally {
     hooks.unmount();
     delete globalThis.window;
