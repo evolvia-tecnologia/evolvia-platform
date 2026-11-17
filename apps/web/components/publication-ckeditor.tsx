@@ -142,11 +142,29 @@ export default function PublicationCkEditor({
       applying = false;
     }
 
+    function revert(current: ClassicEditor) {
+      const undo = current.commands.get('undo');
+      if (undo?.isEnabled) {
+        queueMicrotask(() => {
+          if (!alive || applying) return;
+          applying = true;
+          current.execute('undo');
+          applying = false;
+        });
+        return;
+      }
+      replace(current, markupToHtml(accepted.current));
+    }
+
     function commit(current: ClassicEditor) {
       if (!alive || applying) return;
       const markup = htmlToMarkup(current.getData());
-      if (markup === null || markup.length > maxLengthRef.current) {
+      if (markup === null) {
         replace(current, markupToHtml(accepted.current));
+        return;
+      }
+      if (markup.length > maxLengthRef.current) {
+        revert(current);
         return;
       }
       if (markup === accepted.current) return;
@@ -172,8 +190,7 @@ export default function PublicationCkEditor({
       created.editing.view.document.on('blur', () => {
         if (!alive) return;
         commit(created);
-        const markup = htmlToMarkup(created.getData());
-        if (markup !== null && markup.length <= maxLengthRef.current) onBlurRef.current?.(markup);
+        onBlurRef.current?.(accepted.current);
       });
       created.editing.view.document.on('focus', () => {
         if (alive) onFocusRef.current?.();

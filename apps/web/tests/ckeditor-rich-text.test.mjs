@@ -40,6 +40,14 @@ test('negrito e itálico gravados pelo editor visual voltam à marcação', () =
   sameFromHtml('<p><b>aviso</b></p>', '**aviso**');
 });
 
+test('fechamento órfão não tira o negrito do texto seguinte', () => {
+  assert.equal(htmlToMarkup('<p>Antes </naoexiste><strong>Depois</strong></p>'), 'Antes **Depois**');
+});
+
+test('entidade numérica inválida não interrompe a conversão', () => {
+  assert.equal(htmlToMarkup('<p>&#999999999;&#xD800;A&#233;</p>'), 'Aé');
+});
+
 test('lista numerada e parágrafos separados permanecem blocos', () => {
   same('Primeira linha\nsegunda linha\n\nOutro parágrafo');
   same('1. Um\n2. Dois');

@@ -102,10 +102,14 @@ function parseFragment(html: string): Array<Node | string> {
   for (const match of html.matchAll(token)) {
     if (match[1]) {
       const name = match[1].toLowerCase();
+      let target = -1;
       for (let index = stack.length - 1; index > 0; index -= 1) {
-        const closed = stack.pop();
-        if (closed?.tag === name) break;
+        if (stack[index].tag === name) {
+          target = index;
+          break;
+        }
       }
+      if (target > 0) stack.splice(target);
       continue;
     }
     if (match[2]) {
@@ -120,11 +124,16 @@ function parseFragment(html: string): Array<Node | string> {
   return root.children;
 }
 
+function fromCodePoint(value: number): string {
+  if (!Number.isInteger(value) || value < 0 || value > 0x10ffff || (value >= 0xd800 && value <= 0xdfff)) return '';
+  return String.fromCodePoint(value);
+}
+
 function decode(value: string): string {
   return value
     .replace(/&nbsp;/giu, ' ')
-    .replace(/&#(\d+);/gu, (_, code: string) => String.fromCodePoint(Number(code)))
-    .replace(/&#x([0-9a-f]+);/giu, (_, code: string) => String.fromCodePoint(Number.parseInt(code, 16)))
+    .replace(/&#(\d+);/gu, (_, code: string) => fromCodePoint(Number(code)))
+    .replace(/&#x([0-9a-f]+);/giu, (_, code: string) => fromCodePoint(Number.parseInt(code, 16)))
     .replace(/&quot;/giu, '"')
     .replace(/&lt;/giu, '')
     .replace(/&gt;/giu, '')
@@ -181,9 +190,8 @@ function sameStyle(style: Style): boolean {
 }
 
 function paint(text: string, style: Style, marks: Marks): string {
-  const plain = text.replace(/\s+/gu, (gap) => gap.includes('\n') ? gap : gap);
-  if (!plain) return '';
-  let value = plain;
+  if (!text) return '';
+  let value = text;
   if (marks.italic && !marks.bold) value = `*${value}*`;
   if (marks.bold) value = `**${value}**`;
   if (!sameStyle(style)) value = `[[fmt ${style.font} ${style.size} ${style.color}]]${value}[[/fmt]]`;
