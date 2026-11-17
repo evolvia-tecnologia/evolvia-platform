@@ -30,10 +30,11 @@ const OVERRIDES_EXIGIDOS = {
   'infra/certbot/bootstrap-staging-tls.sh': [
     'EVOLVIA_NGINX_SITE', 'EVOLVIA_NGINX_LINK', 'EVOLVIA_ACME_WEBROOT',
     'EVOLVIA_STAGING_ENV_FILE', 'EVOLVIA_CERT_DIR', 'EVOLVIA_BACKUP_ROOT',
+    'EVOLVIA_CERTBOT_BIN',
   ],
   'infra/certbot/bootstrap-homologacao.sh': [
     'EVOLVIA_NGINX_SITE', 'EVOLVIA_NGINX_LINK', 'EVOLVIA_ACME_WEBROOT',
-    'EVOLVIA_CERT_DIR', 'EVOLVIA_BACKUP_ROOT',
+    'EVOLVIA_CERT_DIR', 'EVOLVIA_BACKUP_ROOT', 'EVOLVIA_CERTBOT_BIN',
   ],
 };
 
@@ -78,11 +79,12 @@ for a in "$@"; do case "$a" in *acme-challenge/*)
 exit 0`,
   snap: 'exit 0',
   certbot: `echo "certbot $*" >> "$STUB_STATE/calls.log"
+case "$1" in certonly) [ -n "$CERTBOT_FAIL" ] && { echo "certbot: erro de emissao" >&2; exit 1; };; esac
 exit 0`,
   ss: 'exit 0',
 };
 
-function ambiente({ nginxFailAt = '', reloadFailAt = '', curlAcme = 'ok', comCertificado = true } = {}, t) {
+function ambiente({ nginxFailAt = '', reloadFailAt = '', curlAcme = 'ok', comCertificado = true, certbotFail = '' } = {}, t) {
   const base = mkdtempSync(join(tmpdir(), 'evolvia-acme-'));
   t?.after(() => rmSync(base, { recursive: true, force: true }));
   const caminhos = {
@@ -129,6 +131,7 @@ function ambiente({ nginxFailAt = '', reloadFailAt = '', curlAcme = 'ok', comCer
       NGINX_FAIL_AT: nginxFailAt,
       RELOAD_FAIL_AT: reloadFailAt,
       CURL_ACME: curlAcme,
+      CERTBOT_FAIL: certbotFail,
       CERTBOT_EMAIL: 'operacao@exemplo.invalid',
       CERTBOT_SKIP_DRY_RUN: '1',
       EVOLVIA_HOMOLOGATION_DOMAIN: DOMINIO,
@@ -139,6 +142,9 @@ function ambiente({ nginxFailAt = '', reloadFailAt = '', curlAcme = 'ok', comCer
       EVOLVIA_CERT_DIR: caminhos.certDir,
       EVOLVIA_BACKUP_ROOT: caminhos.backups,
       EVOLVIA_STAGING_ENV_FILE: caminhos.envFile,
+      // Sem isto o script resolve /usr/local/bin/certbot por caminho absoluto: o
+      // stub do PATH nunca e chamado e o teste mede um certbot que nao e o seu.
+      EVOLVIA_CERTBOT_BIN: join(caminhos.stub, 'certbot'),
     },
   };
 }
@@ -294,6 +300,16 @@ for (const [rotulo, script] of [['homologacao', HOMOLOGACAO], ['staging-tls', ST
           `${curlAcme}: o desafio sobrou apos a execucao`);
       }
     }
+  });
+
+  test(`${rotulo}: falha na emissao do certificado preserva o site ativo byte a byte`, (t) => {
+    const contexto = ambiente({ comCertificado: false, certbotFail: '1' }, t);
+    const antes = readFileSync(contexto.caminhos.site, 'utf8');
+    const resultado = executar(script, contexto);
+    assert.notEqual(resultado.status, 0, 'o script tem de falhar quando a emissao falha');
+    assert.match(chamadas(contexto), /certbot certonly/u, 'a emissao nem chegou a ser tentada');
+    assert.equal(readFileSync(contexto.caminhos.site, 'utf8'), antes,
+      'o site ativo foi deixado diferente do original apos falha de emissao');
   });
 
   test(`${rotulo}: o estado carregado pelo Nginx nao diverge do que ficou em disco`, (t) => {
