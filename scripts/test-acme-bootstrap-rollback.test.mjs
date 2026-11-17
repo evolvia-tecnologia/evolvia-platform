@@ -14,7 +14,7 @@ import test from 'node:test';
 import { spawnSync } from 'node:child_process';
 import { chmodSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, readlinkSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const RAIZ = fileURLToPath(new URL('../', import.meta.url));
@@ -49,10 +49,16 @@ case "$1 $2" in "reload nginx") case " $RELOAD_FAIL_AT " in *" $(( $(cat "$STUB_
 exit 0`,
   getent: `[ "$1" = "ahostsv4" ] && echo "${IPV4} STREAM $2"
 exit 0`,
+  // Modela `root ${WEBROOT}` do Nginx: a URI inteira resolve sob o webroot.
+  // Um desafio gravado fora de .well-known/acme-challenge/ devolve 404, como no
+  // servidor real. O stub NAO pode inventar o conteudo: se inventasse, o teste
+  // passaria mesmo com o defeito de caminho, que e justamente o que ele procura.
   curl: `echo "curl $*" >> "$STUB_STATE/calls.log"
 for a in "$@"; do case "$a" in *acme-challenge/*)
   [ "$CURL_ACME" = "ok" ] || exit 22
-  printf '%s' "\${a##*/}"; exit 0;; esac; done
+  alvo="$EVOLVIA_ACME_WEBROOT/.well-known/acme-challenge/\${a##*/}"
+  [ -f "$alvo" ] || exit 22
+  cat "$alvo"; exit 0;; esac; done
 exit 0`,
   snap: 'exit 0',
   certbot: `echo "certbot $*" >> "$STUB_STATE/calls.log"
@@ -133,7 +139,23 @@ const chamadas = (contexto) => {
   return existsSync(log) ? readFileSync(log, 'utf8') : '';
 };
 
+/**
+ * Verificada ANTES do spawn. A checagem posterior detectava o problema tarde demais:
+ * um script que ignorasse os overrides ja teria escrito no /etc da maquina que roda
+ * o teste. Aqui ele simplesmente nao chega a ser executado.
+ */
+const exigirOverrides = (script) => {
+  const relativo = script.slice(RAIZ.length).split(sep).join('/');
+  const variaveis = OVERRIDES_EXIGIDOS[relativo];
+  assert.ok(variaveis, `sem lista de overrides para ${relativo}`);
+  const fonte = readFileSync(script, 'utf8');
+  const faltando = variaveis.filter((variavel) => !fonte.includes(`\${${variavel}:-`));
+  assert.deepEqual(faltando, [],
+    `${relativo} nao aceita override de caminho (${faltando.join(', ')}): o teste seria executado contra o /etc real e por isso NAO foi executado`);
+};
+
 const executar = (script, contexto) => {
+  exigirOverrides(script);
   const resultado = spawnSync('bash', [script], { env: contexto.env, encoding: 'utf8' });
   confirmarIsolamento(contexto);
   return resultado;
