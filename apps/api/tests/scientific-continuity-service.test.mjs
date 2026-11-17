@@ -102,8 +102,15 @@ function reviewerHarness({ foreignPerson = false, foreignAccess = false, failAud
       assert.equal(input.where.conflictStatus.not, 'CONFLICT');
       calls.push(['assignment', input]); return { count: unavailableAssignment ? 0 : 1 };
     } },
-    scientificReview: { create: async (input) => { calls.push(['review', input]); return { id: 'creview0000001' }; } },
+    scientificReview: {
+      findFirst: async () => null,
+      create: async (input) => { calls.push(['review', input]); return { id: 'creview0000001' }; },
+    },
     scientificReviewScore: { createMany: async (input) => { calls.push(['scores', input]); } },
+    scientificReviewRevision: {
+      aggregate: async () => ({ _max: { versionNumber: null } }),
+      create: async () => ({ id: 'crevision00001' }),
+    },
     auditLog: { create: async (input) => { calls.push(['audit', input]); if (failAudit) throw new Error('auditoria indisponível'); } },
   };
   const prisma = {

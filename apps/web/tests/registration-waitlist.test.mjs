@@ -9,20 +9,21 @@ test('página da fila exige conta, mostra a própria posição e oferece voltar'
     read('../app/evento/[slug]/inscricao/fila/page.tsx'),
     read('../components/registration-waitlist.tsx'),
   ]);
-  assert.match(page, /<RegistrationWaitlist slug=\{slug\} \/>/u);
-  assert.match(page, /robots: \{ index: false, follow: false \}/u);
+  assert.match(page, /<RegistrationWaitlist/u);
+  assert.match(page, /fetchPublicEventProfile\(slug\)/u);
+  assert.match(page, /publicPageTitle\('waitlist'/u);
   assert.match(component, /getToken\(\)/u);
   assert.match(component, /Entre na sua conta para usar a fila/u);
   assert.match(component, /\/participant\/events\/\$\{encodeURIComponent\(slug\)\}\/waitlist/u);
   assert.match(component, /Você está na posição <strong>\{entry\.position\}<\/strong> da fila/u);
-  assert.match(component, /Voltar à inscrição/u);
+  assert.match(component, /publicWaitlistBackLabel/u);
   assert.match(component, /Voltar ao evento/u);
   assert.match(component, /Fila indisponível/u);
-  assert.match(component, /Nenhum lote com fila aberta agora/u);
+  assert.match(component, /publicWaitlistOpenHint/u);
   assert.match(component, /Prazo vencido/u);
   assert.match(component, /method: 'DELETE'/u);
   assert.match(component, /\?oferta=\$\{encodeURIComponent\(entry\.lotId\)\}/u);
-  assert.match(component, /Entrar na fila não cobra nada/u);
+  assert.match(component, /publicWaitlistPaidHint/u);
 });
 
 test('participante não recebe dados de terceiros e organizador vê só códigos pseudônimos', async () => {

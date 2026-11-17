@@ -11,6 +11,7 @@ import PublicationReleaseGate from './publication-release-gate';
 import PublicationMediaEditor from './publication-media-editor';
 import PublicationRichTextField from './publication-rich-text-field';
 import PublicationSectionsEditor, { PublicationSection } from './publication-sections-editor';
+import SportsModalitiesEditor from './sports-modalities-editor';
 import styles from './publication-editor.module.css';
 
 type ThemeConfig = {
@@ -165,10 +166,12 @@ export default function PublicationEditor({
   eventId,
   embedded = false,
   supportsScientificSources = false,
+  running = false,
 }: {
   eventId: string;
   embedded?: boolean;
   supportsScientificSources?: boolean;
+  running?: boolean;
 }) {
   const router = useRouter();
   const navigationDialogRef = useRef<HTMLDialogElement>(null);
@@ -490,7 +493,7 @@ export default function PublicationEditor({
         <PublicationRichTextField
           id="publication-fullDescription"
           label="Apresentação completa"
-          help="Use para objetivos, contexto e informações úteis. Título, negrito, lista e link https aparecem formatados na página pública."
+          help="Use para objetivos, contexto e informações úteis. Título, negrito, lista, link https, alinhamento, fonte, tamanho e cor da paleta aparecem formatados na página pública."
           value={form.fullDescription}
           onChange={(value) => update('fullDescription', value)}
           maxLength={12000}
@@ -605,6 +608,12 @@ export default function PublicationEditor({
       supportsScientificSources={supportsScientificSources}
       onReload={refreshAuxiliary}
     />
+    {running && <SportsModalitiesEditor
+      eventId={eventId}
+      sections={payload.sections}
+      canEdit={payload.permissions.canEditSections}
+      onReload={refreshAuxiliary}
+    />}
 
     <PublicationReleaseGate
       eventId={eventId}

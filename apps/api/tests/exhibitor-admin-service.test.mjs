@@ -28,7 +28,7 @@ for (const scenario of [
   });
 }
 
-test('home consulta somente a organização e evento autorizados e não anuncia acesso externo', async () => {
+test('home consulta somente a organização e evento autorizados e aponta a área da empresa sem senha', async () => {
   const { service, prisma } = fixture();
   let queries = 0;
   const checkScope = ({ where }) => { assert.equal(where.eventId, 'event'); assert.equal(where.organizationId, 'org'); queries++; };
@@ -38,10 +38,15 @@ test('home consulta somente a organização e evento autorizados e não anuncia 
   prisma.eventExhibitorCredential.groupBy = async input => { checkScope(input); return []; };
   prisma.eventExhibitorCredential.count = async input => { checkScope(input); return 0; };
   prisma.eventExhibitorCompany.aggregate = async input => { checkScope(input); return { _count: { _all: 0 }, _sum: {} }; };
+  prisma.eventPublication = { findUnique: async ({ where }) => {
+    assert.deepEqual(where, { eventId_organizationId: { eventId: 'event', organizationId: 'org' } });
+    return { publicContactEmail: 'suporte@feira.com.br', publicContactPhone: '(11) 98888-7777', logoAsset: { id: 'logo-a', usage: 'LOGO', state: 'ACTIVE', width: 400, height: 120 } };
+  } };
   const result = await service.home('user', 'event');
   assert.ok(queries > 10);
-  assert.equal(result.publicPath, null);
-  assert.equal(result.externalAccessAvailable, false);
+  assert.deepEqual(result.identity, { logo: { url: '/api/public/events/feira/exhibitor-identity/logo?v=logo-a', width: 400, height: 120 } });
+  assert.equal(result.publicPath, '/evento/feira/expositor');
+  assert.equal(result.externalAccessAvailable, true);
   assert.equal(typeof service.createSession, 'undefined');
 });
 
@@ -153,4 +158,188 @@ test('transições inválidas de pedido explicam o estado correto', async () => 
       error => error.getStatus() === 400 && error.message === scenario.message,
     );
   }
+});
+
+
+test('edição transfere a credencial para empresa do mesmo evento e valida a cota de destino', async () => {
+  const { service, prisma } = fixture();
+  const targetCompanyId = 'company654321';
+  const existingCredential = {
+    id: 'credential1234',
+    companyId,
+    kind: 'EXHIBITOR',
+    nationality: 'BRAZILIAN',
+    document: '52998224725',
+    fullName: 'Pessoa Teste',
+    badgeName: 'PESSOA',
+    role: 'Coordenação',
+    phone: '',
+    mobile: '',
+    credentialedAt: null,
+    printedAt: null,
+  };
+  let updated = null;
+  let audit = null;
+  prisma.$transaction = async (callback, options) => {
+    assert.equal(options.isolationLevel, 'Serializable');
+    return callback({
+      eventExhibitorCompany: {
+        findFirst: async ({ where }) => {
+          assert.deepEqual(where, { id: targetCompanyId, eventId: 'event', organizationId: 'org' });
+          return { id: targetCompanyId, quotaExhibitor: 2, quotaAssembler: 0, quotaService: 0 };
+        },
+      },
+      eventExhibitorCredential: {
+        findFirst: async ({ where }) => {
+          assert.deepEqual(where, { id: existingCredential.id, eventId: 'event', organizationId: 'org' });
+          return existingCredential;
+        },
+        count: async ({ where }) => {
+          assert.equal(where.companyId, targetCompanyId);
+          assert.equal(where.kind, 'EXHIBITOR');
+          assert.deepEqual(where.id, { not: existingCredential.id });
+          return 0;
+        },
+        update: async ({ where, data }) => {
+          assert.deepEqual(where, { id: existingCredential.id });
+          updated = data;
+          return { ...existingCredential, ...data };
+        },
+      },
+      auditLog: { create: async ({ data }) => { audit = data; } },
+    });
+  };
+
+  const saved = await service.saveCredential('user', 'event', {
+    id: existingCredential.id,
+    companyId: targetCompanyId,
+    kind: existingCredential.kind,
+    nationality: existingCredential.nationality,
+    document: existingCredential.document,
+    fullName: existingCredential.fullName,
+    badgeName: existingCredential.badgeName,
+    role: existingCredential.role,
+    phone: existingCredential.phone,
+    mobile: existingCredential.mobile,
+  });
+
+  assert.equal(updated.companyId, targetCompanyId);
+  assert.equal(saved.companyId, targetCompanyId);
+  assert.equal(audit.organizationId, 'org');
+  assert.equal(audit.eventId, 'event');
+  assert.equal(audit.metadata.companyId, targetCompanyId);
+  assert.equal(audit.metadata.previousCompanyId, companyId);
+});
+
+test('transferência de credencial respeita a cota da empresa de destino', async () => {
+  const { service, prisma } = fixture();
+  const targetCompanyId = 'company654321';
+  prisma.$transaction = async (callback) => callback({
+    eventExhibitorCompany: {
+      findFirst: async () => ({ id: targetCompanyId, quotaExhibitor: 1, quotaAssembler: 0, quotaService: 0 }),
+    },
+    eventExhibitorCredential: {
+      findFirst: async () => ({
+        id: 'credential1234', companyId, kind: 'EXHIBITOR', nationality: 'BRAZILIAN',
+        document: '52998224725', fullName: 'Pessoa Teste', badgeName: 'PESSOA',
+        role: 'Coordenação', phone: '', mobile: '', credentialedAt: null, printedAt: null,
+      }),
+      count: async () => 1,
+    },
+  });
+
+  await assert.rejects(
+    service.saveCredential('user', 'event', {
+      id: 'credential1234', companyId: targetCompanyId, kind: 'EXHIBITOR',
+      nationality: 'BRAZILIAN', document: '52998224725', fullName: 'Pessoa Teste',
+      badgeName: 'PESSOA', role: 'Coordenação', phone: '', mobile: '',
+    }),
+    /cota deste tipo de crachá já foi usada/,
+  );
+});
+
+test('transferência recusa empresa ou credencial fora do evento sem escrita nem auditoria', async () => {
+  for (const missing of ['company', 'credential']) {
+    const { service, prisma } = fixture();
+    let writes = 0;
+    let audits = 0;
+    prisma.$transaction = async (callback, options) => {
+      assert.equal(options.isolationLevel, 'Serializable');
+      return callback({
+        eventExhibitorCompany: {
+          findFirst: async ({ where }) => {
+            assert.deepEqual(where, { id: 'company654321', eventId: 'event', organizationId: 'org' });
+            return missing === 'company' ? null : { id: 'company654321', quotaExhibitor: 2 };
+          },
+        },
+        eventExhibitorCredential: {
+          findFirst: async ({ where }) => {
+            assert.deepEqual(where, { id: 'credential1234', eventId: 'event', organizationId: 'org' });
+            return null;
+          },
+          update: async () => { writes++; throw new Error('escrita indevida'); },
+          create: async () => { writes++; throw new Error('escrita indevida'); },
+        },
+        auditLog: { create: async () => { audits++; } },
+      });
+    };
+    await assert.rejects(service.saveCredential('user', 'event', {
+      id: 'credential1234', companyId: 'company654321', kind: 'EXHIBITOR',
+      nationality: 'BRAZILIAN', document: '52998224725', fullName: 'Pessoa Teste',
+      badgeName: 'PESSOA', role: 'Coordenação', phone: '', mobile: '',
+    }), missing === 'company' ? /Empresa não encontrada neste evento/ : /Credencial não encontrada neste evento/);
+    assert.equal(writes, 0);
+    assert.equal(audits, 0);
+  }
+});
+
+
+test('edição na mesma empresa continua permitida quando a cota já está preenchida', async () => {
+  const { service, prisma } = fixture();
+  const existingCredential = {
+    id: 'credential1234', companyId, kind: 'EXHIBITOR', nationality: 'BRAZILIAN',
+    document: '52998224725', fullName: 'Pessoa Teste', badgeName: 'PESSOA',
+    role: 'Coordenação', phone: '', mobile: '', credentialedAt: null, printedAt: null,
+  };
+  let updated = false;
+  prisma.$transaction = async (callback, options) => {
+    assert.equal(options.isolationLevel, 'Serializable');
+    return callback({
+      eventExhibitorCompany: {
+        findFirst: async ({ where }) => {
+          assert.deepEqual(where, { id: companyId, eventId: 'event', organizationId: 'org' });
+          return { id: companyId, quotaExhibitor: 1, quotaAssembler: 0, quotaService: 0 };
+        },
+      },
+      eventExhibitorCredential: {
+        findFirst: async ({ where }) => {
+          assert.deepEqual(where, { id: existingCredential.id, eventId: 'event', organizationId: 'org' });
+          return existingCredential;
+        },
+        count: async ({ where }) => {
+          assert.equal(where.companyId, companyId);
+          assert.deepEqual(where.id, { not: existingCredential.id });
+          return 1;
+        },
+        update: async ({ data }) => {
+          updated = true;
+          return { ...existingCredential, ...data };
+        },
+      },
+      auditLog: { create: async ({ data }) => {
+        assert.equal(data.metadata.companyId, companyId);
+        assert.equal(Object.hasOwn(data.metadata, 'previousCompanyId'), false);
+      } },
+    });
+  };
+
+  const saved = await service.saveCredential('user', 'event', {
+    id: existingCredential.id, companyId, kind: 'EXHIBITOR',
+    nationality: 'BRAZILIAN', document: '52998224725', fullName: 'Pessoa Atualizada',
+    badgeName: 'PESSOA', role: 'Coordenação', phone: '', mobile: '',
+  });
+
+  assert.equal(updated, true);
+  assert.equal(saved.fullName, 'Pessoa Atualizada');
+  assert.equal(saved.companyId, companyId);
 });

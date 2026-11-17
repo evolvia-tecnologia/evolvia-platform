@@ -1,13 +1,18 @@
+import { Fragment } from 'react';
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import PublicEventPresentation, { PublicEventPresentationData } from '../../../components/public-event-presentation';
+import RecordPublicVisit from '../../../components/record-public-visit';
 import PublicEventProgram from '../../../components/public-event-program';
 import { parsePublicProgram, publicProgramWideLayout, type PublicProgram } from '../../../lib/public-event-program';
 import PublicSiteHeader from '../../../components/public-site-header';
+import PublicSportsLanding from '../../../components/public-sports-landing';
+import { isRunningProfile } from '../../../lib/sports-public-profile';
+import { readPublishedAthletePrompts, readPublishedShirtSizes, type PublishedAthletePrompt, type PublishedShirtSize } from '../../../lib/sports-athlete-and-kits';
+import { publicApiSignal, publicApiUrl } from '../../../lib/public-api';
 import { parsePublicRegistrationOffer, type PublicRegistrationOffer } from '../../../lib/public-registration-cta';
 import styles from './page.module.css';
 
-const API_BASE_URL = process.env.EVOLVIA_API_INTERNAL_URL ?? 'http://api:4000';
 const PUBLIC_BASE_URL = (process.env.EVOLVIA_PUBLIC_BASE_URL ?? 'http://localhost:3000').replace(/\/$/, '');
 const PUBLIC_INDEXING_ENABLED = process.env.EVOLVIA_PUBLIC_INDEXING === '1';
 
@@ -20,18 +25,22 @@ function publicAssetUrl(path: string): string {
 }
 
 async function getPublicEvent(slug: string): Promise<PublicEventPresentationData | null> {
-  const response = await fetch(`${API_BASE_URL}/public/events/${encodeURIComponent(slug)}`, {
+  const response = await fetch(publicApiUrl(`/public/events/${encodeURIComponent(slug)}`), {
     next: { revalidate: 60 },
+    signal: publicApiSignal(),
   });
   if (response.status === 404) return null;
   if (!response.ok) throw new Error('Não foi possível carregar o evento publicado.');
-  return response.json() as Promise<PublicEventPresentationData>;
+  const payload: unknown = await response.json();
+  if (!payload || typeof payload !== 'object') return null;
+  return payload as PublicEventPresentationData;
 }
 
 async function publicProgram(slug: string): Promise<PublicProgram | null> {
   try {
-    const response = await fetch(`${API_BASE_URL}/public/events/${encodeURIComponent(slug)}/program`, {
+    const response = await fetch(publicApiUrl(`/public/events/${encodeURIComponent(slug)}/program`), {
       next: { revalidate: 60 },
+      signal: publicApiSignal(),
     });
     if (!response.ok) return null;
     return parsePublicProgram(await response.json());
@@ -40,15 +49,21 @@ async function publicProgram(slug: string): Promise<PublicProgram | null> {
   }
 }
 
-async function registrationOffer(slug: string): Promise<PublicRegistrationOffer | null> {
+async function registrationOffer(slug: string): Promise<{ offer: PublicRegistrationOffer | null; shirtSizes: PublishedShirtSize[]; athletePrompts: PublishedAthletePrompt[] }> {
   try {
-    const response = await fetch(`${API_BASE_URL}/public/events/${encodeURIComponent(slug)}/registration`, {
+    const response = await fetch(publicApiUrl(`/public/events/${encodeURIComponent(slug)}/registration`), {
       cache: 'no-store',
+      signal: publicApiSignal(),
     });
-    if (!response.ok) return null;
-    return parsePublicRegistrationOffer(await response.json());
+    if (!response.ok) return { offer: null, shirtSizes: [], athletePrompts: [] };
+    const payload: unknown = await response.json();
+    return {
+      offer: parsePublicRegistrationOffer(payload),
+      shirtSizes: readPublishedShirtSizes(payload),
+      athletePrompts: readPublishedAthletePrompts(payload),
+    };
   } catch {
-    return null;
+    return { offer: null, shirtSizes: [], athletePrompts: [] };
   }
 }
 
@@ -123,15 +138,19 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
 
 export default async function PublicEventPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  const [event, offer, program] = await Promise.all([getPublicEvent(slug), registrationOffer(slug), publicProgram(slug)]);
+  const [event, registration, program] = await Promise.all([getPublicEvent(slug), registrationOffer(slug), publicProgram(slug)]);
   if (!event) notFound();
+  const offer = registration.offer;
   const registrationMode = offer?.mode ?? null;
 
   const jsonLd = eventJsonLd(event);
 
   return <>
+    <RecordPublicVisit slug={event.event.slug} />
     <a className="skip-link" href="#main-content">Pular para o conteúdo principal</a>
     <main id="main-content" className={styles.page} tabIndex={-1}>
+    {/* A chave preserva o fiber Fragment: um filho RSC suspenso não repete a hidratação do main. */}
+    <Fragment key="public-event-content">
       {jsonLd && <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, '\\u003c') }}
@@ -140,6 +159,9 @@ export default async function PublicEventPage({ params }: { params: Promise<{ sl
     <PublicSiteHeader current="evento" />
 
       <PublicEventPresentation event={event} registrationMode={registrationMode} categories={offer?.categories ?? []} programContent={program?.activities.length ? <PublicEventProgram program={program} wide={publicProgramWideLayout(event.publication.themeConfig)} /> : null} />
+      {isRunningProfile(event.event.eventType) && <PublicSportsLanding event={event} registrationOpen={registrationMode !== null} shirtSizes={registration.shirtSizes} athletePrompts={registration.athletePrompts} />}
+    </Fragment>
     </main>
   </>;
 }
+

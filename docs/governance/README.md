@@ -8,6 +8,8 @@ mantém somente o estado necessário para retomar o trabalho com segurança.
 
 | Documento | Função | Responsável por consolidar |
 | --- | --- | --- |
+| `GATES_STATUS.json` / `GATES_STATUS.md` | critérios, marcos I/T/D/F e percentuais reproduzíveis | Orquestrador |
+| `EVOLVIA_MASTER_CODEX.md` | decisões e continuidade com evidências | Orquestrador/Product Owner |
 | `PROJECT_STATE.md` | fotografia executiva e próximo Gate | Orquestrador |
 | `ARCHITECTURE.md` | mapa e invariantes de arquitetura | Arquitetura + Orquestrador |
 | `DECISIONS.md` | decisões aceitas e substituições | Orquestrador/Product Owner |

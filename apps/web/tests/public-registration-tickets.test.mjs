@@ -12,9 +12,10 @@ test('inscrição pública escolhe categoria e lote em cartões e resume o valor
   assert.match(form, /name="registration-category"/u);
   assert.match(form, /name="registration-lot"/u);
   assert.match(form, /role="radiogroup"/u);
-  assert.match(form, /id="registration-summary-title">Sua inscrição/u);
+  assert.match(form, /id="registration-summary-title"/u);
+  assert.match(form, /publicRegistrationSummaryTitle/u);
   assert.match(form, /Valor antes do benefício/u);
-  assert.match(form, /Reservar minha vaga/u);
+  assert.match(form, /publicRegistrationSubmitLabel/u);
   assert.match(form, /categoryId/u);
   assert.match(form, /lotId/u);
   assert.match(form, /remaining === 0/u);

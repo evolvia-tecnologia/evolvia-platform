@@ -2,8 +2,9 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { api, getToken } from '../lib/api';
+import { acquireBenefitSaveLock, releaseBenefitSaveLock } from '../lib/benefit-save-lock';
 import styles from './registration-benefits-builder.module.css';
 
 type RegistrationMode = 'FREE' | 'PAID' | 'INVITATION';
@@ -110,6 +111,8 @@ export default function RegistrationBenefitsBuilder({ eventId }: { eventId: stri
   const [benefits, setBenefits] = useState<Benefit[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  // Synchronous lock: a second submit can arrive before React commits saving=true.
+  const saveInFlight = useRef(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [uses, setUses] = useState<BenefitUsage[]>([]);
@@ -152,7 +155,7 @@ export default function RegistrationBenefitsBuilder({ eventId }: { eventId: stri
   }
 
   async function save() {
-    if (!payload) return;
+    if (!payload || !acquireBenefitSaveLock(saveInFlight, dirty)) return;
     setSaving(true); setError(''); setNotice('');
     try {
       const normalized = benefits.map((benefit, index) => ({
@@ -174,7 +177,7 @@ export default function RegistrationBenefitsBuilder({ eventId }: { eventId: stri
       setNotice('Cupons, convites e cortesias salvos. O resgate público continua bloqueado.');
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'Não foi possível salvar os benefícios.');
-    } finally { setSaving(false); }
+    } finally { releaseBenefitSaveLock(saveInFlight); setSaving(false); }
   }
 
   if (loading) return <main className={styles.page} aria-busy="true"><div className={styles.loading}>A EVA está preparando os benefícios comerciais...</div></main>;
@@ -224,7 +227,12 @@ export default function RegistrationBenefitsBuilder({ eventId }: { eventId: stri
               <label>Válido a partir de<input required type="datetime-local" value={benefit.validFrom} onChange={(event) => updateBenefit(index, { validFrom: event.target.value })} /></label>
               <label>Válido até<input required type="datetime-local" value={benefit.validUntil} onChange={(event) => updateBenefit(index, { validUntil: event.target.value })} /></label>
             </div>
-            <button className={styles.danger} type="button" disabled={benefit.usedCount > 0} onClick={() => setBenefits((current) => current.filter((_, currentIndex) => currentIndex !== index))}>{benefit.usedCount > 0 ? 'Desative: código já utilizado' : 'Remover código'}</button>
+            <div className={styles.cardActions}>
+              <button className={styles.danger} type="button" disabled={benefit.usedCount > 0} onClick={() => setBenefits((current) => current.filter((_, currentIndex) => currentIndex !== index))}>{benefit.usedCount > 0 ? 'Desative: código já utilizado' : 'Remover código'}</button>
+              <button className={styles.primary} type="submit" disabled={!dirty || saving} aria-label={`Salvar alterações de ${kindLabels[benefit.kind]} ${index + 1}`}>
+                {saving ? 'Salvando…' : 'Salvar alterações'}
+              </button>
+            </div>
           </fieldset>)}
         </div>
       </form>

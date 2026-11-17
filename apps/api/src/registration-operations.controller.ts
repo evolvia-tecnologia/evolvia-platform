@@ -31,6 +31,25 @@ export class RegistrationOperationsController {
     return this.operations.list(request.user!.id, eventId, filters);
   }
 
+  @Get(':protocol/category-options')
+  categoryOptions(
+    @Req() request: AuthenticatedRequest,
+    @Param('eventId') eventId: string,
+    @Param('protocol') protocol: string,
+  ) {
+    return this.operations.categoryOptions(request.user!.id, eventId, protocol);
+  }
+
+  @Post(':protocol/category')
+  changeCategory(
+    @Req() request: AuthenticatedRequest,
+    @Param('eventId') eventId: string,
+    @Param('protocol') protocol: string,
+    @Body() input: unknown,
+  ) {
+    return this.operations.changeCategory(request.user!.id, eventId, protocol, input);
+  }
+
   @Post(':protocol/category-proof')
   reviewCategoryProof(
     @Req() request: AuthenticatedRequest,

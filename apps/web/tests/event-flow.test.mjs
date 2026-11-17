@@ -10,7 +10,9 @@ import {
   maskTaxId,
   rejectWorkspaceLoad,
   replaceWorkspaceEvent,
+  showsEntertainmentNavigation,
   showsScientificNavigation,
+  showsTransmissionNavigation,
   visibleWorkspacePayload,
   workspaceShell,
 } from '../lib/event-flow.ts';
@@ -120,6 +122,23 @@ test('troca de evento descarta carga antiga, resposta atrasada e erro anterior',
   assert.equal(workspaceShell({ section: 'check-in', eventId: 'B', phase: 'loading', payloadEventId: null }), 'loading');
 });
 
+test('navegação de show fica no perfil de entretenimento e a operação inclui catracas', () => {
+  const families = ['SCIENTIFIC_EVENT', 'CORPORATE_TRAINING', 'FAIR_EXHIBITION', 'ENTERTAINMENT', 'SOCIAL_COMMUNITY', 'OTHER'];
+  for (const profileCode of families) {
+    assert.equal(showsEntertainmentNavigation(profileCode), profileCode === 'ENTERTAINMENT');
+  }
+  assert.equal(showsEntertainmentNavigation('OTHER', 'Festival'), true);
+  assert.equal(showsEntertainmentNavigation('OTHER', 'Show ou entretenimento'), true);
+  assert.equal(showsEntertainmentNavigation(null, 'Festival'), true);
+  assert.equal(showsEntertainmentNavigation('SCIENTIFIC_EVENT', 'Congresso'), false);
+  assert.equal(showsEntertainmentNavigation('SCIENTIFIC_EVENT', 'Festival'), false);
+  assert.equal(showsEntertainmentNavigation('CORPORATE_TRAINING', 'Festival'), false);
+  assert.equal(showsEntertainmentNavigation('FAIR_EXHIBITION', 'Festival'), false);
+  assert.equal(showsEntertainmentNavigation('SOCIAL_COMMUNITY', 'Show ou entretenimento'), false);
+  assert.ok(eventFlowSections().includes('show'));
+  assert.equal(workspaceShell({ section: 'show', eventId: 'B', phase: 'error', payloadEventId: null }), 'operation');
+});
+
 test('navegação científica fica restrita ao perfil e a operação não abre o painel completo', () => {
   const families = ['SCIENTIFIC_EVENT', 'CORPORATE_TRAINING', 'FAIR_EXHIBITION', 'ENTERTAINMENT', 'SOCIAL_COMMUNITY', 'OTHER'];
   for (const profileCode of families) {
@@ -199,4 +218,11 @@ test('preparação científica precede publicação e operação; integrações 
   assert.ok(sections.indexOf('scientific') < sections.indexOf('check-in'));
   assert.ok(sections.indexOf('scientific') < sections.indexOf('transmission'));
   assert.equal(sections.at(-1), 'integrations');
+});
+
+test('predicado de transmissão falha fechado para formatos ausentes ou presenciais', () => {
+  for (const format of ['IN_PERSON', null, undefined, '', 'INVALID']) {
+    assert.equal(showsTransmissionNavigation(format), false, String(format));
+  }
+  for (const format of ['ONLINE', 'HYBRID']) assert.equal(showsTransmissionNavigation(format), true, format);
 });

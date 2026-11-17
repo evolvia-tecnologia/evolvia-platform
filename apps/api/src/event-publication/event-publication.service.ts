@@ -17,6 +17,7 @@ import {
   EventPublicationSectionRow,
 } from './event-publication.repository';
 import { lookalikeSignals, LookalikeFingerprint } from './event-lookalike.policy';
+import { assertPublicationRichTextSafe } from '../publication-text-style';
 import { normalizeEventPublicationTheme } from './event-publication-theme.policy';
 
 type EventScope = {
@@ -383,7 +384,16 @@ export class EventPublicationService {
     const value = dto[key];
     if (value === null || value === undefined) return null;
     const normalized = value.trim();
-    return normalized.length > 0 ? normalized : null;
+    if (normalized.length === 0) return null;
+    if (key === 'shortDescription' || key === 'fullDescription') {
+      try {
+        assertPublicationRichTextSafe(normalized, 'texto da divulgação');
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Formatação não permitida na divulgação.';
+        throw new BadRequestException(message);
+      }
+    }
+    return normalized;
   }
 
   private changedFields(dto: UpdateEventPublicationDto): string[] {

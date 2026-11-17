@@ -144,6 +144,14 @@
   line-height: var(--line-height-spacious);
 }
 
+.work {
+  max-width: 72ch;
+  margin: 0 0 var(--space-12);
+  color: var(--color-text);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-body);
+}
+
 .people {
   display: flex;
   flex-wrap: wrap;

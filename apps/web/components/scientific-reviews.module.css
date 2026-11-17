@@ -13,3 +13,11 @@
 .page h2 { font-size: var(--font-size-xl); line-height: var(--line-height-compact); font-weight: var(--font-weight-semibold); overflow-wrap: anywhere; }
 .page h3 { font-size: var(--font-size-lg); line-height: var(--line-height-compact); font-weight: var(--font-weight-medium); overflow-wrap: anywhere; }
 .page :is(input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=color]),select,textarea) { font-family: inherit; font-size: var(--font-size-md); font-weight: var(--font-weight-regular); min-width: 0; max-width: 100%; }
+
+.reviewHistory { margin-block: var(--space-8); }
+.reviewHistory summary { min-height: 44px; padding-block: var(--space-8); cursor: pointer; }
+.reviewHistory summary:focus-visible, .rubricTable:focus-visible { outline: 3px solid var(--color-focus); outline-offset: 2px; }
+.rubricTable { max-width: 100%; overflow-x: auto; }
+.rubricTable table { width: 100%; min-width: 28rem; border-collapse: collapse; }
+.rubricTable th, .rubricTable td { padding: var(--space-8); border-bottom: 1px solid var(--color-border); text-align: left; overflow-wrap: anywhere; }
+.rubricTable caption { text-align: left; font-weight: var(--font-weight-semibold); padding-block: var(--space-8); }

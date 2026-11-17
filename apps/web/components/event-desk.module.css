@@ -117,4 +117,78 @@
 .links li { min-width: 0; padding: 16px; border: 1px solid var(--color-border); border-radius: var(--radius-control); align-content: start; }
 .links input { width: 100%; min-width: 0; font-size: var(--font-size-sm); }
 .page :is(textarea, summary):focus-visible { outline: 3px solid var(--color-focus-on-light); outline-offset: 2px; }
+.kit { display: grid; gap: var(--space-12); min-width: 0; }
+.kit > h3, .kit > p { margin: 0; }
+.kit label { display: grid; gap: var(--space-8); font-weight: var(--font-weight-bold); min-width: 0; }
+.kit input:not([type="checkbox"]) {
+  min-height: var(--space-44);
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-control);
+  padding: var(--space-8) var(--space-12);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: inherit;
+  font-weight: var(--font-weight-regular);
+}
+.kitCheck { display: flex !important; align-items: center; min-height: var(--space-44); }
+.kitCheck input { width: 18px; height: 18px; margin: 0; }
+.kitRows { display: grid; gap: var(--space-12); }
+.kitRow { display: grid; grid-template-columns: minmax(0, 1fr) 8rem auto; gap: var(--space-8); align-items: end; }
+.kitTable { width: 100%; border-collapse: collapse; }
+.kitTable caption { text-align: left; font-weight: var(--font-weight-bold); margin-bottom: var(--space-8); }
+.kitTable th, .kitTable td { text-align: left; padding: var(--space-8); border-bottom: 1px solid var(--color-border); }
+.secondaryAction { background: var(--color-surface) !important; color: var(--color-text-strong) !important; border: 1px solid var(--color-border-strong) !important; }
+.kitFilters { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--space-8); align-items: end; }
+.kitActions { display: flex; flex-wrap: wrap; gap: var(--space-8); }
+.kitPager { display: flex; flex-wrap: wrap; gap: var(--space-8); align-items: center; }
+@media (max-width: 700px) {
+  .kitRow { grid-template-columns: minmax(0, 1fr); }
+  .kitFilters { grid-template-columns: minmax(0, 1fr); }
+  .kitTable { display: block; overflow-x: auto; }
+}
 @media (max-width: 700px) { .panel { padding: 16px; } .modes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); } .modes button { min-width: 0; padding: 10px; font-size: var(--font-size-sm); } }
+
+/* Totem: orientações, opções de consulta e ações em linhas distintas. */
+.choices {
+  flex: 1 1 100%;
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+  gap: var(--space-12) var(--space-16);
+  min-inline-size: 0;
+}
+.choices > :is(p, a, button) { grid-column: 1 / -1; }
+.choices > p { font-size: var(--font-size-sm); line-height: var(--line-height-body); }
+.choices > label {
+  min-width: 0;
+  min-height: var(--space-44);
+  padding: var(--space-8) var(--space-12);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  background: var(--color-surface-subtle);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-regular);
+}
+.choices > :is(a, button) { justify-self: start; max-width: 100%; font-size: var(--font-size-sm); font-weight: var(--font-weight-medium); }
+.page .panel > header h2 { font-size: var(--font-size-lg); line-height: var(--line-height-compact); }
+@media (max-width: 560px) {
+  .choices { grid-template-columns: minmax(0, 1fr); }
+  .choices > :is(a, button) { justify-self: stretch; }
+}
+
+
+.kitFields { border: 0; padding: 0; margin: 0; min-width: 0; }
+
+/* Resultados de busca e lista de participantes mantêm nome, código e ações distintos. */
+.participantTableScroll { max-width: 100%; min-width: 0; overflow-x: auto; overscroll-behavior-inline: contain; }
+.participantTableScroll table { min-width: 710px; }
+.participantTableScroll tbody th { font-weight: var(--font-weight-medium); }
+.participantTableScroll td, .participantTableScroll th { vertical-align: middle; }
+.participantTableScroll .kitActions { gap: var(--space-8); align-items: center; }
+.participantTableScroll .kitActions button { min-height: 36px; padding: 7px 10px; font-size: var(--font-size-sm); white-space: nowrap; }
+.participantTableScroll .kitActions label { display: grid; gap: 6px; min-width: min(100%, 300px); }
+.participantTableScroll input { min-height: 40px; border: 1px solid var(--color-border-strong); background: var(--color-surface); color: var(--color-text); border-radius: var(--radius-control); padding: 8px 10px; font: inherit; }
+@media (max-width: 700px) { .participantTableScroll .kitActions button { width: auto; flex: 1 1 auto; } }

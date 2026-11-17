@@ -1,6 +1,7 @@
+import { loadPublicationSource } from './helpers/publication-source.mjs';
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { parsePublicRichText } from '../lib/public-rich-text.ts';
+const { parsePublicRichText } = await loadPublicationSource('public-rich-text');
 
 test('texto simples vira parágrafos e preserva quebra de linha', () => {
   const blocks = parsePublicRichText('Primeira linha\nsegunda linha\n\nOutro parágrafo');
@@ -24,6 +25,16 @@ test('título, lista, negrito e link https viram estrutura', () => {
   assert.equal(blocks[2].lines[0][1].href, 'https://evento.example.com/pagina');
 });
 
+test('alinhamento e span com fonte, tamanho e cor viram estrutura', () => {
+  const blocks = parsePublicRichText('@center [[fmt sans 20 navy]]Título[[/fmt]]');
+  assert.equal(blocks.length, 1);
+  assert.equal(blocks[0].type, 'paragraph');
+  assert.equal(blocks[0].align, 'center');
+  assert.equal(blocks[0].lines[0][0].type, 'styled');
+  assert.equal(blocks[0].lines[0][0].size, 20);
+  assert.equal(blocks[0].lines[0][0].inlines[0].value, 'Título');
+});
+
 test('html e link inseguro permanecem texto', () => {
   const blocks = parsePublicRichText('<script>alert(1)</script>\n\n[clique](javascript:alert(1))\n\n[local](https://localhost/mapa)\n\n[credencial](https://user:pass@evento.example.com/a)');
   const values = JSON.stringify(blocks);
@@ -32,3 +43,4 @@ test('html e link inseguro permanecem texto', () => {
   assert.match(values, /javascript:alert\(1\)/u);
   assert.match(values, /https:\/\/localhost\/mapa/u);
 });
+

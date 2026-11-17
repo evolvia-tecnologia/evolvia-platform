@@ -9,7 +9,8 @@ import { createHash, randomBytes } from 'node:crypto';
 import { IntegrationFoundationService } from './integration-foundation.service';
 import type { ConfirmedRegistrationNotice } from './integration-foundation.policy';
 import { PrismaService } from './prisma.service';
-import { publicRegistrationFields, validateCategoryAnswers } from './registration-category-fields';
+import { RegistrationRefundService } from './registration-refund.service';
+import { RegistrationCategoryValidationError, publicRegistrationFields, validateCategoryAnswers } from './registration-category-fields';
 import { AsaasCheckoutGateway } from './asaas-checkout.gateway';
 import { PaidEventCommissionError, negotiatedCommissionPercent, normalizeFeeBearer } from './paid-event-commission.policy';
 import { deskCanConfirmFreeRegistration } from './event-desk-policy';
@@ -17,10 +18,34 @@ import {
   PublicRegistrationInput,
   RegistrationReservationPolicyError,
   calculateRegistrationPrice,
+  isPublicTicketOffer,
   normalizeIdempotencyKey,
   normalizePublicRegistration,
+  publicOfferCategories,
 } from './registration-reservations-policy';
 import { combinedFreeSeats, freeSeats, waitlistAcceptsEntries } from './registration-waitlist-policy';
+import { PublicRegistrationOrderInput, normalizeRegistrationOrder, prepareRegistrationOrderReservation, previewRegistrationOrder } from './registration-order-policy';
+
+/**
+ * Os dois campos são metadados de consentimento financeiro do pedido pago,
+ * não campos configuráveis da ficha de inscrição. A validação do formulário
+ * recebe somente as respostas de cadastro; o snapshot completo é persistido
+ * na reserva para a transação de aceite do G2.11.
+ */
+export function validateGroupedRefundConsent(
+  answers: Record<string, unknown>,
+  paid: boolean,
+): Record<string, unknown> {
+  const { refund_policy_acceptance: accepted, refund_policy_version: version, ...formAnswers } = answers;
+  if (paid && (accepted !== true || typeof version !== 'number'
+    || !Number.isSafeInteger(version) || version < 1)) {
+    throw new BadRequestException('Cada participante deve aceitar a versão publicada da política de reembolso.');
+  }
+  if (!paid && (accepted !== undefined || version !== undefined)) {
+    throw new BadRequestException('A política de reembolso não se aplica a inscrições gratuitas.');
+  }
+  return formAnswers;
+}
 
 const RESERVATION_MINUTES = 20;
 const ACTIVE_STATUSES = [
@@ -40,12 +65,12 @@ function sha256(value: string): string {
   return createHash('sha256').update(value).digest('hex');
 }
 
-function canonicalPayload(input: PublicRegistrationInput): string {
+export function canonicalPayload(input: PublicRegistrationInput): string {
   return JSON.stringify({
     categoryId: input.categoryId,
     lotId: input.lotId,
     benefitCode: input.benefitCode ?? null,
-    answers: Object.fromEntries(Object.entries(input.answers).sort(([a], [b]) => a.localeCompare(b))),
+    answers: Object.fromEntries(Object.entries(input.answers).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))),
     billing: input.billing ? {
       payer: { kind: input.billing.payer.kind, name: input.billing.payer.name, document: input.billing.payer.document, email: input.billing.payer.email },
       recipient: { kind: input.billing.recipient.kind, name: input.billing.recipient.name, document: input.billing.recipient.document, email: input.billing.recipient.email },
@@ -59,6 +84,7 @@ export class RegistrationReservationsService {
     private readonly prisma: PrismaService,
     private readonly asaas: AsaasCheckoutGateway,
     private readonly webhooks: IntegrationFoundationService,
+    private readonly refunds: RegistrationRefundService,
   ) {}
 
   private async resolveFormSchema(
@@ -133,6 +159,8 @@ export class RegistrationReservationsService {
         name: true,
         slug: true,
         status: true,
+        profileCode: true,
+        eventType: true,
         registrationMode: true,
         timeZone: true,
         registrationForm: { select: { id: true, fields: true, publishedVersion: true } },
@@ -204,13 +232,23 @@ export class RegistrationReservationsService {
           }
           return [];
         }
-        if (lotFree === 0) return [];
-        return [{ ...publicLot, endsAt: lot.endsAt.toISOString(), remaining: lotFree }];
+        // A capacidade da categoria é compartilhada por todos os seus lotes.
+        // Não anunciar como disponível um lote com vagas próprias, mas categoria esgotada.
+        // A oferta de fila acima continua acessível quando habilitada.
+        if (categoryFree === 0 || lotFree === 0) return [];
+        return [{ ...publicLot, endsAt: lot.endsAt.toISOString(), remaining: combinedFreeSeats(lotFree, categoryFree) }];
       });
-      return { ...category, lots };
+      // A categoria pode ter limite próprio além da capacidade de cada lote.
+      // Expor apenas o número agregado de vagas, sem participantes ou reservas.
+      return { ...category, remaining: categoryFree, lots };
     });
     const available = categories.filter((category) => category.lots.length > 0);
-    if (available.length === 0 && waitlist.length === 0) throw new NotFoundException('Não há lotes disponíveis para inscrição.');
+    const publicCategories = publicOfferCategories(available, {
+      registrationMode: event.registrationMode,
+      profileCode: event.profileCode,
+      eventType: event.eventType,
+    });
+    if (publicCategories.length === 0 && waitlist.length === 0) throw new NotFoundException('Não há lotes disponíveis para inscrição.');
 
     const { schema, formVersion } = await this.resolveFormSchema(this.prisma, event);
 
@@ -218,10 +256,12 @@ export class RegistrationReservationsService {
       event: {
         name: event.name,
         slug: event.slug,
+        profileCode: event.profileCode,
+        eventType: event.eventType,
         registrationMode: event.registrationMode,
         timeZone: event.timeZone,
       },
-      categories: available,
+      categories: publicCategories,
       waitlist,
       fields: publicRegistrationFields(schema),
       formVersion,
@@ -232,6 +272,382 @@ export class RegistrationReservationsService {
       reservationMinutes: RESERVATION_MINUTES,
       platformCommission: await this.platformCommission(event.id),
     };
+  }
+
+  // Leitura pública e sem efeitos externos: não reserva vagas, não gera cobrança
+  // e não promete preço final antes de aprovar eventuais comprovações e descontos.
+  async previewOrder(slug: string, rawInput: PublicRegistrationOrderInput) {
+    let order: ReturnType<typeof normalizeRegistrationOrder>;
+    try {
+      order = normalizeRegistrationOrder(rawInput);
+    } catch (error) {
+      if (error instanceof RegistrationReservationPolicyError) throw new BadRequestException(error.message);
+      throw error;
+    }
+
+    const options = await this.getOptions(slug);
+    // A reserva paga exige cobrança antes de qualquer escrita; a prévia deve
+    // informar essa exigência igualmente, sem anunciar um checkout impossível.
+    if (options.event.registrationMode === RegistrationMode.PAID && !order.billing) {
+      throw new BadRequestException('Dados de cobrança são obrigatórios para a compra.');
+    }
+    if (!options.terms) {
+      throw new BadRequestException('Os termos e a Política de Privacidade precisam estar publicados.');
+    }
+    try {
+      for (const entry of order.entries) {
+        const categoryFields = options.fields.filter((field) =>
+          !field.appliesToCategoryIds?.length || field.appliesToCategoryIds.includes(entry.categoryId));
+        // Erros de validação da ficha são 400; falhas internas não devem
+        // ser convertidas em mensagens públicas com detalhes do servidor.
+        try {
+          validateCategoryAnswers(validateGroupedRefundConsent(entry.answers, options.event.registrationMode === RegistrationMode.PAID), categoryFields, entry.categoryId);
+        } catch (error) {
+          if (error instanceof RegistrationCategoryValidationError) throw new BadRequestException(error.message);
+          throw error;
+        }
+      }
+      const preview = previewRegistrationOrder(order, options);
+      // Um evento PAID não pode criar uma compra agrupada sem valor cobravel:
+      // não há checkout válido para confirmar essas reservas posteriormente.
+      if (options.event.registrationMode === RegistrationMode.PAID && preview.subtotalCents <= 0) {
+        throw new BadRequestException('A compra paga precisa ter valor maior que zero.');
+      }
+      return {
+        ...preview, currency: 'BRL' as const,
+        // Identidade, respostas, CPF, e-mail e dados do pagador nunca retornam.
+        expiresAt: null,
+        requiresProof: order.entries.some((entry) =>
+          options.categories.find((cat) => cat.id === entry.categoryId)?.proofRequirement === 'REQUIRED_BEFORE_PAYMENT'),
+      };
+    } catch (error) {
+      if (error instanceof RegistrationReservationPolicyError) {
+        throw new BadRequestException(error.message);
+      }
+      throw error;
+    }
+  }
+
+
+  /**
+   * Reserva transacional de 2–10 identidades. Ainda não é rota pública:
+   * o checkout agrupado e a confirmação idempotente do webhook precisam ser
+   * conectados antes de expor esta operação aos participantes.
+   */
+  async reserveOrder(slug: string, rawInput: PublicRegistrationOrderInput, rawIdempotencyKey?: string) {
+    let order: ReturnType<typeof normalizeRegistrationOrder>;
+    let plan: ReturnType<typeof prepareRegistrationOrderReservation>;
+    try {
+      order = normalizeRegistrationOrder(rawInput);
+      plan = prepareRegistrationOrderReservation(order, rawIdempotencyKey);
+    } catch (error) {
+      if (error instanceof RegistrationReservationPolicyError) throw new BadRequestException(error.message);
+      throw error;
+    }
+    if (order.entries.some((entry) => Boolean(entry.benefitCode))) {
+      throw new BadRequestException('Descontos exigem validação individual antes da compra múltipla.');
+    }
+
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      try {
+        return await this.prisma.$transaction(async (tx) => {
+          const event = await tx.event.findUnique({
+            where: { slug: slug.trim().toLowerCase() },
+            select: {
+              id: true, organizationId: true, status: true, registrationMode: true,
+              registrationForm: { select: { id: true, fields: true, publishedVersion: true } },
+            },
+          });
+          if (!event?.organizationId || event.status !== EventStatus.PUBLISHED) {
+            throw new NotFoundException('Inscrições indisponíveis para este evento.');
+          }
+          // Checkout agrupado não recebe cobrança no POST posterior: recusar
+          // reservas pagas sem pagador/destinatário antes de qualquer escrita.
+          if (event.registrationMode === RegistrationMode.PAID && !order.billing) {
+            throw new BadRequestException('Dados de cobrança são obrigatórios para a compra.');
+          }
+          const existing = await tx.eventRegistrationOrder.findUnique({
+            where: { eventId_idempotencyKeyHash: { eventId: event.id, idempotencyKeyHash: plan.idempotencyKeyHash } },
+            include: { entries: { orderBy: { position: 'asc' }, select: { position: true, categoryId: true, lotId: true, reservation: { select: { protocol: true, status: true } } } } },
+          });
+          if (existing) {
+            if (existing.payloadHash !== plan.payloadHash) {
+              throw new ConflictException('A chave de idempotência já foi utilizada para outra compra.');
+            }
+            return {
+              orderId: existing.id, status: existing.status, entryCount: existing.entries.length,
+              subtotalCents: existing.subtotalCents, expiresAt: existing.expiresAt?.toISOString() ?? null,
+              entries: existing.entries.map((entry) => ({
+                position: entry.position, categoryId: entry.categoryId, lotId: entry.lotId,
+                protocol: entry.reservation?.protocol ?? null, status: entry.reservation?.status ?? null,
+              })),
+            };
+          }
+
+          if (event.registrationMode === RegistrationMode.INVITATION) {
+            throw new BadRequestException('Compras por convite exigem validação individual.');
+          }
+          const { schema, formVersion } = await this.resolveFormSchema(tx, event);
+          const terms = await tx.eventRegistrationTermsDocument.findFirst({
+            where: { eventId: event.id, organizationId: event.organizationId, state: RegistrationTermsDocumentState.ACTIVE },
+            select: { id: true, version: true, checksumSha256: true },
+          });
+          if (!terms) throw new BadRequestException('Os termos e a Política de Privacidade precisam estar publicados.');
+          for (const entry of order.entries) {
+            try {
+              validateCategoryAnswers(validateGroupedRefundConsent(entry.answers, event.registrationMode === RegistrationMode.PAID), publicRegistrationFields(schema, entry.categoryId), entry.categoryId);
+            } catch (error) {
+              if (error instanceof RegistrationCategoryValidationError) throw new BadRequestException(error.message);
+              throw error;
+            }
+          }
+
+          if (event.registrationMode === RegistrationMode.PAID) {
+            // A versão enviada no formulário não é fonte de verdade. A política
+            // canônica precisa estar publicada antes de reservar qualquer vaga.
+            // O checkout agrupado só será liberado após a integração com G2.11.
+            const tables = await tx.$queryRaw<Array<{ ready: boolean }>>`
+              SELECT (to_regclass('"EventRefundPolicy"') IS NOT NULL
+                AND to_regclass('"EventRefundPolicyVersion"') IS NOT NULL) AS "ready"
+            `;
+            if (!tables[0]?.ready) {
+              throw new ConflictException('Política de reembolso ainda não integrada. Não é possível reservar esta compra paga.');
+            }
+            const policies = await tx.$queryRaw<Array<{ version: number }>>`
+              SELECT p."version"
+              FROM "EventRefundPolicy" p
+              JOIN "EventRefundPolicyVersion" v
+                ON v."eventId" = p."eventId"
+               AND v."organizationId" = p."organizationId"
+               AND v."version" = p."version"
+              WHERE p."eventId" = ${event.id}
+                AND p."organizationId" = ${event.organizationId}
+              LIMIT 1
+            `;
+            const publishedVersion = policies[0]?.version;
+            if (!Number.isSafeInteger(publishedVersion) || !publishedVersion
+              || order.entries.some((entry) => entry.answers.refund_policy_version !== publishedVersion)) {
+              throw new ConflictException('A política de reembolso exibida mudou ou não foi publicada. Recarregue a compra.');
+            }
+          }
+
+          await this.expireStaleReservations(tx, event.id, event.organizationId);
+          const now = new Date();
+          const activeWhere = {
+            eventId: event.id, organizationId: event.organizationId,
+            status: { in: ACTIVE_STATUSES },
+            OR: [{ status: RegistrationReservationStatus.CONFIRMED }, { expiresAt: { gt: now } }],
+          } satisfies Prisma.EventRegistrationReservationWhereInput;
+          const offersWhere = {
+            ...activeWaitlistOfferWhere(event.id, now), organizationId: event.organizationId,
+          } satisfies Prisma.EventRegistrationWaitlistEntryWhereInput;
+
+          // Consultas em lote evitam N+1 dentro da transação Serializable.
+          // Todas as leituras mantêm escopo de evento e organização.
+          const categoryIds = plan.categoryDemand.map((demand) => demand.categoryId);
+          const categories = await tx.eventRegistrationCategory.findMany({
+            where: { id: { in: categoryIds }, eventId: event.id, organizationId: event.organizationId, active: true },
+            select: { id: true, capacity: true, proofRequirement: true },
+          });
+          const categoryMap = new Map(categories.map((category) => [category.id, category]));
+          const [categoryReservations, categoryOffers] = await Promise.all([
+            tx.eventRegistrationReservation.groupBy({
+              by: ['categoryId'], where: { ...activeWhere, categoryId: { in: categoryIds } }, _count: { _all: true },
+            }),
+            tx.eventRegistrationWaitlistEntry.groupBy({
+              by: ['categoryId'], where: { ...offersWhere, categoryId: { in: categoryIds } }, _count: { _all: true },
+            }),
+          ]);
+          const reservedByCategory = new Map(categoryReservations.map((item) => [item.categoryId, item._count._all]));
+          const offeredByCategory = new Map(categoryOffers.map((item) => [item.categoryId, item._count._all]));
+          for (const demand of plan.categoryDemand) {
+            const category = categoryMap.get(demand.categoryId);
+            if (!category) throw new BadRequestException('Categoria indisponível para a compra.');
+            if (category.proofRequirement === 'REQUIRED_BEFORE_PAYMENT') {
+              throw new BadRequestException('Esta categoria exige aprovação de comprovante antes do pagamento.');
+            }
+            if (category.capacity !== null) {
+              const occupied = (reservedByCategory.get(demand.categoryId) ?? 0) +
+                (offeredByCategory.get(demand.categoryId) ?? 0);
+              if (occupied + demand.quantity > category.capacity) {
+                throw new ConflictException('Não existem vagas suficientes na categoria para todas as entradas.');
+              }
+            }
+          }
+
+          const lotIds = plan.lotDemand.map((demand) => demand.lotId);
+          const lots = await tx.eventRegistrationLot.findMany({
+            where: {
+              id: { in: lotIds }, eventId: event.id, organizationId: event.organizationId,
+              active: true, startsAt: { lte: now }, endsAt: { gt: now },
+            },
+            select: { id: true, categoryId: true, priceCents: true, quantity: true, waitlistEnabled: true },
+          });
+          const lotMap = new Map(lots.map((lot) => [lot.id, lot]));
+          const [lotReservations, lotOffers, waiting] = await Promise.all([
+            tx.eventRegistrationReservation.groupBy({
+              by: ['lotId'], where: { ...activeWhere, lotId: { in: lotIds } }, _count: { _all: true },
+            }),
+            tx.eventRegistrationWaitlistEntry.groupBy({
+              by: ['lotId'], where: { ...offersWhere, lotId: { in: lotIds } }, _count: { _all: true },
+            }),
+            tx.eventRegistrationWaitlistEntry.groupBy({
+              by: ['lotId'],
+              where: {
+                eventId: event.id, organizationId: event.organizationId,
+                lotId: { in: lotIds }, status: RegistrationWaitlistStatus.WAITING,
+              },
+              _count: { _all: true },
+            }),
+          ]);
+          const reservedByLot = new Map(lotReservations.map((item) => [item.lotId, item._count._all]));
+          const offeredByLot = new Map(lotOffers.map((item) => [item.lotId, item._count._all]));
+          const waitingByLot = new Map(waiting.map((item) => [item.lotId, item._count._all]));
+          const lotPrices = new Map<string, number>();
+          for (const demand of plan.lotDemand) {
+            const lot = lotMap.get(demand.lotId);
+            if (!lot || lot.categoryId !== demand.categoryId ||
+                !Number.isSafeInteger(lot.priceCents) || lot.priceCents < 0) {
+              throw new BadRequestException('Lote indisponível para a compra.');
+            }
+            if (lot.waitlistEnabled && (waitingByLot.get(demand.lotId) ?? 0) > 0) {
+              throw new ConflictException('Este lote possui fila de espera ativa.');
+            }
+            if (lot.quantity !== null) {
+              const occupied = (reservedByLot.get(demand.lotId) ?? 0) +
+                (offeredByLot.get(demand.lotId) ?? 0);
+              if (occupied + demand.quantity > lot.quantity) {
+                throw new ConflictException('Não existem vagas suficientes no lote para todas as entradas.');
+              }
+            }
+            lotPrices.set(demand.lotId, lot.priceCents);
+          }
+
+          const paid = event.registrationMode === RegistrationMode.PAID;
+          const expiresAt = paid ? new Date(now.getTime() + RESERVATION_MINUTES * 60_000) : null;
+          const subtotalCents = order.entries.reduce((total, entry) => total + (lotPrices.get(entry.lotId) ?? 0), 0);
+          if (!Number.isSafeInteger(subtotalCents)) throw new BadRequestException('Total da compra fora do limite permitido.');
+          // Antes da primeira escrita: não prender estoque em PENDING_PAYMENT
+          // quando nenhum pagamento poderá ser criado para este pedido PAID.
+          if (paid && subtotalCents <= 0) {
+            throw new BadRequestException('A compra paga precisa ter valor maior que zero.');
+          }
+          const status = paid ? RegistrationReservationStatus.PENDING_PAYMENT : RegistrationReservationStatus.CONFIRMED;
+          const savedOrder = await tx.eventRegistrationOrder.create({
+            data: {
+              organizationId: event.organizationId, eventId: event.id,
+              idempotencyKeyHash: plan.idempotencyKeyHash, payloadHash: plan.payloadHash,
+              status, subtotalCents, expiresAt,
+              ...(paid && order.billing ? { billingSnapshot: order.billing as Prisma.InputJsonObject } : {}),
+            },
+          });
+
+          const responseEntries: Array<{
+            position: number; categoryId: string; lotId: string; protocol: string; status: RegistrationReservationStatus;
+          }> = [];
+          for (const [position, entry] of order.entries.entries()) {
+            const priceCents = lotPrices.get(entry.lotId)!;
+            const reservation = await tx.eventRegistrationReservation.create({
+              data: {
+                organizationId: event.organizationId, eventId: event.id,
+                categoryId: entry.categoryId, lotId: entry.lotId,
+                protocol: `EVO-${randomBytes(8).toString('hex').toUpperCase()}`,
+                idempotencyKeyHash: sha256(`${plan.idempotencyKeyHash}:${position}`),
+                payloadHash: sha256(canonicalPayload({ ...entry, billing: order.billing })),
+                identityHash: plan.entries[position].identityHash,
+                emailHash: plan.entries[position].emailHash,
+                registrationData: entry.answers as Prisma.InputJsonObject,
+                registrationFormVersion: formVersion,
+                termsDocumentId: terms.id, termsDocumentVersion: terms.version,
+                // LGPD: dados do pagador pertencem ao pedido, não a cada participante.
+                // O checkout agrupado lê EventRegistrationOrder.billingSnapshot.
+                basePriceCents: priceCents, discountPercent: 0, finalPriceCents: priceCents,
+                status, expiresAt, confirmedAt: paid ? null : now,
+              },
+            });
+            await tx.eventRegistrationOrderEntry.create({
+              data: {
+                organizationId: event.organizationId, eventId: event.id, orderId: savedOrder.id,
+                position, categoryId: entry.categoryId, lotId: entry.lotId,
+                reservationId: reservation.id,
+                identityHash: plan.entries[position].identityHash, emailHash: plan.entries[position].emailHash,
+                basePriceCents: priceCents, finalPriceCents: priceCents,
+              },
+            });
+            responseEntries.push({
+              position, categoryId: entry.categoryId, lotId: entry.lotId,
+              protocol: reservation.protocol, status: reservation.status,
+            });
+          }
+          if (paid) {
+            await this.refunds.recordOrderAcceptances(tx, {
+              orderId: savedOrder.id, eventId: event.id, organizationId: event.organizationId,
+            }, now);
+          }
+          await tx.auditLog.create({
+            data: {
+              organizationId: event.organizationId, eventId: event.id,
+              action: 'registration.order_reserved',
+              entityType: 'EventRegistrationOrder', entityId: savedOrder.id,
+              metadata: {
+                entryCount: order.entries.length, subtotalCents, status,
+                termsDocumentVersion: terms.version, termsChecksumSha256: terms.checksumSha256,
+              } as Prisma.InputJsonObject,
+            },
+          });
+          return {
+            orderId: savedOrder.id, status, entryCount: responseEntries.length,
+            subtotalCents, expiresAt: expiresAt?.toISOString() ?? null, entries: responseEntries,
+          };
+        }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+      } catch (error) {
+        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2034') continue;
+        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+          // Two identical requests may both pass the initial lookup. The unique
+          // constraint selects the winner; replay it instead of reporting a
+          // false conflict. Never fall back to an order from another tenant.
+          const event = await this.prisma.event.findUnique({
+            where: { slug: slug.trim().toLowerCase() },
+            select: { id: true, organizationId: true, status: true },
+          });
+          if (event?.organizationId && event.status === EventStatus.PUBLISHED) {
+            const winner = await this.prisma.eventRegistrationOrder.findFirst({
+              where: {
+                eventId: event.id, organizationId: event.organizationId,
+                idempotencyKeyHash: plan.idempotencyKeyHash,
+              },
+              include: {
+                entries: {
+                  orderBy: { position: 'asc' },
+                  select: {
+                    position: true, categoryId: true, lotId: true,
+                    reservation: { select: { protocol: true, status: true } },
+                  },
+                },
+              },
+            });
+            if (winner) {
+              if (winner.payloadHash !== plan.payloadHash) {
+                throw new ConflictException('A chave de idempotência já foi utilizada para outra compra.');
+              }
+              return {
+                orderId: winner.id, status: winner.status,
+                entryCount: winner.entries.length, subtotalCents: winner.subtotalCents,
+                expiresAt: winner.expiresAt?.toISOString() ?? null,
+                entries: winner.entries.map((entry) => ({
+                  position: entry.position, categoryId: entry.categoryId, lotId: entry.lotId,
+                  protocol: entry.reservation?.protocol ?? null,
+                  status: entry.reservation?.status ?? null,
+                })),
+              };
+            }
+          }
+          throw new ConflictException('Uma identidade já possui inscrição ou a compra foi repetida.');
+        }
+        throw error;
+      }
+    }
+    throw new ConflictException('Não foi possível reservar todas as entradas. Tente novamente.');
   }
 
   async getWaitlistOfferOptions(slug: string, userId: string, lotId: string) {
@@ -309,6 +725,8 @@ export class RegistrationReservationsService {
               slug: true,
               status: true,
               registrationMode: true,
+              profileCode: true,
+              eventType: true,
               registrationForm: { select: { id: true, fields: true, publishedVersion: true } },
             },
           });
@@ -323,7 +741,7 @@ export class RegistrationReservationsService {
             if (existing.payloadHash !== payloadHash) {
               throw new ConflictException('A chave de idempotência já foi usada com dados diferentes.');
             }
-            return this.toPublicReservation(existing);
+            return this.toPublicReservation(existing, isPublicTicketOffer(event.profileCode, event.eventType));
           }
 
           await this.expireStaleReservations(tx, event.id, event.organizationId);
@@ -501,13 +919,13 @@ export class RegistrationReservationsService {
               slug: event.slug,
             };
           }
-          return this.toPublicReservation(reservation);
+          return this.toPublicReservation(reservation, isPublicTicketOffer(event.profileCode, event.eventType));
         }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
         if (notice) await this.webhooks.notifyRegistrationConfirmed(notice);
         return result;
       } catch (error) {
         notice = null;
-        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2034' && attempt < 2) continue;
+        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2034') continue;
         if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
           throw new ConflictException('Já existe uma inscrição para este documento ou a solicitação foi repetida.');
         }
@@ -527,6 +945,18 @@ export class RegistrationReservationsService {
         expiresAt: { lte: now },
       },
       select: { id: true, benefitId: true },
+    });
+    // Persist the parent order's expiration in the same Serializable transaction.
+    // A public EXPIRED projection alone leaves grouped orders PENDING_PAYMENT in storage.
+    // Scope by tenant/event and only transition still-pending, expired orders;
+    // never rewrite CONFIRMED orders or claim the provider checkout was cancelled.
+    await tx.eventRegistrationOrder.updateMany({
+      where: {
+        eventId, organizationId,
+        status: RegistrationReservationStatus.PENDING_PAYMENT,
+        expiresAt: { lte: now },
+      },
+      data: { status: RegistrationReservationStatus.EXPIRED },
     });
     if (stale.length === 0) return;
     const counts = new Map<string, number>();
@@ -551,7 +981,7 @@ export class RegistrationReservationsService {
     finalPriceCents: number;
     expiresAt: Date | null;
     confirmedAt: Date | null;
-  }) {
+  }, ticketEvent = false) {
     return {
       protocol: reservation.protocol,
       status: reservation.status,
@@ -565,7 +995,9 @@ export class RegistrationReservationsService {
         ? this.asaas.isConfigured()
           ? 'Sua vaga está reservada. Inicie o pagamento seguro antes do vencimento.'
           : 'Sua vaga está reservada, mas o pagamento está temporariamente indisponível.'
-        : 'Inscrição confirmada. Guarde o protocolo para acompanhamento.',
+        : ticketEvent
+          ? 'Ingresso confirmado. Guarde o protocolo para acompanhamento.'
+          : 'Inscrição confirmada. Guarde o protocolo para acompanhamento.',
     };
   }
 }

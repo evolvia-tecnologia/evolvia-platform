@@ -3,6 +3,7 @@ import { EventFormat, EventProfileCode, EventStatus, OrganizationLegalKind, Pris
 import { PrismaService } from '../prisma.service';
 import { buildPublicEventDto, PublicEventDto } from './event-publication.public-contract';
 import { EventPublicationMediaService } from './event-publication-media.service';
+import { recordPublicPageView } from '../event-page-view';
 import { discoveryTextWhere, regionWhere, subjectAreaWhere } from './public-discovery.policy';
 
 export type PublicEventDiscoveryItem = {
@@ -175,6 +176,10 @@ export class EventPublicationPublicService {
         ...event.eventPublicationSections.map((section) => section.updatedAt),
       ]),
     }));
+  }
+
+  recordVisit(slug: string) {
+    return recordPublicPageView(this.prisma, slug);
   }
 
   async findBySlug(slug: string): Promise<(PublicEventDto & {

@@ -74,6 +74,34 @@ CSV usa UTF-8/BOM, delimitador ponto e vírgula, aspas e proteção de fórmulas
 Não apresentar zero para métricas sem coleta/engine. Mailing nominal exige
 contrato separado com finalidade, autorização e exportação própria.
 
+## Visitas da página pública
+
+`POST /public/events/:slug/visit` soma uma abertura do evento publicado no dia
+do fuso desse evento. A tabela guarda organização, evento, dia e quantidade.
+Não guarda pessoa, IP, navegador nem origem. O pedido do navegador não leva
+corpo nem cookie e usa `referrerPolicy: no-referrer`. Cabeçalhos e metadados
+de rede podem existir no transporte; esta entrega não afirma o que a
+infraestrutura registra no log.
+
+Cada processo da API aceita 120 reservas do mesmo evento numa janela fixa de
+60 segundos, contada pelo relógio do pedido. Só slugs confirmados como publicados
+ocupam o mapa por evento. Para slugs já confirmados, a reserva precede a consulta;
+para os demais, a consulta precede a reserva. No limite por evento, a resposta
+é 429 e não há escrita. Descobertas concorrentes podem consultar antes da recusa,
+mas não gravam além da cota. A janela seguinte recomeça a contagem.
+
+Consultas de slugs ainda não confirmados têm uma cota global separada de 5 mil
+por processo e janela de 60 segundos, sem guardar as chaves recebidas. Esgotada
+essa cota, a descoberta de um evento válido também pode ser recusada até a
+próxima janela. Eventos já confirmados continuam sujeitos à própria cota.
+Slugs inexistentes não ocupam o mapa por evento, que comporta até 5 mil slugs
+confirmados; um novo além disso é recusado sem escrita até expirar alguma janela.
+
+Instâncias não compartilham os tetos, e os limites efetivos acompanham a quantidade
+de processos. Não há IP nem identificador de visitante nessas reservas. Webhooks
+não entram nestas janelas. A contagem é de aberturas aceitas, não de visitantes
+únicos nem de todas as aberturas em condições de tráfego elevado.
+
 ## Validação e rollback
 
 Testes de agregação, versões, condições, idade, status efetivo, ACL, tenant e
@@ -81,3 +109,4 @@ exportação. CI completo confirma tipos, testes, migrations existentes e ARM64.
 Validar ainda navegação, impressão e teclado/leitor de tela em homologação.
 Não converter teste automatizado em WCAG humana ou aceite formal. Sem migration;
 rollback pelo revert do código, preservando todas as fontes de dados.
+
