@@ -5,10 +5,13 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ApiError, api } from '../lib/api';
 import { formatEventDate } from '../lib/event-time-zone';
+import { eventTimeZoneLabel } from '../lib/event-flow';
 import PublicationEvaGuidance, { PublicationEvaGuidanceData } from './publication-eva-guidance';
 import PublicationReleaseGate from './publication-release-gate';
 import PublicationMediaEditor from './publication-media-editor';
+import PublicationRichTextField from './publication-rich-text-field';
 import PublicationSectionsEditor, { PublicationSection } from './publication-sections-editor';
+import SportsModalitiesEditor from './sports-modalities-editor';
 import styles from './publication-editor.module.css';
 
 type ThemeConfig = {
@@ -163,10 +166,12 @@ export default function PublicationEditor({
   eventId,
   embedded = false,
   supportsScientificSources = false,
+  running = false,
 }: {
   eventId: string;
   embedded?: boolean;
   supportsScientificSources?: boolean;
+  running?: boolean;
 }) {
   const router = useRouter();
   const navigationDialogRef = useRef<HTMLDialogElement>(null);
@@ -180,6 +185,8 @@ export default function PublicationEditor({
   const [success, setSuccess] = useState('');
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [pendingHref, setPendingHref] = useState('');
+  const [publicOrigin, setPublicOrigin] = useState('');
+  const [linkStatus, setLinkStatus] = useState('');
 
   const isDirty = useMemo(
     () => JSON.stringify(comparableForm(form)) !== JSON.stringify(comparableForm(baseline)),
@@ -204,6 +211,23 @@ export default function PublicationEditor({
     }
   };
 
+  const refreshAfterMutation = async () => {
+    setError('');
+    try {
+      const result = await api<PublicationPayload>(`/events/${eventId}/publication`);
+      const nextForm = formFromPayload(result);
+      setPayload({ ...result, sections: result.sections ?? [] });
+      setForm((current) => JSON.stringify(comparableForm(current)) === JSON.stringify(comparableForm(baseline))
+        ? nextForm
+        : current);
+      setBaseline(nextForm);
+      setFieldErrors({});
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'Não foi possível atualizar os dados da Divulgação.');
+      throw reason;
+    }
+  };
+
   const refreshAuxiliary = async () => {
     setError('');
     try {
@@ -221,6 +245,8 @@ export default function PublicationEditor({
       throw reason;
     }
   };
+
+  useEffect(() => { setPublicOrigin(window.location.origin); }, []);
 
   useEffect(() => {
     void loadInitial().catch(() => undefined);
@@ -413,11 +439,39 @@ export default function PublicationEditor({
       <div><p className={styles.eyebrow}>DADOS REUTILIZADOS</p><h2 id="publication-context-title">Fundação do evento</h2></div>
       <dl className={styles.contextGrid}>
         <div><dt>Nome</dt><dd>{payload.event.name}</dd></div>
-        <div><dt>URL</dt><dd>/{payload.event.slug}</dd></div>
+        <div className={styles.publicLinkCard}>
+          <dt>{payload.event.status === 'PUBLISHED' ? 'Link para divulgar' : 'Página pública ainda indisponível'}</dt>
+          <dd>
+            {payload.event.status === 'PUBLISHED'
+              ? <a className={styles.publicLink} href={publicOrigin ? `${publicOrigin}/${encodeURIComponent(payload.event.slug)}` : `/${encodeURIComponent(payload.event.slug)}`} target="_blank" rel="noopener noreferrer">
+                  {publicOrigin ? `${publicOrigin}/${encodeURIComponent(payload.event.slug)}` : `/${encodeURIComponent(payload.event.slug)}`}
+                </a>
+              : <>
+                  <code>{publicOrigin ? `${publicOrigin}/${encodeURIComponent(payload.event.slug)}` : `/${encodeURIComponent(payload.event.slug)}`}</code>
+                  <small>Endereço reservado. Ele ainda não funciona para o público e pode mostrar uma página 404 até a publicação do evento.</small>
+                  {payload.permissions.canPreparePreview && <Link className={styles.previewLink} href={`/eventos/${encodeURIComponent(eventId)}/painel/divulgacao/preview`}>
+                    Abrir prévia privada
+                  </Link>}
+                </>}
+            <small>Este é o endereço completo para divulgar, no formato domínio/sigla do evento.</small>
+            <button className={styles.copyLink} type="button" onClick={() => {
+              const href = `${publicOrigin || window.location.origin}/${encodeURIComponent(payload.event.slug)}`;
+              if (!navigator.clipboard?.writeText) {
+                setLinkStatus('Não foi possível copiar. Selecione o endereço acima.');
+                return;
+              }
+              void navigator.clipboard.writeText(href).then(
+                () => setLinkStatus('Link copiado.'),
+                () => setLinkStatus('Não foi possível copiar. Selecione o endereço acima.'),
+              );
+            }}>Copiar link completo</button>
+            <small role="status">{linkStatus}</small>
+          </dd>
+        </div>
         <div><dt>Formato</dt><dd>{formatLabels[payload.event.format] ?? payload.event.format}</dd></div>
         <div><dt>Data inicial</dt><dd>{formatEventDate(payload.event.startDate, payload.event.timeZone, { dateStyle: 'medium' }) ?? 'A definir'}</dd></div>
         <div><dt>Data final</dt><dd>{formatEventDate(payload.event.endDate, payload.event.timeZone, { dateStyle: 'medium' }) ?? 'A definir'}</dd></div>
-        <div><dt>Fuso horário</dt><dd>{payload.event.timeZone || 'Não confirmado'}</dd></div>
+        <div><dt>Fuso horário</dt><dd>{eventTimeZoneLabel(payload.event.timeZone)}</dd></div>
         <div><dt>Local</dt><dd>{payload.event.format === 'ONLINE' ? 'Evento online' : payload.event.venue || 'A definir'}</dd></div>
       </dl>
     </section>
@@ -425,24 +479,29 @@ export default function PublicationEditor({
     <form id="publication-form" className={styles.form} onSubmit={submit} noValidate>
       <section className={styles.card} aria-labelledby="presentation-title">
         <div className={styles.cardHeading}>
-          <div><p className={styles.eyebrow}>1 · APRESENTAÇÃO</p><h2 id="presentation-title">Explique o evento sem sobrecarregar</h2><p>A descrição curta é o resumo principal. A apresentação completa é opcional.</p></div>
+          <div><p className={styles.eyebrow}>1 · APRESENTAÇÃO</p><h2 id="presentation-title">Explique o evento sem sobrecarregar</h2><p>A descrição curta é o resumo principal. A apresentação completa aceita título, negrito, lista e link para a página organizar o texto.</p></div>
           <span className={styles.counter}>{form.shortDescription.length}/280</span>
         </div>
 
         <label className={styles.field} htmlFor="publication-shortDescription">
           <span>Descrição curta <strong aria-hidden="true">*</strong></span>
           <small id="publication-shortDescription-help">Uma frase objetiva que ajude a pessoa a entender rapidamente o evento.</small>
-          <textarea id="publication-shortDescription" value={form.shortDescription} onChange={(event) => update('shortDescription', event.target.value)} maxLength={280} rows={3} disabled={!canEdit || saving} required aria-invalid={Boolean(fieldErrors.shortDescription)} aria-describedby={`publication-shortDescription-help${fieldErrors.shortDescription ? ' publication-shortDescription-error' : ''}`} />
+          <textarea id="publication-shortDescription" value={form.shortDescription} onChange={(event) => update('shortDescription', event.target.value)} maxLength={280} rows={3} placeholder="Ex.: Congresso de atualização clínica, de 10 a 12 de outubro, em São Paulo." disabled={!canEdit || saving} required aria-invalid={Boolean(fieldErrors.shortDescription)} aria-describedby={`publication-shortDescription-help${fieldErrors.shortDescription ? ' publication-shortDescription-error' : ''}`} />
           {fieldErrors.shortDescription && <small id="publication-shortDescription-error" className={styles.fieldError}>{fieldErrors.shortDescription}</small>}
         </label>
 
-        <label className={styles.field} htmlFor="publication-fullDescription">
-          <span>Apresentação completa <em>opcional</em></span>
-          <small id="publication-fullDescription-help">Use para objetivos, contexto e informações úteis, sem duplicar programação ou regras que terão fonte própria.</small>
-          <textarea id="publication-fullDescription" value={form.fullDescription} onChange={(event) => update('fullDescription', event.target.value)} maxLength={12000} rows={8} disabled={!canEdit || saving} aria-invalid={Boolean(fieldErrors.fullDescription)} aria-describedby={`publication-fullDescription-help${fieldErrors.fullDescription ? ' publication-fullDescription-error' : ''}`} />
-          <span className={styles.fieldCounter}>{form.fullDescription.length}/12000</span>
-          {fieldErrors.fullDescription && <small id="publication-fullDescription-error" className={styles.fieldError}>{fieldErrors.fullDescription}</small>}
-        </label>
+        <PublicationRichTextField
+          id="publication-fullDescription"
+          label="Apresentação completa"
+          help="Use para objetivos, contexto e informações úteis. Título, negrito, lista, link https, alinhamento, fonte, tamanho e cor da paleta aparecem formatados na página pública."
+          value={form.fullDescription}
+          onChange={(value) => update('fullDescription', value)}
+          maxLength={12000}
+          rows={8}
+          disabled={!canEdit || saving}
+          optional
+          error={fieldErrors.fullDescription}
+        />
       </section>
 
       <section className={styles.card} aria-labelledby="contact-title">
@@ -539,7 +598,7 @@ export default function PublicationEditor({
       publicationRevision={payload.publication.revision}
       canEdit={canEdit}
       hasUnsavedChanges={isDirty}
-      onChanged={loadInitial}
+      onChanged={refreshAfterMutation}
     />
 
     <PublicationSectionsEditor
@@ -549,6 +608,12 @@ export default function PublicationEditor({
       supportsScientificSources={supportsScientificSources}
       onReload={refreshAuxiliary}
     />
+    {running && <SportsModalitiesEditor
+      eventId={eventId}
+      sections={payload.sections}
+      canEdit={payload.permissions.canEditSections}
+      onReload={refreshAuxiliary}
+    />}
 
     <PublicationReleaseGate
       eventId={eventId}

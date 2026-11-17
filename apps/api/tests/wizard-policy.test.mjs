@@ -9,6 +9,7 @@ import {
   getWizardCompletionIssues,
   inferEventProfileCode,
   normalizeWizardAnswers,
+  parseSubjectAreas,
 } from '../dist/wizard-policy.js';
 
 const CATALOG_CASES = [
@@ -30,6 +31,7 @@ const CATALOG_CASES = [
   { eventType: 'Evento social ou comunitário', profileCode: EventProfileCode.SOCIAL_COMMUNITY },
   { eventType: 'Evento religioso ou beneficente', profileCode: EventProfileCode.SOCIAL_COMMUNITY },
   { eventType: 'Evento esportivo ou torneio', profileCode: EventProfileCode.SOCIAL_COMMUNITY },
+  { eventType: 'Corrida', profileCode: EventProfileCode.SOCIAL_COMMUNITY },
   { eventType: 'Outro tipo de evento', profileCode: EventProfileCode.OTHER },
 ];
 
@@ -72,10 +74,10 @@ test('prioriza marcadores explícitos e evita inferência científica excessiva'
   );
 });
 
-test('cataloga exatamente os 19 tipos aprovados sem duplicar família', () => {
-  assert.equal(CATALOG_CASES.length, 19);
-  assert.equal(CANONICAL_EVENT_TYPE_PROFILES.length, 19);
-  assert.equal(new Set(CATALOG_CASES.map((item) => item.eventType)).size, 19);
+test('cataloga exatamente os 20 tipos aprovados sem duplicar família', () => {
+  assert.equal(CATALOG_CASES.length, 20);
+  assert.equal(CANONICAL_EVENT_TYPE_PROFILES.length, 20);
+  assert.equal(new Set(CATALOG_CASES.map((item) => item.eventType)).size, 20);
   assert.deepEqual(
     [...new Set(CATALOG_CASES.map((item) => item.profileCode))].sort(),
     [
@@ -89,7 +91,7 @@ test('cataloga exatamente os 19 tipos aprovados sem duplicar família', () => {
   );
 });
 
-test('infere a família canônica de cada um dos 19 tipos do catálogo', () => {
+test('infere a família canônica de cada um dos 20 tipos do catálogo', () => {
   for (const item of CATALOG_CASES) {
     assert.equal(
       inferEventProfileCode(item.eventType),
@@ -99,19 +101,26 @@ test('infere a família canônica de cada um dos 19 tipos do catálogo', () => {
   }
 });
 
-test('recomenda capabilities estruturais para os 19 tipos, com pagamento só quando a inscrição é paga', () => {
+test('recomenda capabilities estruturais para os 20 tipos, com pagamento só quando a inscrição é paga', () => {
   for (const item of CATALOG_CASES) {
-    const free = getRecommendedCapabilities(item.profileCode, RegistrationMode.FREE);
-    const paid = getRecommendedCapabilities(item.profileCode, RegistrationMode.PAID);
+    const free = getRecommendedCapabilities(item.profileCode, RegistrationMode.FREE, item.eventType);
+    const paid = getRecommendedCapabilities(item.profileCode, RegistrationMode.PAID, item.eventType);
     const structural = STRUCTURAL_CAPABILITIES[item.profileCode];
+    const expectsMaterial = item.profileCode === EventProfileCode.CORPORATE_TRAINING || item.eventType === 'Corrida';
 
     for (const code of structural) {
       assert.ok(free.includes(code), `${item.eventType} deve incluir ${code}`);
     }
 
+    assert.equal(
+      free.includes('material_delivery'),
+      expectsMaterial,
+      `${item.eventType} ${expectsMaterial ? 'deve' : 'não deve'} recomendar entrega de material`,
+    );
     assert.equal(free.includes('payment'), false, `${item.eventType} gratuito não recomenda pagamento`);
     assert.ok(paid.includes('payment'), `${item.eventType} pago recomenda pagamento`);
     assert.ok(paid.includes('registration'), `${item.eventType} pago mantém inscrição`);
+    assert.equal(paid.includes('material_delivery'), expectsMaterial, item.eventType);
   }
 });
 
@@ -181,6 +190,63 @@ test('customização de entretenimento não remove o controle de acesso estrutur
   }
 });
 
+test('Corrida sugere entrega de material sem torná-la obrigatória e preserva a desativação', () => {
+  const started = normalizeWizardAnswers({
+    eventType: 'Corrida',
+    registrationMode: RegistrationMode.FREE,
+    capabilitiesCustomized: false,
+  });
+  assert.equal(started.profileCode, EventProfileCode.SOCIAL_COMMUNITY);
+  assert.equal(started.capabilitiesCustomized, false);
+  assert.ok(started.capabilities.includes('material_delivery'));
+  assert.ok(started.capabilities.includes('registration'));
+  assert.equal(getRequiredCapabilities(EventProfileCode.SOCIAL_COMMUNITY).includes('material_delivery'), false);
+
+  const reopened = normalizeWizardAnswers({
+    eventType: ' Corrida ',
+    profileCode: EventProfileCode.SOCIAL_COMMUNITY,
+    registrationMode: RegistrationMode.FREE,
+    capabilitiesCustomized: false,
+    capabilities: ['registration', 'communication', 'credential'],
+  });
+  assert.ok(reopened.capabilities.includes('material_delivery'));
+
+  const customized = normalizeWizardAnswers({
+    eventType: 'Corrida',
+    registrationMode: RegistrationMode.FREE,
+    capabilitiesCustomized: true,
+    capabilities: ['communication'],
+  });
+  assert.equal(customized.capabilitiesCustomized, true);
+  assert.deepEqual(customized.capabilities, ['registration', 'communication']);
+  assert.equal(customized.capabilities.includes('material_delivery'), false);
+
+  for (const eventType of ['Evento social ou comunitário', 'Evento religioso ou beneficente', 'Evento esportivo ou torneio']) {
+    const answers = normalizeWizardAnswers({
+      eventType,
+      registrationMode: RegistrationMode.FREE,
+      capabilitiesCustomized: false,
+    });
+    assert.equal(answers.profileCode, EventProfileCode.SOCIAL_COMMUNITY, eventType);
+    assert.equal(answers.capabilities.includes('material_delivery'), false, eventType);
+  }
+
+  const corporate = normalizeWizardAnswers({
+    eventType: 'Treinamento',
+    registrationMode: RegistrationMode.FREE,
+    capabilitiesCustomized: false,
+  });
+  assert.ok(corporate.capabilities.includes('material_delivery'));
+
+  const looseLabel = normalizeWizardAnswers({
+    eventType: 'corrida de rua',
+    registrationMode: RegistrationMode.FREE,
+    capabilitiesCustomized: false,
+  });
+  assert.equal(looseLabel.profileCode, EventProfileCode.OTHER);
+  assert.equal(looseLabel.capabilities.includes('material_delivery'), false);
+});
+
 test('outros perfis continuam livres para não usar controle de acesso', () => {
   const answers = normalizeWizardAnswers({
     eventType: 'Evento social ou comunitário',
@@ -236,10 +302,41 @@ test('calcula progresso no backend e limita sessão ativa a 92%', () => {
     venuePending: true,
     registrationMode: RegistrationMode.INVITATION,
     capabilitiesCustomized: false,
+    subjectAreas: ['negocios', 'negocios', 'inexistente'],
   });
 
+  assert.deepEqual(answers.subjectAreas, ['negocios']);
   assert.equal(getWizardCompletion(answers), 92);
   assert.deepEqual(getWizardCompletionIssues(answers), []);
+});
+
+test('área de atuação é obrigatória e limitada ao catálogo público', () => {
+  const missing = normalizeWizardAnswers({
+    eventType: 'Congresso ou evento científico',
+    format: EventFormat.IN_PERSON,
+    name: 'Congresso de Cardiologia',
+    datesPending: true,
+    timeZone: 'America/Sao_Paulo',
+    venuePending: true,
+    registrationMode: RegistrationMode.PAID,
+  });
+  assert.deepEqual(missing.subjectAreas, []);
+  assert.ok(getWizardCompletionIssues(missing).includes('Escolha ao menos uma área de atuação.'));
+  assert.ok(getWizardCompletion(missing) < 92);
+
+  const chosen = normalizeWizardAnswers({ ...missing, subjectAreas: ['saude', 'educacao', 'direito', 'tecnologia'] });
+  assert.deepEqual(chosen.subjectAreas, ['saude', 'educacao', 'direito']);
+  assert.equal(getWizardCompletionIssues(chosen).includes('Escolha ao menos uma área de atuação.'), false);
+});
+
+test('escrita direta da área deduplica e recusa o que o Wizard apenas descartaria', () => {
+  assert.deepEqual(parseSubjectAreas(['saude', 'saude', 'direito']), { subjectAreas: ['saude', 'direito'] });
+  assert.deepEqual(parseSubjectAreas(['saude', 'educacao', 'direito', 'saude']), {
+    subjectAreas: ['saude', 'educacao', 'direito'],
+  });
+  for (const value of [undefined, null, 'saude', {}, [], ['futebol'], ['saude', 1], ['saude', 'educacao', 'direito', 'tecnologia']]) {
+    assert.ok('error' in parseSubjectAreas(value), JSON.stringify(value));
+  }
 });
 
 test('impede conclusão com datas invertidas', () => {

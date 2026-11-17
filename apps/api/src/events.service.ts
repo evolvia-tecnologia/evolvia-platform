@@ -1,12 +1,19 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { MembershipStatus } from '@prisma/client';
+import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { randomBytes } from 'node:crypto';
+import { EventStatus, MembershipStatus, Prisma, WizardSessionStatus } from '@prisma/client';
 import { AuthorizationService } from './authorization.service';
 import { CreateEventDto } from './dto';
 import { EVENT_EDITOR_ROLES } from './membership-policy';
 import { PrismaService } from './prisma.service';
-import { slugify } from './slug';
+import { eventPublicSlug } from './slug';
 import { normalizeEventTimeZone } from './time-zone-policy';
-import { inferEventProfileCode } from './wizard-policy';
+import {
+  WIZARD_FLOW_VERSION,
+  getWizardCompletion,
+  inferEventProfileCode,
+  normalizeWizardAnswers,
+  parseSubjectAreas,
+} from './wizard-policy';
 
 @Injectable()
 export class EventsService {
@@ -97,7 +104,14 @@ export class EventsService {
     const eventType = dto.eventType.trim();
     const timeZone = dto.timeZone ? normalizeEventTimeZone(dto.timeZone) : undefined;
     if (dto.timeZone && !timeZone) throw new BadRequestException('Fuso horário do evento inválido.');
-    const base = slugify(dto.name) || 'evento';
+    let subjectAreas: string[] = [];
+    if (dto.subjectAreas !== undefined) {
+      const parsed = parseSubjectAreas(dto.subjectAreas);
+      if ('error' in parsed) throw new BadRequestException(parsed.error);
+      subjectAreas = parsed.subjectAreas;
+    }
+    const publicSlug = eventPublicSlug(dto.name, randomBytes(6).toString('hex'));
+    // O identificador é criado uma vez; alterações editoriais não mudam links divulgados.
     return this.prisma.$transaction(async (tx) => {
       const event = await tx.event.create({
         data: {
@@ -105,8 +119,9 @@ export class EventsService {
           createdById: userId,
           organizationId,
           name: dto.name.trim(),
-          slug: `${base}-${Date.now().toString(36)}`,
+          slug: publicSlug,
           eventType,
+          subjectAreas,
           profileCode: inferEventProfileCode(eventType),
           format: dto.format,
           startDate: dto.startDate ? new Date(dto.startDate) : null,
@@ -125,10 +140,92 @@ export class EventsService {
           action: 'event.created',
           entityType: 'Event',
           entityId: event.id,
-          metadata: { profileCode: event.profileCode },
+          metadata: { profileCode: event.profileCode, subjectAreas },
         },
       });
       return event;
+    });
+  }
+
+  async updateSubjectAreas(userId: string, eventId: string, input: unknown) {
+    const event = await this.prisma.event.findUnique({
+      where: { id: eventId },
+      select: { id: true, organizationId: true, ownerId: true },
+    });
+    if (!event) throw new NotFoundException('Evento não encontrado.');
+    if (event.organizationId) {
+      await this.authorization.requireRole(userId, event.organizationId, EVENT_EDITOR_ROLES);
+    } else if (event.ownerId !== userId) {
+      throw new NotFoundException('Evento não encontrado.');
+    }
+
+    const parsed = parseSubjectAreas(
+      input && typeof input === 'object' && !Array.isArray(input)
+        ? (input as { subjectAreas?: unknown }).subjectAreas
+        : undefined,
+    );
+    if ('error' in parsed) throw new BadRequestException(parsed.error);
+    const { subjectAreas } = parsed;
+
+    return this.prisma.$transaction(async (tx) => {
+      // O save/complete do Wizard atualiza o Event antes da sessão; travar a mesma
+      // linha aqui serializa as duas escritas e o CAS da revisão recusa o rascunho antigo.
+      const [locked] = await tx.$queryRaw<{ status: EventStatus }[]>`
+        SELECT "status" FROM "Event" WHERE "id" = ${event.id} FOR UPDATE`;
+      if (!locked) throw new NotFoundException('Evento não encontrado.');
+      if (locked.status === EventStatus.CANCELLED) {
+        throw new ConflictException('Um evento cancelado não entra na busca por área.');
+      }
+
+      const updated = await tx.event.update({
+        where: { id: event.id },
+        data: { subjectAreas },
+        select: { subjectAreas: true },
+      });
+
+      const session = await tx.eventWizardSession.findUnique({
+        where: { eventId_flowVersion: { eventId: event.id, flowVersion: WIZARD_FLOW_VERSION } },
+        select: { id: true, answers: true, revision: true, status: true },
+      });
+      let wizardRevision: number | null = null;
+      if (session) {
+        const stored = session.answers && typeof session.answers === 'object' && !Array.isArray(session.answers)
+          ? session.answers as Prisma.JsonObject
+          : {};
+        const answers: Prisma.JsonObject = { ...stored, subjectAreas };
+        const synced = await tx.eventWizardSession.updateMany({
+          where: { id: session.id, revision: session.revision },
+          data: {
+            answers,
+            revision: { increment: 1 },
+            ...(session.status === WizardSessionStatus.ACTIVE
+              ? { completionPercent: getWizardCompletion(normalizeWizardAnswers(answers)) }
+              : {}),
+          },
+        });
+        if (synced.count !== 1) {
+          throw new ConflictException({
+            code: 'VERSION_CONFLICT',
+            message: 'Este evento foi atualizado em outra sessão. Recarregue para salvar a área de atuação.',
+          });
+        }
+        wizardRevision = session.revision + 1;
+      }
+
+      if (event.organizationId) {
+        await tx.auditLog.create({
+          data: {
+            organizationId: event.organizationId,
+            actorUserId: userId,
+            eventId: event.id,
+            action: 'event.subject_areas_updated',
+            entityType: 'Event',
+            entityId: event.id,
+            metadata: { subjectAreas, wizardRevision },
+          },
+        });
+      }
+      return { subjectAreas: updated.subjectAreas, wizardRevision };
     });
   }
 }

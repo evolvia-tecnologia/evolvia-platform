@@ -1,6 +1,6 @@
 import type { MetadataRoute } from 'next';
+import { publicApiSignal, publicApiUrl } from '../lib/public-api';
 
-const API_BASE_URL = process.env.EVOLVIA_API_INTERNAL_URL ?? 'http://api:4000';
 const PUBLIC_BASE_URL = (process.env.EVOLVIA_PUBLIC_BASE_URL ?? 'http://localhost:3000').replace(/\/$/, '');
 const PUBLIC_INDEXING_ENABLED = process.env.EVOLVIA_PUBLIC_INDEXING === '1';
 
@@ -10,8 +10,9 @@ type SitemapEvent = {
 };
 
 async function publishedEvents(): Promise<SitemapEvent[]> {
-  const response = await fetch(`${API_BASE_URL}/public/events/meta/sitemap`, {
+  const response = await fetch(publicApiUrl('/public/events/meta/sitemap'), {
     next: { revalidate: 300 },
+    signal: publicApiSignal(),
   });
   if (!response.ok) throw new Error('Não foi possível carregar o índice dos eventos publicados.');
   return response.json() as Promise<SitemapEvent[]>;
@@ -38,7 +39,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     return [
       ...staticEntries,
       ...events.map((event) => ({
-        url: `${PUBLIC_BASE_URL}/evento/${encodeURIComponent(event.slug)}`,
+        url: `${PUBLIC_BASE_URL}/${encodeURIComponent(event.slug)}`,
         lastModified: new Date(event.updatedAt),
         changeFrequency: 'weekly' as const,
         priority: 0.8,

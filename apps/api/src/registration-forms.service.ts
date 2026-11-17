@@ -1,9 +1,12 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { Prisma, RegistrationTermsDocumentState } from '@prisma/client';
 import { AuthorizationService } from './authorization.service';
 import { EventMutationPolicy } from './event-mutation-policy.service';
 import { EVENT_EDITOR_ROLES } from './membership-policy';
+import { readPostEventReport } from './post-event-report-reader';
+import { postEventBiReport } from './post-event-bi-report';
 import { PrismaService } from './prisma.service';
+import { RegistrationTermsDocumentService } from './registration-terms-document.service';
 
 type FieldType = 'TEXT' | 'TEXTAREA' | 'EMAIL' | 'PHONE' | 'DOCUMENT' | 'CNPJ' | 'DATE' | 'NUMBER' | 'SELECT' | 'RADIO' | 'CHECKBOX' | 'PHOTO' | 'CONSENT' | 'REGISTRATION_TYPE';
 type FieldOption = { id: string; label: string };
@@ -22,6 +25,7 @@ export type RegistrationField = {
   placeholder?: string;
   options?: FieldOption[];
   condition?: FieldCondition;
+  appliesToCategoryIds?: string[];
 };
 export type SaveRegistrationFormInput = { expectedRevision: number; fields: RegistrationField[] };
 
@@ -86,6 +90,10 @@ export const REGISTRATION_SYSTEM_FIELDS = [
 ] as const;
 
 const TYPES = new Set<FieldType>(['TEXT', 'TEXTAREA', 'EMAIL', 'PHONE', 'DOCUMENT', 'CNPJ', 'DATE', 'NUMBER', 'SELECT', 'RADIO', 'CHECKBOX', 'PHOTO', 'CONSENT', 'REGISTRATION_TYPE']);
+
+function formTextHasInjection(value: string): boolean {
+  return /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/u.test(value) || /[<>`]|\$\{|javascript\s*:/iu.test(value);
+}
 const OPERATORS = new Set(['EQUALS', 'NOT_EQUALS']);
 
 @Injectable()
@@ -94,18 +102,35 @@ export class RegistrationFormsService {
     private readonly prisma: PrismaService,
     private readonly authorization: AuthorizationService,
     private readonly mutationPolicy: EventMutationPolicy,
+    private readonly termsDocuments: RegistrationTermsDocumentService,
   ) {}
+
+  async postEventReport(userId: string, eventId: string) {
+    const event = await this.requireEvent(userId, eventId);
+    return readPostEventReport(this.prisma, event);
+  }
+
+  async postEventBiReport(userId: string, eventId: string) {
+    return postEventBiReport(await this.postEventReport(userId, eventId));
+  }
 
   async get(userId: string, eventId: string) {
     const event = await this.requireEvent(userId, eventId);
     const scope = { eventId, organizationId: event.organizationId! };
     const form = await this.prisma.eventRegistrationForm.findUnique({ where: { eventId_organizationId: scope } });
     const fields = form ? this.readFields(form.fields) : ESSENTIAL_FIELDS;
+    const registrationCategories = await this.prisma.eventRegistrationCategory.findMany({
+      where: { ...scope, active: true },
+      select: { id: true, name: true },
+      orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
+    });
     return {
       event: { id: event.id, name: event.name, status: event.status },
       form: { revision: form?.revision ?? 0, publishedVersion: form?.publishedVersion ?? 0, fields },
       catalog: REGISTRATION_FIELD_CATALOG,
+      registrationCategories,
       systemFields: REGISTRATION_SYSTEM_FIELDS,
+      termsDocument: await this.termsDocuments.current(event.organizationId!, event.id),
       publicRegistrationEnabled: false,
       message: 'A ficha pode ser preparada e testada, mas a inscrição pública permanece bloqueada até o Go/No-Go da Fase 2.',
     };
@@ -113,9 +138,10 @@ export class RegistrationFormsService {
 
   async save(userId: string, eventId: string, dto: SaveRegistrationFormInput) {
     const event = await this.requireMutableEvent(userId, eventId);
-    const fields = this.validateFields(dto.fields);
     const scope = { eventId, organizationId: event.organizationId! };
     await this.prisma.$transaction(async (tx) => {
+      const categories = await tx.eventRegistrationCategory.findMany({ where: { ...scope, active: true }, select: { id: true } });
+      const fields = this.validateFields(dto.fields, new Set(categories.map((category) => category.id)));
       const existing = await tx.eventRegistrationForm.findUnique({ where: { eventId_organizationId: scope } });
       if ((existing?.revision ?? 0) !== dto.expectedRevision) {
         throw new ConflictException('A ficha foi alterada em outra sessão. Recarregue antes de salvar novamente.');
@@ -140,9 +166,24 @@ export class RegistrationFormsService {
       const form = await tx.eventRegistrationForm.findUnique({ where: { eventId_organizationId: scope } });
       if (!form) throw new BadRequestException('Salve a ficha antes de publicar uma versão.');
       if (form.revision !== expectedRevision) throw new ConflictException('A ficha mudou. Recarregue antes de publicar.');
+      const categories = await tx.eventRegistrationCategory.findMany({ where: { ...scope, active: true }, select: { id: true } });
+      this.validateFields(this.readFields(form.fields), new Set(categories.map((category) => category.id)));
+      const terms = await tx.eventRegistrationTermsDocument.findFirst({
+        where: { ...scope, state: RegistrationTermsDocumentState.ACTIVE },
+        select: { id: true, version: true },
+      });
+      if (!terms) throw new BadRequestException('Anexe o PDF dos termos de inscrição e da Política de Privacidade antes de preservar a versão.');
       const version = form.publishedVersion + 1;
       await tx.eventRegistrationFormVersion.create({
-        data: { ...scope, formId: form.id, version, schema: form.fields as Prisma.InputJsonValue, createdById: userId },
+        data: {
+          ...scope,
+          formId: form.id,
+          version,
+          schema: form.fields as Prisma.InputJsonValue,
+          termsDocumentId: terms.id,
+          termsDocumentVersion: terms.version,
+          createdById: userId,
+        },
       });
       await tx.eventRegistrationForm.update({ where: { id: form.id }, data: { publishedVersion: version } });
       await this.audit(tx, event, userId, 'registration.form_version_published', form.id, { version, revision: form.revision });
@@ -150,7 +191,7 @@ export class RegistrationFormsService {
     return this.get(userId, eventId);
   }
 
-  private validateFields(input: RegistrationField[]) {
+  private validateFields(input: RegistrationField[], activeCategoryIds: Set<string>) {
     if (!Array.isArray(input) || input.length < 3 || input.length > 80) throw new BadRequestException('A ficha deve possuir entre 3 e 80 campos.');
     const ids = new Set<string>();
     const codes = new Set<string>();
@@ -164,6 +205,22 @@ export class RegistrationFormsService {
       ids.add(id); codes.add(code);
       if (!TYPES.has(field.type)) throw new BadRequestException('Tipo de campo não permitido.');
       const options = field.options?.map((option) => ({ id: this.safeId(option.id, 'identificador da opção'), label: this.text(option.label, 1, 100, 'opção') }));
+      if (field.appliesToCategoryIds !== undefined && !Array.isArray(field.appliesToCategoryIds)) {
+        throw new BadRequestException('Seleção de categorias inválida para o campo.');
+      }
+      const appliesToCategoryIds = field.appliesToCategoryIds ?? [];
+      if (appliesToCategoryIds.length > 50) {
+        throw new BadRequestException('Um campo não pode ser aplicado a mais de 50 categorias.');
+      }
+      if (new Set(appliesToCategoryIds).size !== appliesToCategoryIds.length) {
+        throw new BadRequestException('A seleção de categorias do campo contém IDs duplicados.');
+      }
+      if (appliesToCategoryIds.some((categoryId) => typeof categoryId !== 'string' || !activeCategoryIds.has(categoryId))) {
+        throw new BadRequestException('O campo deve usar apenas categorias ativas deste evento.');
+      }
+      if (appliesToCategoryIds.length && ESSENTIAL_FIELDS.some((item) => item.code === code)) {
+        throw new BadRequestException('Campos essenciais precisam aparecer em todas as categorias.');
+      }
       if ((field.type === 'SELECT' || field.type === 'RADIO' || field.type === 'CHECKBOX') && (!options || options.length < 1 || options.length > 50)) {
         throw new BadRequestException('Campos de escolha precisam ter entre 1 e 50 opções.');
       }
@@ -178,6 +235,7 @@ export class RegistrationFormsService {
         ...(field.help ? { help: this.text(field.help, 1, 240, 'ajuda') } : {}),
         ...(field.placeholder ? { placeholder: this.text(field.placeholder, 1, 120, 'placeholder') } : {}),
         ...(options ? { options } : {}),
+        ...(appliesToCategoryIds.length ? { appliesToCategoryIds } : {}),
         ...(field.condition ? { condition: this.condition(field.condition, priorIds, index) } : {}),
       };
     });
@@ -226,10 +284,12 @@ export class RegistrationFormsService {
   }
   private text(value: string, min: number, max: number, label: string) {
     const normalized = value?.trim().replace(/\s+/gu, ' ');
-    if (!normalized || normalized.length < min || normalized.length > max || /[<>]/u.test(normalized)) throw new BadRequestException(`O ${label} é inválido.`);
+    if (!normalized || normalized.length < min || normalized.length > max || formTextHasInjection(normalized)) throw new BadRequestException(`O ${label} é inválido.`);
     return normalized;
   }
   private async audit(tx: Prisma.TransactionClient, event: { id: string; organizationId: string | null }, actorUserId: string, action: string, entityId: string, metadata: Prisma.InputJsonObject) {
     await tx.auditLog.create({ data: { organizationId: event.organizationId!, eventId: event.id, actorUserId, action, entityType: 'EventRegistrationForm', entityId, metadata } });
   }
 }
+
+

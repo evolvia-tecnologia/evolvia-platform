@@ -35,12 +35,18 @@ test('grade do catálogo reserva coluna para os quatro filtros e preserva reflow
   assert.match(catalogStyles, /@media \(max-width:\s*640px\)[\s\S]*grid-template-columns:\s*minmax\(0,\s*1fr\)/u);
 });
 
-test('página pública diferencia tipo, formato e estimativa sem prometer inscrição', () => {
+test('página pública diferencia fatos e condiciona a inscrição à disponibilidade real', () => {
   assert.match(presentation, /<dt>Tipo<\/dt>/u);
   assert.match(presentation, /<dt>Formato<\/dt>/u);
   assert.match(presentation, /<dt>Público estimado<\/dt>/u);
   assert.match(presentation, /formatEstimatedAudience/u);
-  assert.doesNotMatch(presentation, /Inscreva-se/u);
+  assert.match(presentation, /registrationMode &&/u);
+  assert.match(presentation, /id=\{offerAnchor\}/u);
+  assert.match(presentation, /offerTitle === 'Ingressos' \? 'ingressos' : 'inscricoes'/u);
+  assert.match(presentation, /PublicRichText/u);
+  assert.match(presentation, /aria-label="Seções da página"/u);
+  assert.match(presentation, /publicRegistrationCtaLabel/u);
+  assert.match(presentation, /publicParticipantCtaLabel/u);
 });
 
 test('EVA explica somente fatos públicos e recusa inferir estimativa ausente', () => {

@@ -1,11 +1,25 @@
-import type { CSSProperties } from 'react';
+import { Fragment, type CSSProperties, type ReactNode } from 'react';
+import Link from 'next/link';
 import PublicEvaSupport from './public-eva-support';
-import { formatEventDate } from '../lib/event-time-zone';
+import PublicEventLocation from './public-event-location';
+import PublicEventShare from './public-event-share';
+import PublicRichText from './public-rich-text';
+import { formatEventDate, formatPublicEventWhen } from '../lib/event-time-zone';
+import { publicPhoneHref } from '../lib/public-event-contact';
 import {
   formatEstimatedAudience,
   publicEventTypeLabel,
   type PublicEventProfileCode,
 } from '../lib/public-event-profile';
+import {
+  publicOfferClosedLead,
+  publicOfferLead,
+  publicOfferSectionTitle,
+  publicParticipantCtaLabel,
+  publicRegistrationCtaLabel,
+  type PublicRegistrationCategory,
+  type PublicRegistrationMode,
+} from '../lib/public-registration-cta';
 import styles from '../app/evento/[slug]/page.module.css';
 
 export type PublicEventPresentationData = {
@@ -36,6 +50,10 @@ export type PublicEventPresentationData = {
     cover: PublicEventMedia | null;
     socialShare: PublicEventMedia | null;
   };
+  organizer?: {
+    legalName: string;
+    taxId: string;
+  } | null;
   sections: Array<{
     kind: string;
     title: string | null;
@@ -102,6 +120,12 @@ function formatLabel(format: PublicEventPresentationData['event']['format']): st
   return 'Presencial';
 }
 
+function formatCnpj(value: string): string {
+  const digits = value.replace(/\D/gu, '');
+  if (digits.length !== 14) return value;
+  return `${digits.slice(0, 2)}.${digits.slice(2, 5)}.${digits.slice(5, 8)}/${digits.slice(8, 12)}-${digits.slice(12)}`;
+}
+
 function sectionText(content: unknown): string | null {
   if (!content || typeof content !== 'object') return null;
   const record = content as Record<string, unknown>;
@@ -116,13 +140,21 @@ export default function PublicEventPresentation({
   event,
   eyebrow = 'EVENTO PUBLICADO NA EVOLVIA',
   mediaSources,
+  registrationMode = null,
+  categories = [],
+  programContent = null,
 }: {
   event: PublicEventPresentationData;
   eyebrow?: string;
   mediaSources?: Partial<Record<'LOGO' | 'COVER' | 'SOCIAL_SHARE', string>>;
+  registrationMode?: PublicRegistrationMode | null;
+  categories?: PublicRegistrationCategory[];
+  programContent?: ReactNode;
 }) {
-  const startsAt = formatEventDate(event.event.startDate, event.event.timeZone);
-  const endsAt = formatEventDate(event.event.endDate, event.event.timeZone);
+  const startsAt = formatPublicEventWhen(event.event.startDate, event.event.timeZone)
+    ?? formatEventDate(event.event.startDate, event.event.timeZone);
+  const endsAt = formatPublicEventWhen(event.event.endDate, event.event.timeZone)
+    ?? formatEventDate(event.event.endDate, event.event.timeZone);
   const estimatedAudience = formatEstimatedAudience(event.event.estimatedAudience);
   const theme = publicTheme(event.publication.themeConfig);
   const themeStyle = {
@@ -131,14 +163,35 @@ export default function PublicEventPresentation({
     '--event-on-primary': theme.onPrimaryColor,
     '--event-on-accent': theme.onAccentColor,
   } as CSSProperties;
+  const organizerTaxId = event.organizer ? formatCnpj(event.organizer.taxId) : null;
   const shellClasses = [
     styles.eventShell,
     theme.contentWidth === 'WIDE' ? styles.wideContent : '',
     theme.fontScale === 'LARGE' ? styles.largeText : '',
     theme.preset === 'HIGH_CONTRAST' ? styles.highContrast : '',
   ].filter(Boolean).join(' ');
+  const phone = event.publication.publicContactPhone?.trim() || null;
+  const phoneHref = publicPhoneHref(phone);
+  const registrationHref = `/evento/${encodeURIComponent(event.event.slug)}/inscricao`;
+  const participantHref = `/evento/${encodeURIComponent(event.event.slug)}/participante`;
+  const registrationLabel = registrationMode
+    ? publicRegistrationCtaLabel(registrationMode, event.event.profileCode, event.event.eventType)
+    : null;
+  const participantLabel = publicParticipantCtaLabel(event.event.profileCode, event.event.eventType);
+  const offerTitle = publicOfferSectionTitle(event.event.profileCode, event.event.eventType);
+  const offerAnchor = offerTitle === 'Ingressos' ? 'ingressos' : 'inscricoes';
+  const hasAbout = Boolean(event.publication.fullDescription?.trim());
+  const hasLocation = Boolean(event.event.venue?.trim()) && event.event.format !== 'ONLINE';
+  const hasAccessibility = Boolean(event.publication.accessibilitySummary?.trim());
+  const hasContact = Boolean(event.publication.publicContactEmail || phone);
+  const visibleSections = event.sections.flatMap((section, index) => {
+    const text = sectionText(section.content);
+    return text ? [{ section, index, text }] : [];
+  });
 
   return <article className={shellClasses} style={themeStyle}>
+    {/* Mantém a reconciliação RSC fora do host article durante suspensão/replay. */}
+    <Fragment key="public-event-presentation-content">
     {event.media.cover && <img
       className={styles.cover}
       src={mediaSources?.COVER ?? event.media.cover.url}
@@ -146,6 +199,8 @@ export default function PublicEventPresentation({
       width={event.media.cover.width}
       height={event.media.cover.height}
     />}
+    <div className={styles.marketplace}>
+    <div className={styles.mainCol}>
     <header className={styles.hero}>
       {event.media.logo && <img
         className={styles.eventLogo}
@@ -157,43 +212,99 @@ export default function PublicEventPresentation({
       <p className={styles.eyebrow}>{eyebrow}</p>
       <h1>{event.event.name}</h1>
       {event.publication.shortDescription && <p className={styles.lead}>{event.publication.shortDescription}</p>}
-      <dl className={styles.facts}>
-        <div><dt>Tipo</dt><dd>{publicEventTypeLabel(event.event.eventType, event.event.profileCode)}</dd></div>
-        <div><dt>Formato</dt><dd>{formatLabel(event.event.format)}</dd></div>
-        {startsAt && <div><dt>Início</dt><dd>{startsAt}</dd></div>}
-        {endsAt && <div><dt>Encerramento</dt><dd>{endsAt}</dd></div>}
-        {estimatedAudience && <div><dt>Público estimado</dt><dd>{estimatedAudience} pessoas</dd></div>}
-        {event.event.venue && <div><dt>Local</dt><dd>{event.event.venue}</dd></div>}
-      </dl>
     </header>
 
-    {event.publication.fullDescription && <section className={styles.section} aria-labelledby="about-title">
+    <nav className={styles.pageNav} aria-label="Seções da página">
+      {hasAbout && <a href="#sobre">Sobre</a>}
+      {programContent && <a href="#programacao">Programação</a>}
+      <a href={`#${offerAnchor}`}>{offerTitle}</a>
+      {visibleSections.map(({ section, index }) => section.title
+        ? <a key={`${section.sortOrder}-${index}`} href={`#secao-${index}`}>{section.title}</a>
+        : null)}
+      {hasLocation && <a href="#local">Local</a>}
+      {hasAccessibility && <a href="#acessibilidade">Acessibilidade</a>}
+      {hasContact && <a href="#contato">Contato</a>}
+      {event.organizer && <a href="#organizacao">Organização</a>}
+    </nav>
+
+    {hasAbout && <section className={styles.section} id="sobre" aria-labelledby="about-title">
       <h2 id="about-title">Sobre o evento</h2>
-      <p className={styles.prose}>{event.publication.fullDescription}</p>
+      <PublicRichText className={styles.prose} text={event.publication.fullDescription ?? ''} />
     </section>}
 
-    {event.sections.map((section, index) => {
-      const text = sectionText(section.content);
-      if (!text) return null;
-      const titleId = `section-${index}`;
-      return <section className={section.kind === 'HIGHLIGHT' ? styles.highlight : styles.section} key={`${section.sortOrder}-${index}`} aria-labelledby={section.title ? titleId : undefined}>
+    {programContent}
+
+    <section className={styles.section} id={offerAnchor} aria-labelledby="registration-title">
+      <h2 id="registration-title">{offerTitle}</h2>
+      {registrationMode && registrationLabel ? <>
+        <p className={styles.registrationLead}>{publicOfferLead(event.event.profileCode, event.event.eventType)}</p>
+        {categories.length > 0 && <ul className={styles.offerList}>
+          {categories.map((category) => <li key={category.id}>
+            <strong>{category.name}</strong>
+            {category.description && <p>{category.description}</p>}
+            <span className={styles.offerPrice}>{category.priceLabel}</span>
+          </li>)}
+        </ul>}
+        <div className={styles.heroActions}>
+          <Link className={styles.registrationCta} href={registrationHref}>{registrationLabel}</Link>
+          <Link className={`${styles.registrationCta} ${styles.secondaryCta}`} href={participantHref}>{participantLabel}</Link>
+        </div>
+      </> : <>
+        <p className={styles.registrationLead}>{publicOfferClosedLead(event.event.profileCode, event.event.eventType)}</p>
+        <div className={styles.heroActions}>
+          <Link className={`${styles.registrationCta} ${styles.secondaryCta}`} href={participantHref}>{participantLabel}</Link>
+        </div>
+      </>}
+    </section>
+
+    {visibleSections.map(({ section, index, text }) => {
+      const sectionId = `secao-${index}`;
+      const titleId = `${sectionId}-titulo`;
+      return <section className={section.kind === 'HIGHLIGHT' ? styles.highlight : styles.section} id={section.title ? sectionId : undefined} key={`${section.sortOrder}-${index}`} aria-labelledby={section.title ? titleId : undefined}>
         {section.title && <h2 id={titleId}>{section.title}</h2>}
-        <p className={styles.prose}>{text}</p>
+        <PublicRichText className={styles.prose} text={text} />
       </section>;
     })}
 
-    {event.publication.accessibilitySummary && <section className={styles.section} aria-labelledby="accessibility-title">
+    <PublicEventLocation venue={event.event.venue} format={event.event.format} />
+
+    {hasAccessibility && <section className={styles.section} id="acessibilidade" aria-labelledby="accessibility-title">
       <h2 id="accessibility-title">Acessibilidade</h2>
-      <p className={styles.prose}>{event.publication.accessibilitySummary}</p>
+      <PublicRichText className={styles.prose} text={event.publication.accessibilitySummary ?? ''} />
     </section>}
 
-    {(event.publication.publicContactEmail || event.publication.publicContactPhone) && <section className={styles.contact} aria-labelledby="contact-title">
+    {hasContact && <section className={styles.contact} id="contato" aria-labelledby="contact-title">
       <h2 id="contact-title">Contato do evento</h2>
       <div>
         {event.publication.publicContactEmail && <a href={`mailto:${event.publication.publicContactEmail}`}>{event.publication.publicContactEmail}</a>}
-        {event.publication.publicContactPhone && <span>{event.publication.publicContactPhone}</span>}
+        {phone && (phoneHref
+          ? <a href={phoneHref}>{phone}</a>
+          : <span>{phone}</span>)}
       </div>
     </section>}
+
+    {event.organizer && <footer className={styles.organizer} id="organizacao">
+      <p>Organização responsável: {event.organizer.legalName}</p>
+      <p>CNPJ {organizerTaxId}</p>
+    </footer>}
+    </div>
+    <aside className={styles.ticket} aria-labelledby="ticket-title">
+      <h2 id="ticket-title">Participar</h2>
+      {startsAt && <p className={styles.ticketWhen}>{startsAt}</p>}
+      <p className={styles.ticketWhere}>{event.event.format === 'ONLINE' ? 'Evento online' : event.event.venue || 'Local a confirmar'}</p>
+      <dl className={styles.facts}>
+        <div><dt>Tipo</dt><dd>{publicEventTypeLabel(event.event.eventType, event.event.profileCode)}</dd></div>
+        <div><dt>Formato</dt><dd>{formatLabel(event.event.format)}</dd></div>
+        {endsAt && <div><dt>Encerramento</dt><dd>{endsAt}</dd></div>}
+        {estimatedAudience && <div><dt>Público estimado</dt><dd>{estimatedAudience} pessoas. Não é o limite de vagas.</dd></div>}
+      </dl>
+      <div className={styles.heroActions}>
+        {registrationMode && registrationLabel && <Link className={styles.registrationCta} href={registrationHref}>{registrationLabel}</Link>}
+        <Link className={`${styles.registrationCta} ${styles.secondaryCta}`} href={participantHref}>{participantLabel}</Link>
+      </div>
+      <PublicEventShare title={event.event.name} />
+    </aside>
+    </div>
 
     <PublicEvaSupport
       eventName={event.event.name}
@@ -209,5 +320,7 @@ export default function PublicEventPresentation({
       publicContactEmail={event.publication.publicContactEmail}
       publicContactPhone={event.publication.publicContactPhone}
     />
+    </Fragment>
   </article>;
 }
+

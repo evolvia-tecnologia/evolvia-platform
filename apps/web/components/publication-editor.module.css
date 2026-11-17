@@ -168,6 +168,11 @@
   border-radius:var(--radius-md);
 }
 
+.contextGrid .publicLinkCard {
+  grid-column: span 2;
+  min-width: 0;
+}
+
 .contextGrid dt {
   color: var(--color-text-subtle);
   font-size:var(--font-size-xs);
@@ -178,6 +183,55 @@
   margin:var(--space-4) 0 0;
   font-weight:var(--font-weight-semibold);
   overflow-wrap: anywhere;
+}
+
+.contextGrid dd code {
+  display: block;
+  overflow-wrap: anywhere;
+  font: inherit;
+}
+
+.contextGrid dd small {
+  display: block;
+  overflow-wrap: normal;
+  margin-top:var(--space-8);
+  color: var(--color-text-subtle);
+  font-weight: normal;
+  line-height:var(--line-height-ui);
+}
+
+.publicLink,
+.previewLink {
+  color: var(--color-brand-blue-700);
+  font-weight: var(--font-weight-semibold);
+  overflow-wrap: anywhere;
+}
+
+.previewLink {
+  display: inline-block;
+  margin-top:var(--space-12);
+}
+
+.publicLink:focus-visible,
+.previewLink:focus-visible,
+.copyLink:focus-visible {
+  outline: 3px solid currentColor;
+  outline-offset: 3px;
+}
+
+.copyLink {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--space-44);
+  margin-top: var(--space-8);
+  padding: 0 var(--space-16);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: inherit;
+  font-weight: var(--font-weight-bold);
+  cursor: pointer;
 }
 
 .form {
@@ -436,13 +490,14 @@
   flex: 0 0 auto;
   width: 52px;
   height: 52px;
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--color-brand-blue-600);
   border-radius:var(--radius-field);
   display: grid;
   place-items: center;
   font-size:var(--font-size-xs);
   font-weight:var(--font-weight-black);
-  background: var(--color-surface-subtle);
+  background: var(--color-brand-blue-600);
+  color: var(--color-on-dark);
 }
 
 .actions {
@@ -540,6 +595,10 @@
     grid-template-columns: 1fr;
   }
 
+  .contextGrid .publicLinkCard {
+    grid-column: auto;
+  }
+
   .cardHeading {
     flex-direction: column;
   }
@@ -568,3 +627,14 @@
     border: 2px solid CanvasText;
   }
 }
+
+/* Embedded screens use the common event frame, matching the Cursor layout. */
+:global([data-shell="panel"]) .page { min-height: 0; min-width: 0; max-width: none; width: 100%; margin: 0; padding: 0; background: transparent; font-family: var(--font-family-sans); font-weight: var(--font-weight-regular); line-height: var(--line-height-body); }
+:global([data-shell="panel"]) .workspace { width: 100%; max-width: none; min-width: 0; margin: 0; padding: 0; }
+:global([data-shell="panel"]) .topbar { display: none; }
+
+.page { font-family: var(--font-family-sans); font-weight: var(--font-weight-regular); line-height: var(--line-height-body); }
+.page h1 { font-size: var(--font-size-title-responsive); line-height: var(--line-height-compact); font-weight: var(--font-weight-semibold); overflow-wrap: anywhere; }
+.page h2 { font-size: var(--font-size-xl); line-height: var(--line-height-compact); font-weight: var(--font-weight-semibold); overflow-wrap: anywhere; }
+.page h3 { font-size: var(--font-size-lg); line-height: var(--line-height-compact); font-weight: var(--font-weight-medium); overflow-wrap: anywhere; }
+.page :is(input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=color]),select,textarea) { font-family: inherit; font-size: var(--font-size-md); font-weight: var(--font-weight-regular); min-width: 0; max-width: 100%; }

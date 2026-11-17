@@ -46,9 +46,11 @@ const event = await request('/events', {
     endDate: '2026-09-12T23:59:59.000Z',
     venue: 'Centro de Convenções Evolvia',
     registrationMode: 'FREE',
+    subjectAreas: ['saude'],
   },
 });
 assert.equal(event.profileCode, 'SCIENTIFIC_EVENT');
+assert.deepEqual(event.subjectAreas, ['saude']);
 
 const otherEvent = await request('/events', {
   method: 'POST', token, expected: 201,
@@ -61,8 +63,10 @@ const otherEvent = await request('/events', {
     endDate: '2026-09-12T23:59:59.000Z',
     venue: 'Outro local',
     registrationMode: 'FREE',
+    subjectAreas: ['educacao', 'educacao'],
   },
 });
+assert.deepEqual(otherEvent.subjectAreas, ['educacao']);
 
 let structure = await request(`/scientific-events/${event.id}/structure/people`, {
   method: 'POST', token, expected: 201,
@@ -191,6 +195,27 @@ await request(`/scientific-events/${event.id}/program/activities`, {
     title: 'Fora do evento', activityType: 'Palestra', spaceId: room2.id,
     startAt: '2026-09-13T10:00:00.000Z', endAt: '2026-09-13T11:00:00.000Z',
   },
+});
+
+// Uma mudança de horário não pode contornar o conflito de palestrante já vinculado.
+await request(`/scientific-events/${event.id}/program/activities/${activityB.id}`, {
+  method: 'PATCH', token, expected: 409,
+  body: {
+    spaceId: room2.id,
+    startAt: '2026-09-10T10:00:00.000Z',
+    endAt: '2026-09-10T10:30:00.000Z',
+  },
+});
+program = await request(`/scientific-events/${event.id}/program`, { token });
+const unchangedB = program.activities.find((item) => item.id === activityB.id);
+assert.equal(unchangedB.startAt, '2026-09-10T11:00:00.000Z');
+assert.equal(unchangedB.endAt, '2026-09-10T12:00:00.000Z');
+assert.equal(unchangedB.spaceId, auditorium.id);
+
+// Atividades consecutivas continuam válidas na edição.
+await request(`/scientific-events/${event.id}/program/activities/${activityB.id}`, {
+  method: 'PATCH', token,
+  body: { endAt: '2026-09-10T12:30:00.000Z' },
 });
 
 program = await request(`/scientific-events/${event.id}/program`, { token });

@@ -189,7 +189,7 @@ export default function PublicationReleaseGate({
     {normalizedStatus === 'PUBLISHED' && <div className={styles.published} role="status">
       <strong>Página publicada</strong>
       <p>Alterações editoriais exigem um fluxo futuro de revisão; nada será modificado silenciosamente.</p>
-      <Link href={`/evento/${encodeURIComponent(eventSlug)}`} target="_blank" rel="noreferrer">
+      <Link href={`/${encodeURIComponent(eventSlug)}`} target="_blank" rel="noreferrer">
         Abrir página pública
       </Link>
       <small>Indexação pública: controlada pela política segura do ambiente. A homologação permanece fora dos mecanismos de busca.</small>
@@ -206,7 +206,7 @@ export default function PublicationReleaseGate({
         <p className={styles.eyebrow}>CONFIRMAÇÃO EXPLÍCITA</p>
         <h2 id="publication-confirm-title">Publicar esta página agora?</h2>
         <p id="publication-confirm-description">
-          A página ficará disponível no endereço público. Esta ação não ativa Inscrição, pagamentos ou qualquer jornada ainda inexistente.
+          A página ficará disponível no endereço público. Depois de publicar, a fundação do evento deixa de aceitar alterações, inclusive a grade científica. Esta ação não abre sozinha a cobrança.
         </p>
         <label htmlFor="publication-confirmation">
           Digite <strong>PUBLICAR</strong> para confirmar

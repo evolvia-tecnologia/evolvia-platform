@@ -2,6 +2,7 @@
   min-height: 100vh;
   background: var(--color-canvas);
   color: var(--color-text);
+  overflow-wrap: anywhere;
 }
 
 .contact a:focus-visible {
@@ -14,13 +15,106 @@
   --event-accent: var(--color-brand-navy-800);
   --event-on-primary: var(--color-surface);
   --event-on-accent: var(--color-surface);
-  width: min(100% - 2rem, 960px);
+  width: min(100% - 2rem, 1120px);
   margin:0 auto;
   padding:var(--space-24) 0 var(--space-64);
 }
 
 .wideContent {
-  width: min(100% - 2rem, 1120px);
+  width: min(100% - 2rem, 1200px);
+}
+
+.marketplace {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-16);
+  align-items: start;
+}
+
+.mainCol {
+  min-width: 0;
+}
+
+.ticket {
+  display: grid;
+  gap: var(--space-16);
+  padding: var(--space-24);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-hero);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-soft);
+}
+
+.ticket h2 {
+  margin: 0;
+  font-size: var(--font-size-xl);
+  line-height: var(--line-height-heading);
+}
+
+.ticket .facts {
+  margin: 0;
+  grid-template-columns: 1fr;
+}
+
+.ticket .heroActions {
+  margin-top: 0;
+}
+
+.ticketWhen,
+.ticketWhere {
+  margin: 0;
+}
+
+.ticketWhen {
+  color: var(--color-text-strong);
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-bold);
+  line-height: var(--line-height-heading);
+}
+
+.ticketWhere {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-body);
+}
+
+.share {
+  display: grid;
+  gap: var(--space-8);
+}
+
+.share p {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+}
+
+.shareButton {
+  min-height: var(--space-44);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-brand-blue-700);
+  font: inherit;
+  font-weight: var(--font-weight-semibold);
+  text-align: left;
+  cursor: pointer;
+}
+
+.shareButton:focus-visible {
+  outline: 3px solid var(--color-brand-blue-600);
+  outline-offset: 3px;
+}
+
+@media (min-width: 960px) {
+  .marketplace {
+    grid-template-columns: minmax(0, 1fr) minmax(18rem, 22rem);
+  }
+
+  .ticket {
+    position: sticky;
+    top: var(--space-24);
+  }
 }
 
 .largeText {
@@ -37,10 +131,13 @@
 .cover {
   display: block;
   width: 100%;
-  max-height: 420px;
+  height: auto;
+  max-height: 28rem;
+  aspect-ratio: 16 / 9;
   margin-bottom:var(--space-16);
   border-radius:var(--radius-hero);
-  object-fit: cover;
+  object-fit: contain;
+  object-position: center;
   background: var(--color-surface-subtle);
 }
 
@@ -89,7 +186,7 @@
 }
 
 .hero h1 {
-  max-width: 16ch;
+  max-width: 28ch;
   margin:0;
   font-size:var(--font-size-display-lg);
   line-height:var(--line-height-tight);
@@ -159,9 +256,134 @@
 .prose {
   max-width: 72ch;
   margin:0;
-  white-space: pre-wrap;
   color: var(--color-text-muted);
   line-height:var(--line-height-spacious);
+}
+
+.prose p,
+.prose ul,
+.prose ol,
+.prose h3 {
+  margin: 0 0 var(--space-12);
+}
+
+.prose h3 {
+  color: var(--color-text);
+  font-size: var(--font-size-lg);
+  line-height: var(--line-height-tight);
+}
+
+.prose ul,
+.prose ol {
+  padding-left: var(--space-20);
+}
+
+.prose a {
+  color: var(--event-primary);
+  font-weight: var(--font-weight-semibold);
+}
+
+.prose a:focus-visible {
+  outline: 3px solid currentColor;
+  outline-offset: 3px;
+}
+
+.pageNav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-8);
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  margin-top: var(--space-16);
+  padding: var(--space-8) 0;
+  background: var(--color-canvas);
+}
+
+.pageNav a {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  padding: var(--space-8) var(--space-16);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface);
+  color: inherit;
+  font-weight: var(--font-weight-semibold);
+  text-decoration: none;
+}
+
+.pageNav a:focus-visible {
+  outline: 3px solid currentColor;
+  outline-offset: 3px;
+}
+
+.registrationLead,
+.address {
+  max-width: 68ch;
+  margin: 0;
+  color: var(--color-text-muted);
+  line-height: var(--line-height-relaxed);
+}
+
+.address {
+  color: var(--color-text);
+  font-weight: var(--font-weight-semibold);
+}
+
+.offerList {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr));
+  gap: var(--space-12);
+  margin: var(--space-16) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.offerList li {
+  display: grid;
+  gap: var(--space-8);
+  padding: var(--space-16);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  background: var(--color-surface-subtle);
+}
+
+.offerList p {
+  margin: 0;
+  color: var(--color-text-muted);
+  line-height: var(--line-height-relaxed);
+}
+
+.offerList strong {
+  color: var(--color-text);
+}
+
+.offerPrice {
+  color: var(--event-primary);
+  font-weight: var(--font-weight-bold);
+}
+
+.mapFrame {
+  margin-top: var(--space-16);
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  aspect-ratio: 16 / 9;
+  background: var(--color-surface-subtle);
+}
+
+.mapFrame iframe {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+
+.locationNote {
+  margin: var(--space-12) 0 0;
+  color: var(--color-text-muted);
+  line-height: var(--line-height-relaxed);
 }
 
 .contact div {
@@ -186,9 +408,20 @@
   font-weight:var(--font-weight-semibold);
 }
 
+.organizer {
+  margin-top: var(--space-16);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-body);
+}
+
+.organizer p {
+  margin: 0;
+}
+
 @media (max-width: 640px) {
   .eventShell {
-    width: min(100% - 1rem, 960px);
+    width: min(100% - 1rem, 1120px);
     padding-top:var(--space-8);
   }
 
@@ -203,7 +436,11 @@
     border-radius:var(--radius-lg);
   }
 
-  .cover { border-radius:var(--radius-lg); }
+  .cover { border-radius:var(--radius-lg); height: auto; }
+
+  .pageNav {
+    position: static;
+  }
 
   .facts {
     grid-template-columns: 1fr;
@@ -214,7 +451,8 @@
   .hero,
   .section,
   .highlight,
-  .contact {
+  .contact,
+  .ticket {
     border: 1px solid CanvasText;
   }
 
@@ -366,3 +604,94 @@
     outline-color: Highlight;
   }
 }
+
+.registrationCta {
+  display: inline-flex;
+  min-height: 48px;
+  align-items: center;
+  justify-content: center;
+  margin-top: var(--space-24);
+  padding: var(--space-12) var(--space-24);
+  border-radius: var(--radius-pill);
+  background: var(--event-primary);
+  color: var(--event-on-primary);
+  font-weight: var(--font-weight-bold);
+  text-decoration: none;
+}
+.registrationCta:focus-visible {
+  outline: 3px solid currentColor;
+  outline-offset: 3px;
+}
+@media (forced-colors: active) {
+  .registrationCta {
+    border: 1px solid ButtonText;
+    background: ButtonFace;
+    color: ButtonText;
+  }
+}
+
+.heroActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-12);
+  margin-top: var(--space-24);
+}
+.heroActions .registrationCta { margin-top: 0; }
+.secondaryCta { background: var(--color-surface); color: var(--event-primary); border: 2px solid var(--event-primary); }
+@media (max-width: 640px) {
+  .heroActions { flex-direction: column; align-items: stretch; }
+  .heroActions .registrationCta { width: 100%; text-align: center; }
+  .heroActions .registrationCta + .registrationCta { margin-top: 0; }
+}
+
+.locationActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-12);
+  align-items: center;
+  margin-top: var(--space-16);
+}
+
+.locationActions a,
+.locationActions button {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  padding: var(--space-8) var(--space-16);
+  border: 1px solid var(--event-primary);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface);
+  color: var(--event-primary);
+  font: inherit;
+  font-weight: var(--font-weight-semibold);
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.locationActions a:focus-visible,
+.locationActions button:focus-visible {
+  outline: 3px solid currentColor;
+  outline-offset: 3px;
+}
+
+.locationStatus {
+  color: var(--color-text-muted);
+  margin: var(--space-12) 0 0;
+}
+
+@media (max-width: 640px) {
+  .locationActions { flex-direction: column; align-items: stretch; }
+  .locationActions a,
+  .locationActions button { justify-content: center; width: 100%; }
+}
+
+@media (forced-colors: active) {
+  .locationActions a,
+  .locationActions button {
+    border-color: ButtonText;
+    background: ButtonFace;
+    color: ButtonText;
+  }
+}
+

@@ -106,11 +106,11 @@ async function loadParsed() {
   return loadRequiredCapabilitySources();
 }
 
-test('matriz canônica tem 19 tipos e acesso só em Show/Festival', async () => {
+test('matriz canônica tem 20 tipos e acesso só em Show/Festival', async () => {
   const { matrix, policy, webEntries } = await loadParsed();
   assert.equal(matrix.length, EXPECTED_TYPE_COUNT);
-  assert.equal(webEntries.length, 19);
-  assert.equal(new Set(matrix.map((item) => item.tipo)).size, 19);
+  assert.equal(webEntries.length, EXPECTED_TYPE_COUNT);
+  assert.equal(new Set(matrix.map((item) => item.tipo)).size, EXPECTED_TYPE_COUNT);
   assert.deepEqual(VIEWPORTS.map((item) => item.width), [1366, 768, 390, 320]);
 
   const entertainment = matrix.filter((item) => item.familia === policy.entertainmentFamilyId);
@@ -419,7 +419,7 @@ test('página gerada espelha article obrigatório e botão opcional', async () =
   assert.deepEqual(expectedRequiredCodes(other.familia, policy), ['registration']);
 });
 
-test('prova Chromium: 19 tipos, teclado, foco, texto e bloqueio de desmarcar', async () => {
+test('prova Chromium: 20 tipos, teclado, foco, texto e bloqueio de desmarcar', async () => {
   const outputDir = await mkdtemp(join(tmpdir(), 'evolvia-cap-runtime-'));
   const output = join(outputDir, 'required-capabilities-runtime.json');
   const previous = process.env.EVOLVIA_CAPABILITIES_OUTPUT;
@@ -433,7 +433,7 @@ test('prova Chromium: 19 tipos, teclado, foco, texto e bloqueio de desmarcar', a
     assert.doesNotMatch(json, /@|password|Bearer|cpf/u);
     const parsed = JSON.parse(json);
     assert.equal(parsed.ok, true);
-    assert.equal(parsed.tipos.length, 19);
+    assert.equal(parsed.tipos.length, EXPECTED_TYPE_COUNT);
     assert.deepEqual(parsed.viewports, ['1366x768', '768x1024', '390x844', '320x720']);
     assert.equal(parsed.navegador, 'chromium-cdp');
 
@@ -505,7 +505,7 @@ test('extractCapabilityStyles e buildTypeMatrix rejeitam entradas inválidas', a
   const policy = parseWizardRequiredPolicy(await readFile(DEFAULT_SOURCES.wizard, 'utf8'));
   assert.throws(
     () => buildTypeMatrix([], policy),
-    /19 tipos canônicos/u,
+    new RegExp(`${EXPECTED_TYPE_COUNT} tipos canônicos`, 'u'),
   );
   assert.equal(TIMEOUT_MESSAGE.includes('capabilities obrigatórias'), true);
   assert.equal(typeof fileURLToPath(VALIDATOR_URL), 'string');

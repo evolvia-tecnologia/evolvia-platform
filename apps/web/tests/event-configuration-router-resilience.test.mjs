@@ -26,7 +26,7 @@ function catchBlock(source) {
 }
 
 function effectBlock(source) {
-  const block = source.match(/useEffect\(\(\) => \{[\s\S]*?\n  \}, \[eventId, router\]\);/u)?.[0];
+  const block = source.match(/useEffect\(\(\) => \{[\s\S]*?\n  \}, \[eventId, router, retryAttempt\]\);/u)?.[0];
   assert.ok(block, 'efeito da sonda precisa existir');
   return block;
 }
@@ -202,9 +202,9 @@ test('apenas uma sonda permanece em voo e o timer para no terminal', async () =>
   assert.match(effect, /timer = setInterval\(probe, 1500\);\s*probe\(\);/u);
   assert.match(
     effect,
-    /payload\.event\.profileCode === 'SCIENTIFIC_EVENT' && payload\.session\.status === 'COMPLETED'[\s\S]{0,80}stopPolling\(\);/u,
+    /payload\.session\.status === 'COMPLETED' && !reviewRequested[\s\S]{0,80}stopPolling\(\);/u,
   );
-  assert.match(effect, /if \(payload\.session\.status === 'COMPLETED'\) \{\s*stopPolling\(\);/u);
+  assert.match(effect, /if \(payload\.session\.status === 'COMPLETED'\) \{[\s\S]*?setReviewFoundation\(reviewRequested\);\s*stopPolling\(\);/u);
   assert.match(caughtStopOnError(effect), /stopPolling\(\);/u);
   assert.match(effect, /return \(\) => \{\s*active = false;\s*stopPolling\(\);/u);
 
@@ -266,17 +266,21 @@ test('unmount encerra o timer mesmo com sonda atrasada', async () => {
   assert.ok(gate.skipped > skippedBefore);
 });
 
-test('científico COMPLETED continua no painel e demais COMPLETED na ficha', async () => {
+test('científico COMPLETED continua no painel e demais COMPLETED começam por categorias e lotes', async () => {
   const source = await routerSource();
   const effect = effectBlock(source);
 
   assert.match(
     effect,
-    /payload\.event\.profileCode === 'SCIENTIFIC_EVENT' && payload\.session\.status === 'COMPLETED'/u,
+    /payload\.session\.status === 'COMPLETED' && !reviewRequested/u,
   );
   assert.match(effect, /router\.replace\(`\/eventos\/\$\{eventId\}\/painel`\)/u);
+  assert.match(effect, /new URLSearchParams\(window\.location\.search\)\.get\('review'\) === 'foundation'/u);
+  assert.doesNotMatch(effect, /profileCode === 'SCIENTIFIC_EVENT' && payload\.session\.status === 'COMPLETED'/u);
   assert.match(source, /sessionStatus === 'COMPLETED' && !reviewFoundation/u);
-  assert.match(source, /\/eventos\/\$\{eventId\}\/painel\/inscricoes\/ficha/u);
+  assert.match(source, /\/eventos\/\$\{eventId\}\/painel\/inscricoes\/categorias-lotes/u);
+  assert.match(source, /Configurar categorias e lotes/u);
+  assert.match(source, /Configurar ficha de inscrição/u);
   assert.match(source, /<EventWizard eventId=\{eventId\} \/>/u);
   assert.doesNotMatch(
     source,
@@ -317,4 +321,139 @@ test('negativos: sem vazamento técnico, sem polling após erro e sem segunda so
   assert.equal(probes, 1);
   assert.equal(gate.timer, null);
   assert.equal(gate.stopped, true);
+});
+
+
+test('orientação de divulgação abre revisão explícita da fundação científica', async () => {
+  const guidance = await readFile(new URL('../components/publication-eva-guidance.tsx', import.meta.url), 'utf8');
+  assert.match(guidance, /\/configuracao\?review=foundation/u);
+});
+
+test('falha da configuração permite retry explícito e retorno seguro sem publicar nem alterar dados', async () => {
+  const source = await routerSource();
+  const effect = effectBlock(source);
+
+  assert.ok(source.includes('const [retryAttempt, setRetryAttempt] = useState(0)'));
+  assert.ok(source.includes("setError('')"));
+  assert.ok(source.includes('setReady(false)'));
+  assert.ok(source.includes('setRetryAttempt((current) => current + 1)'));
+  assert.ok(effect.includes('[eventId, router, retryAttempt]'));
+  assert.ok(source.includes('onClick={retryProbe}>Tentar novamente'));
+  assert.ok(source.includes('aria-live="polite" aria-labelledby="configuration-error-title"'));
+  assert.ok(source.includes('href="/painel">Todos os eventos'));
+  assert.ok(source.includes('Voltar ao painel do evento'));
+  assert.ok(!source.includes('window.location.reload'));
+  assert.ok(!source.includes('localStorage.clear'));
+});
+
+test('troca de evento não reutiliza o estado autenticado do evento anterior', async () => {
+  const source = await routerSource();
+  const effect = effectBlock(source);
+
+  assert.match(source, /const \[resolvedEventId, setResolvedEventId\] = useState\(''\)/u);
+  assert.match(source, /if \(!ready \|\| resolvedEventId !== eventId\)/u);
+  assert.match(effect, /setReady\(false\);\s*setError\(''\);\s*setSessionStatus\(''\);\s*setResolvedEventId\(''\);\s*setReviewFoundation\(false\);/u);
+  assert.match(effect, /setSessionStatus\(payload\.session\.status\);\s*setResolvedEventId\(eventId\);\s*setReady\(true\);/u);
+  assert.match(effect, /setError\(reason instanceof Error[\s\S]*?\);\s*setResolvedEventId\(eventId\);\s*setReady\(true\);/u);
+
+  const previousEvent = { ready: true, resolvedEventId: 'evento-A' };
+  const mayRender = (eventId) => previousEvent.ready && previousEvent.resolvedEventId === eventId;
+  assert.equal(mayRender('evento-A'), true);
+  assert.equal(mayRender('evento-B'), false, 'evento B não pode exibir estado de A antes de nova sonda');
+});
+
+test('retry invalida imediatamente respostas de sondas anteriores, inclusive falhas tardias', async () => {
+  const source = await routerSource();
+  const effect = effectBlock(source);
+
+  assert.match(source, /const generationRef = useRef\(0\)/u);
+  assert.match(effect, /const generation = \+\+generationRef\.current;/u);
+  assert.match(effect, /if \(!active \|\| stopped \|\| inFlight\) return;\s*if \(generationRef\.current !== generation\) return;/u);
+  assert.match(effect, /if \(!active\) return;\s*if \(generationRef\.current !== generation\) return;\s*const reviewRequested/u);
+  assert.match(effect, /catch \(caught\) \{\s*if \(!active\) return;\s*if \(generationRef\.current !== generation\) return;/u);
+  assert.match(source, /function retryProbe\(\) \{[\s\S]*?generationRef\.current \+= 1;[\s\S]*?setResolvedEventId\(''\);[\s\S]*?setReady\(false\);[\s\S]*?setRetryAttempt\(\(current\) => current \+ 1\);/u);
+
+  let generation = 1;
+  const oldRequest = generation;
+  generation += 1; // clique de retry antes da limpeza do efeito antigo
+  assert.equal(oldRequest === generation, false);
+  const retryRequest = ++generation;
+  assert.equal(retryRequest === generation, true);
+  assert.equal(oldRequest === generation, false, 'resposta tardia não pode atualizar erro nem sessão');
+});
+
+
+test('erro recuperável recebe foco de teclado e loading anuncia progresso sem bloquear leitores', async () => {
+  const source = await routerSource();
+
+  assert.match(source, /const errorHeadingRef = useRef<HTMLHeadingElement>\(null\);/u);
+  assert.match(
+    source,
+    /useEffect\(\(\) => \{\s*if \(ready && resolvedEventId === eventId && error\) \{\s*errorHeadingRef\.current\?\.focus\(\);\s*\}\s*\}, \[error, eventId, ready, resolvedEventId\]\);/u,
+  );
+  assert.match(source, /<h1 id="configuration-error-title" ref=\{errorHeadingRef\} tabIndex=\{-1\}>/u);
+  assert.match(source, /aria-labelledby="configuration-error-title" aria-describedby="configuration-error-description"/u);
+  assert.match(source, /<div id="configuration-error-description" className="error">\{error\}<\/div>/u);
+  assert.match(source, /<div className="loading-mark" aria-hidden="true">E<\/div>/u);
+  assert.match(source, /<p role="status">A EVA está abrindo a configuração do evento\.\.\.<\/p>/u);
+  assert.doesNotMatch(source, /className="loading-screen" aria-busy="true"/u);
+  assert.match(source, /<button type="button" className="btn btn-primary" onClick=\{retryProbe\}>Tentar novamente<\/button>/u);
+  assert.match(source, /href=\{`\/eventos\/\$\{eventId\}\/painel`\}>Voltar ao painel do evento<\/Link>/u);
+  assert.match(source, /href="\/painel">Todos os eventos<\/Link>/u);
+});
+
+
+test('link review=foundation abre a fundação sem clique adicional quando a sessão está concluída', async () => {
+  const source = await routerSource();
+  const effect = effectBlock(source);
+  assert.match(effect, /new URLSearchParams\(window\.location\.search\)\.get\('review'\) === 'foundation'/u);
+  assert.match(effect, /if \(payload\.session\.status === 'COMPLETED' && !reviewRequested\) \{\s*stopPolling\(\);\s*router\.replace/u);
+  assert.match(effect, /if \(payload\.session\.status === 'COMPLETED'\) \{\s*\/\/[^\n]*\n\s*setReviewFoundation\(reviewRequested\);\s*stopPolling\(\);/u);
+  assert.match(source, /sessionStatus === 'COMPLETED' && !reviewFoundation/u);
+  assert.match(source, /<EventWizard eventId=\{eventId\} \/>/u);
+
+  const landingShown = (status, reviewRequested) => status === 'COMPLETED' && !reviewRequested;
+  assert.equal(landingShown('COMPLETED', true), false, 'review explícito abre o wizard');
+  assert.equal(landingShown('COMPLETED', false), true, 'fluxo normal preserva o painel de conclusão');
+  assert.equal(landingShown('ACTIVE', true), false, 'sessão ativa continua no wizard');
+});
+
+
+test('sonda sem resposta termina por timeout e libera retry, sem expor detalhes', async () => {
+  const source = await routerSource();
+  const effect = effectBlock(source);
+
+  assert.match(source, /const PROBE_TIMEOUT_MS = 15000;/u);
+  assert.match(effect, /const controller = new AbortController\(\);/u);
+  assert.match(effect, /requestTimeout = setTimeout\(\(\) => controller\.abort\(\), PROBE_TIMEOUT_MS\);/u);
+  assert.match(effect, /api<WizardRouteProbe>\(`\/event-wizard\/\$\{eventId\}`, \{ signal: controller\.signal \}\)/u);
+  assert.match(effect, /if \(requestTimeout\) clearTimeout\(requestTimeout\);/u);
+  assert.match(effect, /requestController\?\.abort\(\);/u);
+  assert.match(effect, /if \(!active\) return;\s*if \(generationRef\.current !== generation\) return;/u);
+  assert.match(effect, /stopPolling\(\);/u);
+
+  const controller = new AbortController();
+  const neverSettlesWithoutAbort = new Promise((resolve, reject) => {
+    controller.signal.addEventListener('abort', () => reject(Object.assign(new Error('aborted'), { name: 'AbortError' })), { once: true });
+  });
+  const timeout = setTimeout(() => controller.abort(), 10);
+  try {
+    await assert.rejects(neverSettlesWithoutAbort, { name: 'AbortError' });
+    assert.equal(controller.signal.aborted, true);
+  } finally {
+    clearTimeout(timeout);
+  }
+});
+
+
+test('loading e erro oferecem retorno ao evento com fallback global sem exigir reload', async () => {
+  const source = await routerSource();
+  const eventLink = '<Link className="btn btn-secondary" href={`/eventos/${eventId}/painel`}>Voltar ao painel do evento</Link>';
+  const globalLink = '<Link className="btn btn-secondary" href="/painel">Todos os eventos</Link>';
+  const transientViews = source.slice(source.indexOf('if (!ready || resolvedEventId !== eventId)'));
+  assert.equal(transientViews.split(eventLink).length - 1, 2, 'loading e erro devem apontar para o painel do evento atual');
+  assert.equal(source.split(globalLink).length - 1, 2, 'loading e erro devem manter saída global se o evento não estiver acessível');
+  assert.ok(source.includes('onClick={retryProbe}>Tentar novamente'), 'retry permanece disponível');
+  assert.ok(!source.includes('window.location.reload'), 'navegação não deve forçar reload ou duplicar gravações');
+  assert.ok(!source.includes('localStorage.clear'), 'erro não apaga credenciais ou sessão');
 });

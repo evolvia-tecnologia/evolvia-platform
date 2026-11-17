@@ -6,6 +6,7 @@ HOMOLOGATION_DOMAIN="homologacao.evolviatecnologia.com"
 CERT_DIR="/etc/letsencrypt/live/${HOMOLOGATION_DOMAIN}"
 BUILD_CACHE_MAX_AGE="${EVOLVIA_BUILD_CACHE_MAX_AGE:-72h}"
 AUTO_TLS_BOOTSTRAP="${EVOLVIA_AUTO_TLS_BOOTSTRAP:-1}"
+DEV_REDIRECT_BOOTSTRAP="${EVOLVIA_DEV_REDIRECT_BOOTSTRAP:-1}"
 
 if [[ ! -f .env ]]; then
   POSTGRES_PASSWORD="$(openssl rand -hex 24)"
@@ -59,15 +60,7 @@ for i in $(seq 1 60); do
   sleep 3
 done
 
-STAMP="$(date +%Y%m%d-%H%M%S)"
 sudo mkdir -p /opt/evolvia/backups/nginx /var/www/certbot
-
-if [[ -f /etc/nginx/sites-available/default ]]; then
-  sudo cp /etc/nginx/sites-available/default "/opt/evolvia/backups/nginx/default-${STAMP}.conf"
-fi
-if [[ -f /etc/nginx/sites-available/evolvia ]]; then
-  sudo cp /etc/nginx/sites-available/evolvia "/opt/evolvia/backups/nginx/evolvia-${STAMP}.conf"
-fi
 
 NGINX_TEMPLATE="infra/nginx/evolvia.conf"
 PUBLIC_URL="http://${HOMOLOGATION_DOMAIN}"
@@ -79,16 +72,25 @@ else
   echo "[EVOLVIA] Certificado ainda não encontrado; mantendo HTTP restrito ao domínio para emissão ACME."
 fi
 
-sudo install -m 0644 "$NGINX_TEMPLATE" /etc/nginx/sites-available/evolvia
-sudo ln -sfn /etc/nginx/sites-available/evolvia /etc/nginx/sites-enabled/evolvia
+DEPLOY_SHA="$(git rev-parse --verify HEAD)"
+NGINX_SOURCE="$(mktemp /tmp/evolvia-nginx.XXXXXX.conf)"
+trap 'rm -f "$NGINX_SOURCE"' EXIT
+install -m 0600 "$NGINX_TEMPLATE" "$NGINX_SOURCE"
 sudo rm -f /etc/nginx/sites-enabled/default
-sudo nginx -t
-sudo systemctl reload nginx
+sudo bash infra/nginx/apply-staging-nginx.sh "$NGINX_SOURCE" "$DEPLOY_SHA"
+rm -f "$NGINX_SOURCE"
+trap - EXIT
 
 if [[ "$PUBLIC_URL" == http://* && "$AUTO_TLS_BOOTSTRAP" == "1" ]]; then
   echo "[EVOLVIA] Iniciando bootstrap TLS da homologação..."
   bash infra/certbot/bootstrap-homologacao.sh
   PUBLIC_URL="https://${HOMOLOGATION_DOMAIN}"
+fi
+
+if [[ "$DEV_REDIRECT_BOOTSTRAP" == "1" ]]; then
+  echo "[EVOLVIA] Validando certificado e redirecionamento do alias legado dev..."
+  sudo env CERTBOT_EMAIL="${CERTBOT_EMAIL:-}" \
+    bash infra/certbot/bootstrap-dev-redirect.sh
 fi
 
 docker compose ps

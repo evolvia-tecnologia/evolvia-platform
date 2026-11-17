@@ -22,6 +22,7 @@ const EVENT_TYPE_AVAILABILITY_TABLE = [
   { eventType: 'Evento social ou comunitário', title: 'Social ou comunitário', profileCode: 'SOCIAL_COMMUNITY' },
   { eventType: 'Evento religioso ou beneficente', title: 'Religioso ou beneficente', profileCode: 'SOCIAL_COMMUNITY' },
   { eventType: 'Evento esportivo ou torneio', title: 'Esportivo ou torneio', profileCode: 'SOCIAL_COMMUNITY' },
+  { eventType: 'Corrida', title: 'Corrida', profileCode: 'SOCIAL_COMMUNITY' },
   { eventType: 'Outro tipo de evento', title: 'Outro perfil', profileCode: 'OTHER' },
 ];
 
@@ -46,13 +47,13 @@ function catalogTypes() {
   return EVENT_PROFILE_GROUPS.flatMap((group) => group.options.map((option) => option.value));
 }
 
-test('catálogo canônico possui os 19 tipos de evento da tabela', () => {
+test('catálogo canônico possui os 20 tipos de evento da tabela', () => {
   const types = catalogTypes();
   const tableTypes = EVENT_TYPE_AVAILABILITY_TABLE.map((row) => row.eventType);
 
-  assert.equal(types.length, 19);
-  assert.equal(new Set(types).size, 19);
-  assert.equal(EVENT_TYPE_AVAILABILITY_TABLE.length, 19);
+  assert.equal(types.length, 20);
+  assert.equal(new Set(types).size, 20);
+  assert.equal(EVENT_TYPE_AVAILABILITY_TABLE.length, 20);
   assert.deepEqual([...types].sort(), [...tableTypes].sort());
 
   for (const row of EVENT_TYPE_AVAILABILITY_TABLE) {
@@ -99,7 +100,7 @@ test('redirecionamento científico após o Wizard permanece seletivo e legítimo
 
   assert.match(
     router,
-    /payload\.event\.profileCode === 'SCIENTIFIC_EVENT' && payload\.session\.status === 'COMPLETED'/u,
+    /payload\.session\.status === 'COMPLETED' && !reviewRequested/u,
   );
   assert.match(router, /router\.replace\(`\/eventos\/\$\{eventId\}\/painel`\)/u);
   assert.doesNotMatch(

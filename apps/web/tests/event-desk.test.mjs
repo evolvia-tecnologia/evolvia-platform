@@ -1,0 +1,125 @@
+import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
+import test from 'node:test';
+
+const desk = await readFile(new URL('../components/event-desk.tsx', import.meta.url), 'utf8');
+const labelSettings = await readFile(new URL('../components/credential-label-settings.tsx', import.meta.url), 'utf8');
+const kiosk = await readFile(new URL('../components/self-service-kiosk.tsx', import.meta.url), 'utf8');
+const page = await readFile(new URL('../app/eventos/[id]/painel/check-in/page.tsx', import.meta.url), 'utf8');
+const deskCss = await readFile(new URL('../components/event-desk.module.css', import.meta.url), 'utf8');
+const kioskCss = await readFile(new URL('../components/self-service-kiosk.module.css', import.meta.url), 'utf8');
+const labelCss = await readFile(new URL('../components/credential-label.module.css', import.meta.url), 'utf8');
+
+test('a portaria segue recursos ativos e não o perfil do evento', () => {
+  assert.match(page, /<EventDesk eventId=\{id\} \/>/u);
+  assert.match(desk, /access_control/u);
+  assert.match(desk, /material_delivery/u);
+  assert.match(desk, /credential/u);
+  assert.match(desk, /Imprimir credencial/u);
+  assert.match(desk, /Registrar material/u);
+  assert.match(desk, /Registrar acesso à atividade/u);
+  assert.match(desk, /publicDeskFreeConfirmLabel/u);
+  assert.match(desk, /Alterar cadastro/u);
+  assert.match(desk, /role === 'OWNER'/u);
+  assert.match(desk, /publicDeskNewLabel/u);
+  assert.match(desk, /embedded/u);
+  assert.match(desk, /segue na página pública/u);
+  assert.match(desk, /lot\.priceCents > 0/u);
+  assert.doesNotMatch(desk, /SCIENTIFIC_EVENT|CORPORATE_TRAINING|FAIR_EXHIBITION|ENTERTAINMENT|SOCIAL_COMMUNITY/u);
+  assert.match(desk, /Autoatendimento do totem/u);
+  assert.match(desk, /Links do credenciamento/u);
+  assert.match(desk, /Posto da equipe/u);
+  assert.match(desk, /Credenciamento no celular/u);
+  assert.match(desk, /Leitor de QR/u);
+  assert.match(desk, /Lista de etiquetas/u);
+  assert.match(desk, /Relatório de credenciamento/u);
+  assert.match(desk, /Impressão/u);
+  assert.match(desk, /Sorteio/u);
+  assert.match(desk, /Totem de autoatendimento/u);
+  assert.match(desk, /#totens': 'kiosk'/u);
+  assert.match(desk, /Salvar tipos de consulta/u);
+  assert.match(desk, /A logo desta tela é a logo enviada em Divulgação/u);
+  assert.match(desk, /painel\/divulgacao/u);
+  assert.match(kiosk, /logoAlt/u);
+  assert.match(kiosk, /logoAltText/u);
+  assert.match(desk, /\['kiosk', 'Totens'\]/u);
+  assert.match(kiosk, /BEM-VINDO\(A\)/u);
+  assert.match(kiosk, /Confirme se suas informações estão corretas/u);
+  assert.match(kiosk, /solicite ajuda a um atendente/u);
+  assert.match(kiosk, /self-service\/preview/u);
+  assert.match(kiosk, /Insira o número do seu CPF/u);
+  assert.match(kiosk, /Válido para cidadãos brasileiros/u);
+  assert.match(kiosk, /Insira o número do seu passaporte/u);
+  const submitPassport = kiosk.slice(kiosk.indexOf('function submitPassport'), kiosk.indexOf('function editPassport'));
+  assert.match(kiosk, /O passaporte precisa ter de 5 a 40 letras ou números/u);
+  assert.match(submitPassport, /trimmed\.length < 5\) \{\s+setError\(SHORT_PASSPORT\);\s+return;/u);
+  assert.ok(submitPassport.indexOf('setError(SHORT_PASSPORT)') < submitPassport.indexOf('lookup('));
+  assert.match(kiosk, /disabled=\{busy \|\| passport\.trim\(\)\.length === 0\}/u);
+  assert.match(kiosk, /current === SHORT_PASSPORT \? '' : current/u);
+  const choose = kiosk.slice(kiosk.indexOf('function choose'), kiosk.indexOf('async function lookup'));
+  assert.match(choose, /if \(busy\) return;/u);
+  const passportForm = kiosk.slice(kiosk.indexOf("documentMode === 'passport'"), kiosk.indexOf("method === 'EMAIL'"));
+  assert.doesNotMatch(passportForm, /concat/u);
+  assert.match(passportForm, /\['1234567890', 'qwertyuiop', 'asdfghjkl', 'zxcvbnm'\]\.map\(\(row\) => <div key=\{row\} className=\{styles\.keyboardRow\}>/u);
+  assert.match(passportForm, /aria-label="Passaporte"[^>]*disabled=\{busy\}/u);
+  assert.match(passportForm, /disabled=\{busy\} onClick=\{\(\) => typePassport\(key\)\}/u);
+  assert.match(passportForm, /disabled=\{busy\} onClick=\{\(\) => \{ setDocumentMode\('cpf'\); setError\(''\); \}\}>CPF<\/button>/u);
+  assert.match(kiosk, /disabled=\{busy\} onClick=\{\(\) => choose\(item\)\}/u);
+  assert.match(kioskCss, /\.keyboardRow \{ display: flex; flex: 1 0 100%; flex-wrap: nowrap;/u);
+  assert.match(kiosk, /Digite o número da inscrição deste evento/u);
+  assert.match(desk, /CPF ou passaporte/u);
+  assert.match(kiosk, /LIMPAR/u);
+  assert.match(kiosk, /Apresente seu QR Code para leitura/u);
+  assert.match(kiosk, /código de barras da etiqueta/u);
+  assert.match(kiosk, /@gmail\.com/u);
+  assert.match(kiosk, /@hotmail\.com/u);
+  assert.match(kiosk, /Check-in realizado com sucesso/u);
+  assert.match(kiosk, /Agradecemos sua participação e desejamos um ótimo evento/u);
+  assert.match(desk, /Sair não registra a entrada/u);
+  assert.match(desk, /Link do totem com validade/u);
+  assert.match(desk, /30 minutos e 90 dias/u);
+  assert.match(desk, /totem-link/u);
+  assert.match(desk, /Substituir link/u);
+  assert.match(desk, /Encerrar link/u);
+  assert.match(kiosk, /self-service\/access/u);
+  assert.match(kiosk, /\?acesso=/u);
+  assert.match(kiosk, /Este link de autoatendimento não é válido/u);
+  assert.doesNotMatch(kiosk, /Imprima sua etiqueta/u);
+  assert.match(desk, /CredentialLabelSettings/u);
+  assert.match(labelSettings, /Etiqueta térmica/u);
+  assert.match(labelSettings, /4×2 cm/u);
+  assert.match(labelSettings, /10×5 cm/u);
+  assert.match(labelSettings, /Personalizada/u);
+  assert.match(labelSettings, /Nome para crachá/u);
+  assert.match(labelSettings, /Só código de barras/u);
+  assert.match(kiosk, /self-service/u);
+  assert.doesNotMatch(kiosk, /SCIENTIFIC_EVENT|CORPORATE_TRAINING|FAIR_EXHIBITION|ENTERTAINMENT|SOCIAL_COMMUNITY/u);
+});
+
+test('posto e autoatendimento usam tokens e alvos de toque', () => {
+  for (const source of [deskCss, kioskCss]) {
+    assert.doesNotMatch(source, /#[0-9a-fA-F]{3,8}/u);
+    assert.match(source, /var\(--color-brand-blue-600\)/u);
+    assert.match(source, /forced-colors: active/u);
+  }
+  // Papel térmico deve ser branco mesmo quando o painel está em tema escuro.
+  // Permitir somente branco e tinta escura explícitos; demais cores seguem tokens.
+  assert.match(labelCss, /\.sheet, \.preview \{[\s\S]*?background: #ffffff;\s*color: #111827;/u);
+  assert.match(labelCss, /var\(--color-brand-blue-600\)/u);
+  assert.match(labelCss, /forced-colors: active/u);
+  const inkColors = [...labelCss.matchAll(/#[0-9a-fA-F]{3,8}/gu)].map((match) => match[0].toLowerCase());
+  assert.deepEqual([...new Set(inkColors)].sort(), ['#111827', '#ffffff']);
+  assert.match(deskCss, /min-height: var\(--space-44\)/u);
+  assert.match(kioskCss, /min-height: var\(--space-56\)/u);
+  assert.match(deskCss, /@media print/u);
+});
+
+
+test('configuração de etiquetas unifica modelos por categoria e papel sem ocultar as configurações legadas', () => {
+  assert.match(desk, /\['labels', 'Configurar etiquetas'\]/u);
+  assert.doesNotMatch(desk, /\['settings', 'Configurações'\]/u);
+  assert.match(desk, /mode === 'labels' \|\| mode === 'settings'/u);
+  assert.match(desk, /1\. Modelos e campos por categoria[\s\S]*<CredentialCategoryTemplates[\s\S]*2\. Papel, dimensões e códigos[\s\S]*<CredentialLabelSettings/u);
+  assert.match(desk, /categoryLabelTemplates: \[/u);
+  assert.match(desk, /\{ \.\.\.current, label \}/u);
+});

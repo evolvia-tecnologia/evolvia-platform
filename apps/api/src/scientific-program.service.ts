@@ -6,8 +6,10 @@ import {
 } from '@nestjs/common';
 import {
   EventProfileCode,
+  EventStatus,
   Prisma,
   ScientificProgramActivityStatus,
+  ScientificSubmissionStatus,
   ScientificTaxonomyLevel,
 } from '@prisma/client';
 import { AuthorizationService } from './authorization.service';
@@ -30,6 +32,12 @@ import {
 } from './scientific-program-policy';
 import { normalizeScientificText } from './scientific-structure-policy';
 
+const PUBLICATION_CLOSED_EVENT_STATUSES = new Set<EventStatus>([
+  EventStatus.SUSPENDED,
+  EventStatus.FINISHED,
+  EventStatus.CANCELLED,
+]);
+
 @Injectable()
 export class ScientificProgramService {
   constructor(
@@ -41,7 +49,7 @@ export class ScientificProgramService {
   async get(userId: string, eventId: string) {
     const event = await this.requireScientificEvent(userId, eventId);
     const scope = { eventId, organizationId: event.organizationId! };
-    const [spaces, activities, people, taxonomy] = await Promise.all([
+    const [spaces, activities, people, taxonomy, acceptedWorks] = await Promise.all([
       this.prisma.scientificProgramSpace.findMany({
         where: scope,
         orderBy: [{ active: 'desc' }, { name: 'asc' }],
@@ -59,6 +67,7 @@ export class ScientificProgramService {
           taxonomyArea: true,
           taxonomySubarea: true,
           taxonomyTopic: true,
+          submission: { select: { id: true, title: true, status: true, stationPublicCode: true } },
         },
         orderBy: [{ startAt: 'asc' }, { title: 'asc' }],
       }),
@@ -71,6 +80,14 @@ export class ScientificProgramService {
         where: { ...scope, active: true },
         orderBy: [{ level: 'asc' }, { sortOrder: 'asc' }, { name: 'asc' }],
       }),
+      this.prisma.scientificSubmission.findMany({
+        where: {
+          ...scope,
+          status: { in: [ScientificSubmissionStatus.ACCEPTED, ScientificSubmissionStatus.ACCEPTED_WITH_CHANGES] },
+        },
+        select: { id: true, title: true, status: true, stationPublicCode: true },
+        orderBy: [{ title: 'asc' }, { id: 'asc' }],
+      }),
     ]);
 
     const conflicts = this.calculateConflicts(event, activities);
@@ -82,12 +99,14 @@ export class ScientificProgramService {
         format: event.format,
         startDate: event.startDate,
         endDate: event.endDate,
+        timeZone: event.timeZone,
         organizationId: event.organizationId,
       },
       summary: {
         spaces: spaces.filter((item) => item.active).length,
         activities: activities.length,
         readyForReview: activities.filter((item) => item.status === ScientificProgramActivityStatus.READY_FOR_REVIEW).length,
+        published: activities.filter((item) => item.status === ScientificProgramActivityStatus.PUBLISHED).length,
         blockingConflicts: conflicts.filter((item) => item.severity === 'BLOCKING').length,
         warnings: conflicts.filter((item) => item.severity === 'WARNING').length,
       },
@@ -101,6 +120,7 @@ export class ScientificProgramService {
         invitationStatus: item.guestProfile?.invitationStatus ?? null,
       })),
       taxonomy,
+      acceptedWorks,
       conflicts,
       nextAction: this.nextAction(spaces, activities, conflicts),
     };
@@ -207,6 +227,19 @@ export class ScientificProgramService {
     this.assertWindow(event, startAt, endAt);
     await this.validateActivityReferences(scope, dto);
     await this.assertSpaceAvailability(scope, spaceId ?? undefined, startAt, endAt, activity.id);
+    if (dto.startAt !== undefined || dto.endAt !== undefined) {
+      const participants = await this.prisma.scientificProgramParticipant.findMany({
+        where: { ...scope, activityId: activity.id },
+        select: { personId: true },
+      });
+      await this.assertPeopleAvailability(
+        scope,
+        participants.map((participant) => participant.personId),
+        startAt,
+        endAt,
+        activity.id,
+      );
+    }
 
     const data: Prisma.ScientificProgramActivityUpdateInput = {
       status: ScientificProgramActivityStatus.DRAFT,
@@ -245,7 +278,7 @@ export class ScientificProgramService {
 
     const roleConflicts = validateProgramParticipationRole(dto.participationType, dto.customRoleLabel);
     if (roleConflicts.length) throw new BadRequestException(roleConflicts[0].message);
-    await this.assertPersonAvailability(scope, dto.personId, activity.startAt, activity.endAt, activity.id);
+    await this.assertPeopleAvailability(scope, [dto.personId], activity.startAt, activity.endAt, activity.id);
 
     try {
       await this.prisma.$transaction(async (tx) => {
@@ -295,6 +328,72 @@ export class ScientificProgramService {
     return this.get(userId, eventId);
   }
 
+  async linkConfirmedWork(userId: string, eventId: string, activityId: string, submissionId: string | null) {
+    const event = await this.requireScientificEvent(userId, eventId);
+    if (PUBLICATION_CLOSED_EVENT_STATUSES.has(event.status)) {
+      throw new ConflictException({
+        code: 'INVALID_EVENT_STATE',
+        message: 'Não é possível alterar o vínculo científico de um evento suspenso, encerrado ou cancelado.',
+        context: { eventStatus: event.status },
+      });
+    }
+    const organizationId = event.organizationId!;
+    const nextId = submissionId?.trim() || null;
+    if (nextId && !/^[a-z0-9]{10,40}$/u.test(nextId)) throw new NotFoundException('Trabalho não encontrado neste evento.');
+    await this.requireActivity(eventId, organizationId, activityId);
+
+    try {
+      await this.prisma.$transaction(async (tx) => {
+        // Row locks make a concurrent decision or correction on the same work wait for this link, or this link see its result.
+        const [current] = await tx.$queryRaw<{ status: EventStatus }[]>`
+          SELECT "status" FROM "Event" WHERE "id" = ${eventId} AND "organizationId" = ${organizationId} FOR SHARE`;
+        if (!current || PUBLICATION_CLOSED_EVENT_STATUSES.has(current.status)) {
+          throw new ConflictException({
+            code: 'INVALID_EVENT_STATE',
+            message: 'Não é possível alterar o vínculo científico de um evento suspenso, encerrado ou cancelado.',
+            context: { eventStatus: current?.status ?? null },
+          });
+        }
+        const [activity] = await tx.$queryRaw<{ id: string; submissionId: string | null }[]>`
+          SELECT "id", "submissionId" FROM "ScientificProgramActivity"
+          WHERE "id" = ${activityId} AND "eventId" = ${eventId} AND "organizationId" = ${organizationId} FOR UPDATE`;
+        if (!activity) throw new NotFoundException('Atividade não encontrada nesta programação.');
+        if ((activity.submissionId ?? null) === nextId) return;
+        if (nextId) {
+          const [work] = await tx.$queryRaw<{ status: ScientificSubmissionStatus }[]>`
+            SELECT "status" FROM "ScientificSubmission"
+            WHERE "id" = ${nextId} AND "eventId" = ${eventId} AND "organizationId" = ${organizationId} FOR UPDATE`;
+          if (!work) throw new NotFoundException('Trabalho não encontrado neste evento.');
+          if (work.status !== ScientificSubmissionStatus.ACCEPTED && work.status !== ScientificSubmissionStatus.ACCEPTED_WITH_CHANGES) {
+            throw new BadRequestException('Só um trabalho aceito ou aceito com ressalvas pode entrar na programação.');
+          }
+          const taken = await tx.scientificProgramActivity.findFirst({
+            where: { eventId, organizationId, submissionId: nextId, NOT: { id: activity.id } },
+            select: { id: true },
+          });
+          if (taken) throw new ConflictException('Este trabalho já está em outra atividade da programação.');
+        }
+        const linked = await tx.scientificProgramActivity.updateMany({
+          where: { id: activity.id, eventId, organizationId, submissionId: activity.submissionId },
+          data: { submissionId: nextId },
+        });
+        if (linked.count !== 1) throw new ConflictException('A atividade mudou. Atualize a programação.');
+        await this.audit(
+          tx,
+          event,
+          userId,
+          nextId ? 'scientific.program_work_linked' : 'scientific.program_work_unlinked',
+          'ScientificProgramActivity',
+          activity.id,
+          { submissionId: nextId, previousSubmissionId: activity.submissionId ?? null },
+        );
+      });
+    } catch (reason) {
+      this.rethrowUnique(reason, 'Este trabalho já está em outra atividade da programação.');
+    }
+    return this.get(userId, eventId);
+  }
+
   async conflicts(userId: string, eventId: string) {
     const current = await this.get(userId, eventId);
     return { conflicts: current.conflicts, summary: current.summary, nextAction: current.nextAction };
@@ -303,6 +402,7 @@ export class ScientificProgramService {
   async markReadyForReview(userId: string, eventId: string, activityId: string) {
     const event = await this.requireMutableScientificEvent(userId, eventId);
     const activity = await this.requireActivity(eventId, event.organizationId!, activityId, true);
+    if (activity.status === ScientificProgramActivityStatus.PUBLISHED) return this.get(userId, eventId);
     const activities = await this.prisma.scientificProgramActivity.findMany({
       where: { eventId, organizationId: event.organizationId! },
       include: {
@@ -332,6 +432,86 @@ export class ScientificProgramService {
       await this.audit(tx, event, userId, 'scientific.program_activity_ready_for_review', 'ScientificProgramActivity', activity.id, {});
     });
     return this.get(userId, eventId);
+  }
+
+  async publishActivity(userId: string, eventId: string, activityId: string) {
+    const event = await this.requireScientificEvent(userId, eventId);
+    if (PUBLICATION_CLOSED_EVENT_STATUSES.has(event.status)) {
+      throw new ConflictException({
+        code: 'INVALID_EVENT_STATE',
+        message: 'Não é possível publicar atividades de um evento suspenso, encerrado ou cancelado.',
+        context: { eventStatus: event.status },
+      });
+    }
+    const scope = { eventId, organizationId: event.organizationId! };
+    const activity = await this.requireActivity(eventId, event.organizationId!, activityId);
+    if (activity.status === ScientificProgramActivityStatus.PUBLISHED) return this.get(userId, eventId);
+    if (activity.status !== ScientificProgramActivityStatus.READY_FOR_REVIEW) {
+      throw new ConflictException({
+        code: 'PROGRAM_ACTIVITY_NOT_REVIEWED',
+        message: 'Marque a atividade como pronta para revisão antes de publicá-la na página do evento.',
+      });
+    }
+    const activities = await this.prisma.scientificProgramActivity.findMany({
+      where: scope,
+      include: {
+        space: true,
+        participants: { include: { person: { include: { guestProfile: true } } } },
+      },
+    });
+    const blocking = this.calculateConflicts(event, activities).filter(
+      (item) => item.severity === 'BLOCKING' && item.entityIds?.includes(activity.id),
+    );
+    if (blocking.length) {
+      throw new ConflictException({
+        code: 'PROGRAM_CONFLICTS_BLOCK_PUBLICATION',
+        message: 'Resolva os conflitos bloqueantes desta atividade antes de publicá-la.',
+        conflicts: blocking,
+      });
+    }
+
+    await this.transitionActivity(event, userId, activity.id, {
+      from: ScientificProgramActivityStatus.READY_FOR_REVIEW,
+      to: ScientificProgramActivityStatus.PUBLISHED,
+      action: 'scientific.program_activity_published',
+    });
+    return this.get(userId, eventId);
+  }
+
+  async unpublishActivity(userId: string, eventId: string, activityId: string) {
+    const event = await this.requireScientificEvent(userId, eventId);
+    const activity = await this.requireActivity(eventId, event.organizationId!, activityId);
+    if (activity.status !== ScientificProgramActivityStatus.PUBLISHED) return this.get(userId, eventId);
+    await this.transitionActivity(event, userId, activity.id, {
+      from: ScientificProgramActivityStatus.PUBLISHED,
+      to: ScientificProgramActivityStatus.READY_FOR_REVIEW,
+      action: 'scientific.program_activity_unpublished',
+    });
+    return this.get(userId, eventId);
+  }
+
+  private async transitionActivity(
+    event: { id: string; organizationId: string | null },
+    userId: string,
+    activityId: string,
+    change: { from: ScientificProgramActivityStatus; to: ScientificProgramActivityStatus; action: string },
+  ) {
+    await this.prisma.$transaction(async (tx) => {
+      const updated = await tx.scientificProgramActivity.updateMany({
+        where: { id: activityId, eventId: event.id, organizationId: event.organizationId!, status: change.from },
+        data: { status: change.to },
+      });
+      if (updated.count !== 1) {
+        throw new ConflictException({
+          code: 'PROGRAM_ACTIVITY_CHANGED',
+          message: 'A atividade foi alterada por outra pessoa. Atualize a programação e tente novamente.',
+        });
+      }
+      await this.audit(tx, event, userId, change.action, 'ScientificProgramActivity', activityId, {
+        from: change.from,
+        to: change.to,
+      });
+    });
   }
 
   private calculateConflicts(event: any, activities: any[]): ScientificProgramConflict[] {
@@ -420,26 +600,33 @@ export class ScientificProgramService {
     }
   }
 
-  private async assertPersonAvailability(
+  private async assertPeopleAvailability(
     scope: { eventId: string; organizationId: string },
-    personId: string,
+    personIds: string[],
     startAt: Date,
     endAt: Date,
     ignoreActivityId?: string,
   ) {
+    const uniquePersonIds = [...new Set(personIds)];
+    if (!uniquePersonIds.length) return;
     const participations = await this.prisma.scientificProgramParticipant.findMany({
       where: {
         ...scope,
-        personId,
+        personId: { in: uniquePersonIds },
         ...(ignoreActivityId ? { activityId: { not: ignoreActivityId } } : {}),
       },
-      include: { activity: true },
+      select: {
+        activity: { select: { title: true, startAt: true, endAt: true } },
+        person: { select: { name: true } },
+      },
     });
     const conflict = participations.find((item) =>
       programIntervalsOverlap(startAt, endAt, item.activity.startAt, item.activity.endAt),
     );
     if (conflict) {
-      throw new ConflictException(`Esta pessoa já participa da atividade “${conflict.activity.title}” no mesmo horário.`);
+      throw new ConflictException(
+        `A pessoa “${conflict.person.name}” já participa da atividade “${conflict.activity.title}” no mesmo horário.`,
+      );
     }
   }
 
@@ -516,6 +703,7 @@ export class ScientificProgramService {
     if (!activities.length) return 'Crie a primeira atividade escolhendo quando, onde e o que acontece.';
     if (conflicts.some((item) => item.severity === 'BLOCKING')) return 'Revise os conflitos bloqueantes antes de marcar atividades como prontas.';
     if (activities.some((item) => item.status === ScientificProgramActivityStatus.DRAFT)) return 'Revise as atividades em rascunho e marque as que estiverem prontas.';
+    if (activities.some((item) => item.status === ScientificProgramActivityStatus.READY_FOR_REVIEW)) return 'Publique na página do evento as atividades revisadas que o público já pode ver.';
     return 'A programação está pronta para a próxima etapa de revisão do evento.';
   }
 
@@ -554,3 +742,4 @@ export class ScientificProgramService {
     });
   }
 }
+

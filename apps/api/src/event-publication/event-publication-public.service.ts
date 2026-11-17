@@ -1,8 +1,10 @@
 import { Injectable, Optional } from '@nestjs/common';
-import { EventFormat, EventProfileCode, EventStatus, Prisma } from '@prisma/client';
+import { EventFormat, EventProfileCode, EventStatus, OrganizationLegalKind, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma.service';
 import { buildPublicEventDto, PublicEventDto } from './event-publication.public-contract';
 import { EventPublicationMediaService } from './event-publication-media.service';
+import { recordPublicPageView } from '../event-page-view';
+import { discoveryTextWhere, regionWhere, subjectAreaWhere } from './public-discovery.policy';
 
 export type PublicEventDiscoveryItem = {
   name: string;
@@ -16,6 +18,7 @@ export type PublicEventDiscoveryItem = {
   venue: string | null;
   estimatedAudience: number | null;
   shortDescription: string | null;
+  cardMedia: { url: string; usage: 'COVER' | 'LOGO' } | null;
 };
 
 export type PublicEventDiscoveryResult = {
@@ -63,6 +66,8 @@ export class EventPublicationPublicService {
     query?: string;
     format?: EventFormat;
     profileCode?: EventProfileCode;
+    area?: string;
+    region?: string;
     from?: string;
     until?: string;
     page?: number;
@@ -74,37 +79,28 @@ export class EventPublicationPublicService {
     const page = positiveInteger(input.page, 1);
     const pageSize = Math.min(24, positiveInteger(input.pageSize, 12));
 
-    const dateConditions: Prisma.EventWhereInput[] = [];
+    const conditions: Prisma.EventWhereInput[] = [];
     if (from) {
-      dateConditions.push({
+      conditions.push({
         OR: [
           { endDate: { gte: from } },
-          { endDate: null, startDate: { gte: from } },
+          { endDate: null },
         ],
       });
     }
-    if (until) {
-      dateConditions.push({
-        OR: [
-          { endDate: { lt: until } },
-          { endDate: null, startDate: { lt: until } },
-        ],
-      });
-    }
+    if (until) conditions.push({ endDate: { lt: until } });
+    const text = discoveryTextWhere(query);
+    const area = subjectAreaWhere(input.area);
+    const region = regionWhere(input.region);
+    if (text) conditions.push(text);
+    if (area) conditions.push(area);
+    if (region) conditions.push(region);
 
     const where: Prisma.EventWhereInput = {
       status: EventStatus.PUBLISHED,
       ...(input.format ? { format: input.format } : {}),
       ...(input.profileCode ? { profileCode: input.profileCode } : {}),
-      ...(dateConditions.length > 0 ? { AND: dateConditions } : {}),
-      ...(query
-        ? {
-            OR: [
-              { name: { contains: query, mode: 'insensitive' as const } },
-              { venue: { contains: query, mode: 'insensitive' as const } },
-            ],
-          }
-        : {}),
+      ...(conditions.length > 0 ? { AND: conditions } : {}),
     };
 
     const [total, events] = await this.prisma.$transaction([
@@ -122,9 +118,9 @@ export class EventPublicationPublicService {
           timeZone: true,
           venue: true,
           estimatedAudience: true,
-          eventPublication: { select: { shortDescription: true } },
+          eventPublication: { select: { shortDescription: true, coverAssetId: true, logoAssetId: true } },
         },
-        orderBy: [{ startDate: until && !from ? 'desc' : 'asc' }, { createdAt: 'desc' }],
+        orderBy: [{ startDate: from && !until ? 'asc' : 'desc' }, { createdAt: 'desc' }],
         skip: (page - 1) * pageSize,
         take: pageSize,
       }),
@@ -143,6 +139,11 @@ export class EventPublicationPublicService {
         venue: event.venue,
         estimatedAudience: event.estimatedAudience,
         shortDescription: event.eventPublication?.shortDescription ?? null,
+        cardMedia: event.eventPublication?.coverAssetId
+          ? { url: `/api/public/events/${encodeURIComponent(event.slug)}/media/COVER`, usage: 'COVER' as const }
+          : event.eventPublication?.logoAssetId
+            ? { url: `/api/public/events/${encodeURIComponent(event.slug)}/media/LOGO`, usage: 'LOGO' as const }
+            : null,
       })),
       page,
       pageSize,
@@ -177,7 +178,13 @@ export class EventPublicationPublicService {
     }));
   }
 
-  async findBySlug(slug: string): Promise<PublicEventDto | null> {
+  recordVisit(slug: string) {
+    return recordPublicPageView(this.prisma, slug);
+  }
+
+  async findBySlug(slug: string): Promise<(PublicEventDto & {
+    organizer: { legalName: string; taxId: string } | null;
+  }) | null> {
     const normalizedSlug = slug.trim().toLowerCase();
     if (!normalizedSlug) return null;
 
@@ -235,6 +242,15 @@ export class EventPublicationPublicService {
     const media = this.media
       ? await this.media.publicDescriptors(event.id, event.organizationId, event.slug, event.eventPublication)
       : [];
-    return buildPublicEventDto(event, event.eventPublication, event.eventPublicationSections, media);
+    const presented = buildPublicEventDto(event, event.eventPublication, event.eventPublicationSections, media);
+    if (!presented) return null;
+    const profile = await this.prisma.organizationLegalProfile.findUnique({
+      where: { organizationId: event.organizationId },
+      select: { kind: true, legalName: true, taxId: true },
+    });
+    const organizer = profile?.kind === OrganizationLegalKind.COMPANY && profile.legalName && profile.taxId
+      ? { legalName: profile.legalName, taxId: profile.taxId }
+      : null;
+    return { ...presented, organizer };
   }
 }

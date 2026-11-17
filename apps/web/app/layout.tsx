@@ -1,7 +1,11 @@
 import type { Metadata } from 'next';
+import AccessibilityPanel from '../components/accessibility-panel';
+import { ACCESSIBILITY_BOOT_SCRIPT } from '../lib/accessibility-preferences';
 import { DEFAULT_LOCALE } from '../lib/i18n';
 import './design-tokens.css';
 import './globals.css';
+import './print-surface-global.css';
+import './accessibility.css';
 
 export const metadata: Metadata = {
   applicationName: 'Evolvia',
@@ -17,5 +21,11 @@ export const metadata: Metadata = {
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
-  return <html lang={DEFAULT_LOCALE}><body>{children}</body></html>;
+  return <html lang={DEFAULT_LOCALE}>
+    <body>
+      <script dangerouslySetInnerHTML={{ __html: ACCESSIBILITY_BOOT_SCRIPT }} />
+      {children}
+      <AccessibilityPanel />
+    </body>
+  </html>;
 }

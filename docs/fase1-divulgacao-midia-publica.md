@@ -49,3 +49,10 @@ O padrão útil observado no benchmark canônico é usar identidade e imagem de 
 - teste direto de membership ativa, suspensa, removida e papel fora da allowlist com resposta indistinguível;
 - Web typecheck e build de produção;
 - CI natural obrigatório para API, Web, segurança, integração, migration idempotente e ARM64.
+
+
+## Catálogo público: SSR e falhas de mídia — 09/10/2026
+
+O #541 mantém a imagem autorizada no HTML inicial para permitir carregamento no SSR. Falhas anteriores à hidratação são reconciliadas no efeito após montagem; erro de elemento antigo após troca de COVER/LOGO não altera a mídia atual. Uma falha confirmada mantém o fallback sem inventar retry automático. O diagnóstico de browser não ignora contextos antigos nem erros React: registra somente código, enum text/HTML e rota pública sanitizada.
+
+Integrado em `7a8d4d39657e12b7624ab6e62b5221e49e20b1be`, validado pelo CI `37966032162` / job `113941575567` no HEAD `da609eb1`. Hidratação, acessibilidade runtime e ARM64 Web passaram em ambiente descartável. Publicação do merge comprovada no run `37967190612` / job `113947839793`: Commit `7a8d4d39` e readiness API/PostgreSQL confirmados em 09/10 às 17:45 UTC. Gate público permanece vermelho pela versão Nginx; o alias registra hostname mismatch. No browser, home e catálogo abriram, mas a busca científica retornou 502 mesmo após uma única recarga com readiness confirmado. Jornada filtrada e ensaio humano continuam pendentes; nenhum aceite WCAG integral foi atribuído. Rollback por reversão da aplicação, sem alteração de schema ou arquivos de mídia.

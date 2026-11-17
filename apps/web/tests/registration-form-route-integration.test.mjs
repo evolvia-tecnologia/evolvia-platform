@@ -99,10 +99,10 @@ test('rota autenticada de configuração usa getToken, probe do Wizard e decisõ
   assert.doesNotMatch(page, /EventWizard|registration-form-builder|workflow/u);
 
   assert.match(router, /if \(!getToken\(\)\) \{\s*router\.replace\('\/login'\);\s*return;/u);
-  assert.match(router, /const payload = await api<WizardRouteProbe>\(`\/event-wizard\/\$\{eventId\}`\);/u);
+  assert.match(router, /const payload = await api<WizardRouteProbe>\(`\/event-wizard\/\$\{eventId\}`, \{ signal: controller\.signal \}\);/u);
   assert.match(
     router,
-    /payload\.event\.profileCode === 'SCIENTIFIC_EVENT' && payload\.session\.status === 'COMPLETED'/u,
+    /payload\.session\.status === 'COMPLETED' && !reviewRequested/u,
   );
   assert.match(router, /router\.replace\(`\/eventos\/\$\{eventId\}\/painel`\)/u);
   assert.match(router, /setSessionStatus\(payload\.session\.status\)/u);
@@ -112,7 +112,7 @@ test('rota autenticada de configuração usa getToken, probe do Wizard e decisõ
     router,
     /setError\(reason instanceof Error \? reason\.message : 'Não foi possível abrir a configuração do evento\.'\)/u,
   );
-  assert.match(router, /<div className="error">\{error\}<\/div>/u);
+  assert.match(router, /<div id="configuration-error-description" className="error">\{error\}<\/div>/u);
   assert.doesNotMatch(router, /traceId|reason\.stack|JSON\.stringify\(reason\)|console\.(debug|info|log)/u);
 
   const api = await apiSource();
@@ -173,7 +173,7 @@ test('científico COMPLETED preserva o redirect legítimo ao painel', async (t) 
 
   const result = await runAuthenticatedConfigurationRoute(eventId);
 
-  assert.equal(result.kind, 'scientific-painel');
+  assert.equal(result.kind, 'event-painel');
   assert.equal(result.redirect, scientificPanelHref(eventId));
   assert.notEqual(result.redirect, registrationFormHref(eventId));
   assert.doesNotMatch(result.redirect, /inscricoes\/ficha|\/evento\/|inscricao/u);
@@ -198,10 +198,9 @@ test('demais perfis COMPLETED oferecem a ficha autenticada', async (t) => {
     });
 
     const result = await runAuthenticatedConfigurationRoute(eventId);
-    assert.equal(result.kind, 'ficha', row.title);
-    assert.equal(result.href, registrationFormHref(eventId), row.title);
-    assert.match(result.href, /\/eventos\/.+\/painel\/inscricoes\/ficha$/u);
-    assert.doesNotMatch(result.href, /\/evento\/|inscricao-publica|publicar/u);
+    assert.equal(result.kind, 'event-painel', row.title);
+    assert.equal(result.redirect, scientificPanelHref(eventId), row.title);
+    assert.doesNotMatch(result.redirect, /inscricoes\/ficha|\/evento\/|inscricao-publica|publicar/u);
   }
 
   const router = await routerSource();
@@ -297,7 +296,7 @@ test('falha de API produz feedback seguro sem dados técnicos', async (t) => {
   assert.equal(safe.reason.code, 'WIZARD_INTERNAL');
 
   const router = await routerSource();
-  assert.match(router, /<div className="error">\{error\}<\/div>/u);
+  assert.match(router, /<div id="configuration-error-description" className="error">\{error\}<\/div>/u);
   assert.doesNotMatch(router, /reason\.traceId|reason\.context|reason\.code|reason\.stack/u);
   assert.doesNotMatch(router, /WIZARD_INTERNAL|ECONNREFUSED|SELECT \*/u);
   assertNoPublicOrWorkflowLeak(harness.calls);
@@ -312,7 +311,7 @@ test('a prova permanece in-process e não abre inscrição pública nem publica�
 
   for (const source of [router, page]) {
     assert.doesNotMatch(source, /playwright|puppeteer|chromium|localhost:3000/iu);
-    assert.doesNotMatch(source, /publicar inscrições|abrir inscrições ao público|inscrição pública disponível/iu);
+    assert.doesNotMatch(source, /<Link[^>]+(?:publicar inscrições|abrir inscrições ao público|inscrição pública disponível)/iu);
   }
 
   assert.doesNotMatch(

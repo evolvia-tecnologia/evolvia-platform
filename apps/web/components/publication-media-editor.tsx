@@ -17,9 +17,9 @@ type MediaItem = {
 };
 
 const CONFIG: Array<{ usage: Usage; title: string; help: string; decorativeAllowed: boolean }> = [
-  { usage: 'LOGO', title: 'Logo do evento', help: 'Identifica o evento sem substituir seu nome.', decorativeAllowed: false },
-  { usage: 'COVER', title: 'Capa pública', help: 'Apoia a apresentação visual no topo da página.', decorativeAllowed: true },
-  { usage: 'SOCIAL_SHARE', title: 'Imagem de compartilhamento', help: 'Usada nas prévias sociais quando a página estiver publicada.', decorativeAllowed: false },
+  { usage: 'LOGO', title: 'Logo do evento', help: 'Aparece ao lado do nome, no topo da página pública, e é a mesma logo na tela de autoatendimento. O texto alternativo descreve a marca para quem não vê a imagem.', decorativeAllowed: false },
+  { usage: 'COVER', title: 'Capa pública', help: 'É a faixa larga no topo da página, acima do título. Se a imagem só enfeita, marque como decorativa. Se ela informa algo, descreva isso no texto alternativo.', decorativeAllowed: true },
+  { usage: 'SOCIAL_SHARE', title: 'Imagem de compartilhamento', help: 'Aparece quando alguém cola o link no WhatsApp ou em uma rede. Não entra no corpo da página. O texto alternativo explica a imagem nessa prévia.', decorativeAllowed: false },
 ];
 
 function toBase64(file: File): Promise<string> {
@@ -49,6 +49,7 @@ export default function PublicationMediaEditor({
 }) {
   const statusRef = useRef<HTMLDivElement>(null);
   const previewUrlsRef = useRef<string[]>([]);
+  const [revision, setRevision] = useState(publicationRevision);
   const [items, setItems] = useState<MediaItem[]>([]);
   const [previews, setPreviews] = useState<Partial<Record<Usage, string>>>({});
   const [files, setFiles] = useState<Partial<Record<Usage, File>>>({});
@@ -57,6 +58,10 @@ export default function PublicationMediaEditor({
   const [busy, setBusy] = useState<Usage | null>(null);
   const [message, setMessage] = useState('');
   const [isError, setIsError] = useState(false);
+
+  useEffect(() => {
+    setRevision(publicationRevision);
+  }, [publicationRevision]);
 
   const load = async () => {
     const current = await api<MediaItem[]>(`/events/${eventId}/publication/media`);
@@ -102,27 +107,33 @@ export default function PublicationMediaEditor({
     setMessage('');
     setIsError(false);
     try {
-      await api(`/events/${eventId}/publication/media`, {
+      const result = await api<{ publicationRevision: number }>(`/events/${eventId}/publication/media`, {
         method: 'POST',
         body: JSON.stringify({
           usage,
           contentBase64: await toBase64(file),
           altText: decorative && usage === 'COVER' ? null : (altTexts[usage] ?? '').trim(),
           decorative: usage === 'COVER' && decorative,
-          publicationRevision,
+          publicationRevision: revision,
         }),
       });
+      if (typeof result.publicationRevision === 'number') setRevision(result.publicationRevision);
       setFiles((current) => ({ ...current, [usage]: undefined }));
       setAltTexts((current) => ({ ...current, [usage]: '' }));
       if (usage === 'COVER') setDecorative(false);
+      const scrollY = window.scrollY;
       await onChanged();
+      window.scrollTo({ top: scrollY });
       setMessage(`${CONFIG.find((item) => item.usage === usage)?.title} atualizada com segurança.`);
     } catch (reason) {
       setIsError(true);
+      if (reason instanceof ApiError && reason.status === 409) {
+        await onChanged().catch(() => undefined);
+      }
       setMessage(reason instanceof ApiError ? reason.message : 'Não foi possível enviar a imagem.');
     } finally {
       setBusy(null);
-      requestAnimationFrame(() => statusRef.current?.focus());
+      requestAnimationFrame(() => statusRef.current?.focus({ preventScroll: true }));
     }
   };
 
@@ -132,18 +143,24 @@ export default function PublicationMediaEditor({
     setMessage('');
     setIsError(false);
     try {
-      await api(`/events/${eventId}/publication/media/${usage}`, {
+      const result = await api<{ publicationRevision: number }>(`/events/${eventId}/publication/media/${usage}`, {
         method: 'DELETE',
-        body: JSON.stringify({ publicationRevision }),
+        body: JSON.stringify({ publicationRevision: revision }),
       });
+      if (typeof result.publicationRevision === 'number') setRevision(result.publicationRevision);
+      const scrollY = window.scrollY;
       await onChanged();
+      window.scrollTo({ top: scrollY });
       setMessage(`${CONFIG.find((item) => item.usage === usage)?.title} removida da publicação.`);
     } catch (reason) {
       setIsError(true);
+      if (reason instanceof ApiError && reason.status === 409) {
+        await onChanged().catch(() => undefined);
+      }
       setMessage(reason instanceof Error ? reason.message : 'Não foi possível remover a imagem.');
     } finally {
       setBusy(null);
-      requestAnimationFrame(() => statusRef.current?.focus());
+      requestAnimationFrame(() => statusRef.current?.focus({ preventScroll: true }));
     }
   };
 

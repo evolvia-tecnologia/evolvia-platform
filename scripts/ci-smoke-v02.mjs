@@ -1,9 +1,15 @@
 import assert from 'node:assert/strict';
+import { createHmac } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
+import { createSmokeTimeline } from './lib/ci-smoke-timeline.mjs';
+
+// Uma única âncora para o evento, o lote e os benefícios do cenário CAE.
+const smokeTimeline = createSmokeTimeline();
 
 const baseUrl = process.env.EVOLVIA_API_URL ?? 'http://127.0.0.1:4000';
 const webBaseUrl = process.env.EVOLVIA_WEB_URL ?? 'http://127.0.0.1:3000';
 const runId = process.env.GITHUB_RUN_ID ?? `${Date.now()}`;
+const asaasWebhookToken = process.env.ASAAS_WEBHOOK_TOKEN ?? 'evolvia_ci_webhook_token_32_characters_minimum';
 const password = `Validacao-${runId}-Aa9!`;
 const expectedVersion = (await readFile(new URL('../VERSION', import.meta.url), 'utf8')).trim();
 
@@ -11,6 +17,7 @@ async function request(path, {
   method = 'GET',
   token,
   body,
+  headers = {},
   expected = 200,
 } = {}) {
   const response = await fetch(`${baseUrl}${path}`, {
@@ -18,6 +25,7 @@ async function request(path, {
     headers: {
       'content-type': 'application/json',
       ...(token ? { authorization: `Bearer ${token}` } : {}),
+      ...headers,
     },
     body: body === undefined ? undefined : JSON.stringify(body),
   });
@@ -121,6 +129,13 @@ assert.ok(owner.token);
 assert.ok(manager.token);
 assert.ok(owner.organization?.id);
 assert.ok(manager.organization?.id);
+const ownerVerificationToken = createHmac('sha256', process.env.JWT_SECRET ?? '')
+  .update(`email-verification:${owner.user.id}`)
+  .digest('hex');
+await request('/auth/email-verification/confirm', {
+  method: 'POST', expected: 201,
+  body: { token: ownerVerificationToken },
+});
 
 const ownerToken = owner.token;
 const managerToken = manager.token;
@@ -147,6 +162,40 @@ const membership = await request(
   },
 );
 assert.equal(membership.role, 'MANAGER');
+
+const legalProfilePath = `/organizations/${ownerOrganizationId}/legal-profile`;
+const legalProfileBody = {
+  expectedRevision: 0, kind: 'COMPANY', legalName: 'Organização de Validação Ltda',
+  tradeName: 'Validação', taxId: '11.222.333/0001-81',
+  contactEmail: 'fiscal@evolvia-ci.local', postalCode: '01001-000',
+  street: 'Praça da Sé', number: '1', complement: '',
+  district: 'Sé', city: 'São Paulo', state: 'SP',
+  asaasWalletId: '7bafd95a-e783-4a62-9be1-23999af742c6',
+};
+await request(legalProfilePath, { expected: 401 });
+await request(legalProfilePath, { token: managerToken, expected: 404 });
+await request(legalProfilePath, {
+  method: 'PUT', token: managerToken, expected: 404, body: legalProfileBody,
+});
+await request(legalProfilePath, {
+  method: 'PUT', token: ownerToken, expected: 400,
+  body: { ...legalProfileBody, taxId: '11.222.333/0001-82' },
+});
+const savedLegalProfile = await request(legalProfilePath, {
+  method: 'PUT', token: ownerToken, body: legalProfileBody,
+});
+assert.equal(savedLegalProfile.revision, 1);
+assert.equal(savedLegalProfile.profile.taxId, '11222333000181');
+assert.equal(savedLegalProfile.verified, false);
+await request(legalProfilePath, {
+  method: 'PUT', token: ownerToken, expected: 409, body: legalProfileBody,
+});
+const ownLegalProfile = await request(legalProfilePath, { token: ownerToken });
+assert.equal(ownLegalProfile.profile.legalName, legalProfileBody.legalName);
+assert.equal(ownLegalProfile.revision, 1);
+await request(`/organizations/${managerPersonalOrganizationId}/legal-profile`, {
+  token: ownerToken, expected: 404,
+});
 
 const managerOrganizations = await request('/organizations', {
   token: managerToken,
@@ -272,14 +321,15 @@ const wizardAnswers = {
   name: 'Congresso Automatizado Evolvia',
   estimatedAudience: 1200,
   audiencePending: false,
-  startDate: '2026-10-20T12:00:00.000Z',
-  endDate: '2026-10-22T12:00:00.000Z',
+  startDate: smokeTimeline.eventStart,
+  endDate: smokeTimeline.eventEnd,
   timeZone: 'America/Sao_Paulo',
   datesPending: false,
   venue: 'Centro de Convenções e transmissão online',
   venuePending: false,
   registrationMode: 'PAID',
   capabilitiesCustomized: false,
+  subjectAreas: ['educacao'],
 };
 
 const wizardSaved = await request(`/event-wizard/${wizardEventId}`, {
@@ -300,6 +350,7 @@ assert.equal(wizardSaved.answers.audiencePending, false);
 assert.equal(wizardSaved.answers.timeZone, 'America/Sao_Paulo');
 assert.ok(wizardSaved.answers.capabilities.includes('payment'));
 assert.ok(wizardSaved.answers.capabilities.includes('scientific_submission'));
+assert.deepEqual(wizardSaved.answers.subjectAreas, ['educacao']);
 
 await request(`/event-wizard/${wizardEventId}`, {
   method: 'PATCH',
@@ -312,26 +363,137 @@ await request(`/event-wizard/${wizardEventId}`, {
   },
 });
 
+const subjectAreasPath = `/events/${wizardEventId}/subject-areas`;
+await request(subjectAreasPath, { method: 'PATCH', body: { subjectAreas: ['saude'] }, expected: 401 });
+await request(`/events/${privateEvent.id}/subject-areas`, {
+  method: 'PATCH', token: ownerToken, body: { subjectAreas: ['saude'] }, expected: 404,
+});
+await request(subjectAreasPath, {
+  method: 'PATCH', token: ownerToken, body: { subjectAreas: ['saude', 'educacao', 'direito', 'tecnologia'] }, expected: 400,
+});
+const subjectAreasPatched = await request(subjectAreasPath, {
+  method: 'PATCH', token: managerToken, body: { subjectAreas: ['educacao', 'saude', 'educacao'] },
+});
+assert.deepEqual(subjectAreasPatched.subjectAreas, ['educacao', 'saude']);
+assert.equal(subjectAreasPatched.wizardRevision, wizardSaved.session.revision + 1);
+
+// O Wizard aberto antes do PATCH ainda tem a revisão anterior e não pode sobrescrever a área.
+await request(`/event-wizard/${wizardEventId}/complete`, {
+  method: 'POST', token: ownerToken, expected: 409,
+  body: { currentStep: 'review', revision: wizardSaved.session.revision, answers: wizardAnswers },
+});
+const wizardAfterSubjectAreas = await request(`/event-wizard/${wizardEventId}`, { token: ownerToken });
+assert.equal(wizardAfterSubjectAreas.session.revision, subjectAreasPatched.wizardRevision);
+assert.equal(wizardAfterSubjectAreas.session.completionPercent, 92);
+assert.deepEqual(wizardAfterSubjectAreas.answers.subjectAreas, ['educacao', 'saude']);
+
 const wizardCompleted = await request(`/event-wizard/${wizardEventId}/complete`, {
   method: 'POST',
   token: ownerToken,
   expected: 201,
   body: {
     currentStep: 'review',
-    revision: wizardSaved.session.revision,
-    answers: wizardAnswers,
+    revision: wizardAfterSubjectAreas.session.revision,
+    answers: { ...wizardAnswers, subjectAreas: wizardAfterSubjectAreas.answers.subjectAreas },
   },
 });
 
 assert.equal(wizardCompleted.session.status, 'COMPLETED');
+assert.deepEqual(wizardCompleted.answers.subjectAreas, ['educacao', 'saude']);
 assert.equal(wizardCompleted.session.completionPercent, 100);
 assert.equal(wizardCompleted.event.status, 'SETUP');
+
+const authorConfiguration = await request(`/scientific-events/${wizardEventId}/submissions/config`, {
+  method: 'PUT', token: ownerToken,
+  body: { requireFile: false, minAuthors: 1, maxSubmissionsPerAuthor: 2, minKeywords: 2, maxKeywords: 4 },
+});
+assert.equal(authorConfiguration.config.maxSubmissionsPerAuthor, 2);
+const authorModality = await request(`/scientific-events/${wizardEventId}/submissions/modalities`, {
+  method: 'POST', token: ownerToken, expected: 201, body: { name: 'Resumo simples' },
+});
+const authorModalityId = authorModality.modalities.find((item) => item.name === 'Resumo simples')?.id;
+assert.ok(authorModalityId);
 
 const reloadedWizard = await request(`/event-wizard/${wizardEventId}`, {
   token: ownerToken,
 });
 assert.equal(reloadedWizard.answers.estimatedAudience, 1200);
 assert.equal(reloadedWizard.answers.audiencePending, false);
+
+const emptyBenefits = await request(`/events/${wizardEventId}/registration-benefits`, { token: ownerToken });
+assert.equal(emptyBenefits.revision, 0);
+assert.deepEqual(emptyBenefits.benefits, []);
+assert.equal(emptyBenefits.publicRedemptionEnabled, false);
+
+const benefitPeriod = {
+  validFrom: smokeTimeline.lotStart,
+  validUntil: smokeTimeline.lotEnd,
+};
+
+const savedCommercial = await request(`/events/${wizardEventId}/registration-commercial`, {
+  method: 'PUT',
+  token: ownerToken,
+  body: {
+    expectedRevision: 0,
+    categories: [{
+      code: 'participante',
+      name: 'Participante',
+      description: 'Categoria pública validada pelo smoke.',
+      capacity: 20,
+      proofRequirement: 'NONE',
+      lots: [{
+        code: 'lote_unico',
+        name: 'Lote único',
+        startsAt: smokeTimeline.lotStart,
+        endsAt: smokeTimeline.lotEnd,
+        quantity: 10,
+        priceCents: 10000,
+      }],
+    }],
+  },
+});
+assert.equal(savedCommercial.categories.length, 1);
+assert.equal(savedCommercial.categories[0].lots.length, 1);
+await request(`/events/${wizardEventId}/registration-commercial`, {
+  method: 'PUT', token: ownerToken, expected: 400,
+  body: {
+    expectedRevision: 1,
+    categories: savedCommercial.categories.map((category) => ({
+      ...category,
+      lots: category.lots.map((lot) => ({ ...lot, endsAt: smokeTimeline.afterEventEnd })),
+    })),
+  },
+});
+
+const savedBenefits = await request(`/events/${wizardEventId}/registration-benefits`, {
+  method: 'PUT',
+  token: ownerToken,
+  body: {
+    expectedRevision: 0,
+    benefits: [
+      { code: 'LANCAMENTO-20', name: 'Lançamento 20%', kind: 'COUPON', discountPercent: 20, maxUses: 100, ...benefitPeriod },
+      { code: 'CONVIDADO-VIP', name: 'Convidado VIP', kind: 'INVITATION', discountPercent: 0, maxUses: 10, ...benefitPeriod },
+      { code: 'CORTESIA-IMPRENSA', name: 'Cortesia imprensa', kind: 'COURTESY', discountPercent: 100, maxUses: 5, ...benefitPeriod },
+    ],
+  },
+});
+assert.equal(savedBenefits.revision, 1);
+assert.equal(savedBenefits.benefits.length, 3);
+assert.equal(savedBenefits.benefits.find((benefit) => benefit.kind === 'COURTESY')?.discountPercent, 100);
+assert.equal(savedBenefits.publicRedemptionEnabled, false);
+
+await request(`/events/${wizardEventId}/registration-benefits`, {
+  method: 'PUT', token: ownerToken, expected: 409,
+  body: { expectedRevision: 0, benefits: [] },
+});
+await request(`/events/${privateEvent.id}/registration-benefits`, { token: ownerToken, expected: 404 });
+await request(`/events/${sharedEvent.id}/registration-benefits`, {
+  method: 'PUT', token: ownerToken, expected: 400,
+  body: {
+    expectedRevision: 0,
+    benefits: [{ code: 'CUPOM-GRATIS', name: 'Cupom inválido', kind: 'COUPON', discountPercent: 10, maxUses: 1, ...benefitPeriod }],
+  },
+});
 
 const managerWizard = await request('/event-wizard/start', {
   method: 'POST',
@@ -435,6 +597,46 @@ await requestBinary(`/public/events/${completedEvent.slug}/media/LOGO`, {
   expected: 404,
 });
 
+const financialPath = `/events/${wizardEventId}/financial-responsibility`;
+await request(financialPath, { expected: 401 });
+await request(financialPath, { token: managerToken, expected: 404 });
+await request(financialPath, {
+  method: 'PUT', token: managerToken, expected: 404,
+  body: { expectedRevision: 0, sellerOrganizationId: ownerOrganizationId },
+});
+await request(financialPath, {
+  method: 'PUT', token: ownerToken, expected: 404,
+  body: { expectedRevision: 0, sellerOrganizationId: managerPersonalOrganizationId },
+});
+await request(`/events/${wizardEventId}/publication/status`, {
+  method: 'POST', token: ownerToken, expected: 400,
+  body: { targetStatus: 'HOMOLOGATION', publicationRevision: 2 },
+});
+const financialSaved = await request(financialPath, {
+  method: 'PUT', token: ownerToken,
+  body: { expectedRevision: 0, sellerOrganizationId: ownerOrganizationId },
+});
+assert.equal(financialSaved.ready, true);
+assert.equal(financialSaved.configuration.revision, 1);
+assert.equal(financialSaved.seller.legalName, legalProfileBody.legalName);
+assert.equal(financialSaved.documentIssuanceAvailable, false);
+await request(financialPath, {
+  method: 'PUT', token: ownerToken, expected: 409,
+  body: { expectedRevision: 0, sellerOrganizationId: ownerOrganizationId },
+});
+
+const termsPdf = Buffer.from('%PDF-1.4\n1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\ntrailer\n<< /Root 1 0 R >>\n%%EOF\n', 'latin1');
+const termsPath = `/events/${wizardEventId}/registration-form/terms`;
+const termsBody = { fileName: 'termos-ci.pdf', contentBase64: termsPdf.toString('base64') };
+await request(termsPath, { method: 'POST', body: termsBody, expected: 401 });
+// O manager pertence à organização deste evento e pode editar a ficha.\n// Testar isolamento no evento da organização pessoal dele com o owner externo.\nawait request(`/events/${managerWizard.event.id}/registration-form/terms`, {\n  method: 'POST', token: ownerToken, body: termsBody, expected: 404,\n});
+await request(`/public/events/${completedEvent.slug}/registration/terms`, { expected: 404 });
+const termsAttached = await request(termsPath, { method: 'POST', token: ownerToken, body: termsBody, expected: 201 });
+assert.equal(termsAttached.version, 1);
+assert.equal(termsAttached.byteSize, termsPdf.length);
+const privateTerms = await requestBinary(`${termsPath}/file`, { token: ownerToken });
+assert.deepEqual(privateTerms.bytes, termsPdf);
+
 const inHomologation = await request(`/events/${wizardEventId}/publication/status`, {
   method: 'POST',
   token: ownerToken,
@@ -473,9 +675,382 @@ const published = await request(`/events/${wizardEventId}/publication/status`, {
   body: { targetStatus: 'PUBLISHED', publicationRevision: 2, confirmation: 'PUBLICAR' },
 });
 assert.equal(published.event.status, 'PUBLISHED');
+const publicTerms = await requestBinary(`/public/events/${completedEvent.slug}/registration/terms`);
+assert.deepEqual(publicTerms.bytes, termsPdf);
+assert.match(publicTerms.response.headers.get('content-type') ?? '', /application\/pdf/u);
+assert.equal(publicTerms.response.headers.get('x-content-type-options'), 'nosniff');
+assert.match(publicTerms.response.headers.get('content-security-policy') ?? '', /sandbox/u);
+await request(termsPath, { method: 'POST', token: ownerToken, body: termsBody, expected: 409 });
 
 const publicPage = await request(`/public/events/${completedEvent.slug}`);
 assert.equal(publicPage.event.slug, completedEvent.slug);
+
+const registrationOptions = await request(`/public/events/${completedEvent.slug}/registration`);
+assert.equal(registrationOptions.categories.length, 1);
+assert.equal(registrationOptions.categories[0].lots.length, 1);
+assert.equal(registrationOptions.paymentEnabled, true);
+
+const reservationBody = {
+  categoryId: savedCommercial.categories[0].id,
+  lotId: savedCommercial.categories[0].lots[0].id,
+  benefitCode: 'LANCAMENTO-20',
+  answers: {
+    full_name: 'Participante Reserva',
+    preferred_name: 'Participante',
+    identity_document: `DOC-${runId}`,
+    email: `reserva-${runId}@evolvia-ci.local`,
+    phone: '11999999999',
+    terms_acceptance: true,
+  },
+};
+const reservationHeaders = { 'idempotency-key': `ci-reservation-${runId}` };
+await request(`/public/events/${completedEvent.slug}/registration/reservations`, {
+  method: 'POST', expected: 400,
+  headers: { 'idempotency-key': `ci-no-consent-${runId}` },
+  body: { ...reservationBody, answers: { ...reservationBody.answers, terms_acceptance: false } },
+});
+const reservation = await request(`/public/events/${completedEvent.slug}/registration/reservations`, {
+  method: 'POST',
+  headers: reservationHeaders,
+  body: reservationBody,
+  expected: 201,
+});
+assert.equal(reservation.status, 'PENDING_PAYMENT');
+assert.equal(reservation.basePriceCents, 10000);
+assert.equal(reservation.discountPercent, 20);
+assert.equal(reservation.finalPriceCents, 8000);
+assert.match(reservation.protocol, /^EVO-[A-F0-9]{16}$/u);
+assert.equal(reservation.paymentEnabled, true);
+
+const replayedReservation = await request(`/public/events/${completedEvent.slug}/registration/reservations`, {
+  method: 'POST',
+  headers: reservationHeaders,
+  body: reservationBody,
+  expected: 201,
+});
+assert.equal(replayedReservation.protocol, reservation.protocol);
+
+const checkoutHeaders = { 'idempotency-key': `ci-checkout-${runId}` };
+// Pagamento sem política publicada deve falhar antes de criar checkout.
+await request(
+  `/public/events/${completedEvent.slug}/registration/reservations/${reservation.protocol}/checkout`,
+  { method: 'POST', headers: checkoutHeaders, body: {}, expected: 409 },
+);
+await request(`/events/${wizardEventId}/refunds/policy`, {
+  method: 'POST', token: ownerToken, body: { window: 'ANYTIME' }, expected: 201,
+});
+const publishedRefundPolicy = await request(`/public/events/${completedEvent.slug}/refund-policy`);
+assert.equal(publishedRefundPolicy.published, true);
+assert.equal(publishedRefundPolicy.version, 1);
+// Reusar a mesma chave comprova que a negativa não prendeu um checkout inválido.
+
+const checkout = await request(`/public/events/${completedEvent.slug}/registration/reservations/${reservation.protocol}/checkout`, {
+  method: 'POST',
+  headers: checkoutHeaders,
+  body: {},
+  expected: 201,
+});
+assert.equal(checkout.reservationStatus, 'PENDING_PAYMENT');
+assert.equal(checkout.checkoutStatus, 'ACTIVE');
+assert.equal(checkout.amountCents, 8000);
+assert.match(checkout.checkoutUrl, /^http:\/\/127\.0\.0\.1\/evolvia-asaas-stub\/ci_[a-f0-9]{32}$/u);
+
+const replayedCheckout = await request(`/public/events/${completedEvent.slug}/registration/reservations/${reservation.protocol}/checkout`, {
+  method: 'POST',
+  headers: checkoutHeaders,
+  body: {},
+  expected: 201,
+});
+assert.equal(replayedCheckout.checkoutUrl, checkout.checkoutUrl);
+
+await request(`/public/events/${completedEvent.slug}/registration/reservations/${reservation.protocol}/checkout`, {
+  method: 'POST',
+  headers: { 'idempotency-key': `ci-checkout-conflict-${runId}` },
+  body: {},
+  expected: 409,
+});
+
+const pendingReceiptSession = await request(`/public/events/${completedEvent.slug}/participant/sessions`, {
+  method: 'POST', expected: 201,
+  body: { protocol: reservation.protocol, identityDocument: reservationBody.answers.identity_document },
+});
+const pendingReceiptArea = await request(`/public/events/${completedEvent.slug}/participant/me`, {
+  token: pendingReceiptSession.accessToken,
+});
+assert.equal(pendingReceiptArea.paymentReceipt, null);
+
+const providerCheckoutId = checkout.checkoutUrl.split('/').at(-1);
+const webhookBody = {
+  id: `evt_checkout_paid_${runId}`,
+  event: 'CHECKOUT_PAID',
+  checkout: {
+    id: providerCheckoutId,
+    status: 'PAID',
+    items: [{ name: 'Inscrição Evolvia', quantity: 1, value: 80 }],
+    additionalFutureField: 'ignored-by-contract',
+  },
+};
+await request('/webhooks/asaas/checkout', {
+  method: 'POST',
+  headers: { 'asaas-access-token': 'invalid-token-with-32-characters-minimum' },
+  body: webhookBody,
+  expected: 401,
+});
+const webhook = await request('/webhooks/asaas/checkout', {
+  method: 'POST',
+  headers: { 'asaas-access-token': asaasWebhookToken },
+  body: webhookBody,
+  expected: 201,
+});
+assert.deepEqual(webhook, { accepted: true, duplicate: false, queued: false });
+const duplicateWebhook = await request('/webhooks/asaas/checkout', {
+  method: 'POST',
+  headers: { 'asaas-access-token': asaasWebhookToken },
+  body: webhookBody,
+  expected: 201,
+});
+assert.deepEqual(duplicateWebhook, { accepted: true, duplicate: true, queued: false });
+
+const paidStatus = await request(`/public/events/${completedEvent.slug}/registration/reservations/${reservation.protocol}`);
+assert.equal(paidStatus.reservationStatus, 'CONFIRMED');
+assert.equal(paidStatus.checkoutStatus, 'PAID');
+assert.equal(paidStatus.paymentConfirmed, true);
+assert.equal(paidStatus.checkoutUrl, null);
+
+await request('/participant/me', { expected: 401 });
+const participantSignup = {
+  name: 'Participante Reserva',
+  email: reservationBody.answers.email,
+  password,
+};
+// Criar conta não exige inscrição prévia nem documento; o vínculo acontece após confirmar o e-mail.
+const participantAccount = await request('/auth/participant/register', {
+  method: 'POST', expected: 201, body: participantSignup,
+});
+assert.ok(participantAccount.token);
+assert.equal(participantAccount.emailVerificationRequired, true);
+const unverifiedDashboard = await request('/participant/me', { token: participantAccount.token });
+assert.equal(unverifiedDashboard.emailVerified, false);
+assert.equal(unverifiedDashboard.linked, false);
+assert.equal(unverifiedDashboard.events.length, 0);
+await request('/participant/links', {
+  method: 'POST', expected: 403, token: participantAccount.token,
+  body: { identityDocument: reservationBody.answers.identity_document },
+});
+const verificationToken = createHmac('sha256', process.env.JWT_SECRET ?? '')
+  .update(`email-verification:${participantAccount.user.id}`)
+  .digest('hex');
+await request('/auth/email-verification/confirm', {
+  method: 'POST', expected: 201,
+  body: { token: verificationToken },
+});
+await request('/auth/email-verification/confirm', {
+  method: 'POST', expected: 401,
+  body: { token: verificationToken },
+});
+const participantOrganizations = await request('/organizations', { token: participantAccount.token });
+assert.deepEqual(participantOrganizations, []);
+const creationKey = `participant-organization-${runId}`;
+await request('/organizations', {
+  method: 'POST', expected: 400, token: participantAccount.token,
+  body: { name: 'Organização da Participante' },
+});
+const participantOrganization = await request('/organizations', {
+  method: 'POST', expected: 201, token: participantAccount.token,
+  headers: { 'idempotency-key': creationKey },
+  body: { name: 'Organização da Participante' },
+});
+assert.ok(participantOrganization.id);
+const creationReplay = await request('/organizations', {
+  method: 'POST', expected: 201, token: participantAccount.token,
+  headers: { 'idempotency-key': creationKey },
+  body: { name: 'Organização da Participante' },
+});
+assert.equal(creationReplay.id, participantOrganization.id);
+await request('/organizations', {
+  method: 'POST', expected: 409, token: participantAccount.token,
+  headers: { 'idempotency-key': creationKey },
+  body: { name: 'Outro nome' },
+});
+const participantMemberships = await request('/organizations', { token: participantAccount.token });
+assert.equal(participantMemberships.length, 1);
+assert.equal(participantMemberships[0].role, 'OWNER');
+assert.equal(participantMemberships[0].organization.id, participantOrganization.id);
+const accountLogin = await request('/auth/login', {
+  method: 'POST', expected: 201, body: { email: participantSignup.email, password },
+});
+const dashboard = await request('/participant/me', { token: accountLogin.token });
+assert.equal((await request('/me', { token: accountLogin.token })).memberships.length, 1);
+assert.equal(dashboard.emailVerified, true);
+assert.equal(dashboard.linked, false);
+assert.equal(dashboard.events.length, 0);
+await request('/participant/links', {
+  method: 'POST', expected: 401, token: accountLogin.token,
+  body: { identityDocument: 'DOCUMENTO-INCORRETO' },
+});
+const linkedDashboard = await request('/participant/links', {
+  method: 'POST', expected: 201, token: accountLogin.token,
+  body: { identityDocument: reservationBody.answers.identity_document },
+});
+assert.equal(linkedDashboard.linked, true);
+assert.equal(linkedDashboard.events.length, 1);
+assert.equal(linkedDashboard.events[0].slug, completedEvent.slug);
+assert.equal(JSON.stringify(dashboard).includes(reservationBody.answers.identity_document), false);
+const dashboardSession = await request(`/participant/events/${completedEvent.slug}/sessions`, {
+  method: 'POST', expected: 201, token: accountLogin.token, body: {},
+});
+const dashboardArea = await request(`/public/events/${completedEvent.slug}/participant/me`, {
+  token: dashboardSession.accessToken,
+});
+assert.equal(dashboardArea.registration.protocol, reservation.protocol);
+await request(`/participant/events/${privateEvent.slug}/sessions`, {
+  method: 'POST', expected: 404, token: accountLogin.token, body: {},
+});
+
+const organizerReservation = await request(`/public/events/${completedEvent.slug}/registration/reservations`, {
+  method: 'POST', expected: 201, headers: { 'idempotency-key': `ci-dual-role-${runId}` },
+  body: { ...reservationBody,
+    answers: { ...reservationBody.answers, full_name: 'Organizador Participante',
+      identity_document: `DOC-OWNER-${runId}`, email: ownerEmail },
+  },
+});
+const organizerBeforeLink = await request('/participant/me', { token: ownerToken });
+assert.equal(organizerBeforeLink.linked, false);
+const organizerLinked = await request('/participant/links', {
+  method: 'POST', expected: 201, token: ownerToken,
+  body: { protocol: organizerReservation.protocol, identityDocument: `DOC-OWNER-${runId}` },
+});
+assert.equal(organizerLinked.events.length, 1);
+assert.equal(organizerLinked.events[0].status, 'PENDING_PAYMENT');
+assert.equal((await request('/organizations', { token: ownerToken })).length, 1);
+
+await request(`/public/events/${completedEvent.slug}/participant/sessions`, {
+  method: 'POST',
+  body: { identityDocument: 'DOCUMENTO-INCORRETO' },
+  expected: 401,
+});
+
+const participantSession = await request(`/public/events/${completedEvent.slug}/participant/sessions`, {
+  method: 'POST',
+  body: { protocol: reservation.protocol, identityDocument: reservationBody.answers.identity_document },
+  expected: 201,
+});
+assert.match(participantSession.accessToken, /^[a-f0-9]{64}$/u);
+assert.ok(Date.parse(participantSession.expiresAt) > Date.now());
+
+const participantArea = await request(`/public/events/${completedEvent.slug}/participant/me`, {
+  token: participantSession.accessToken,
+});
+assert.equal(participantArea.event.slug, completedEvent.slug);
+assert.equal(participantArea.registration.protocol, reservation.protocol);
+assert.equal(participantArea.registration.status, 'CONFIRMED');
+assert.equal(participantArea.registration.category, savedCommercial.categories[0].name);
+assert.equal(participantArea.registration.lot, savedCommercial.categories[0].lots[0].name);
+assert.equal(participantArea.payment.status, 'PAID');
+assert.match(participantArea.paymentReceipt.number, /^EVO-R-[A-F0-9]{20}$/u);
+assert.equal(participantArea.paymentReceipt.amountCents, 8000);
+assert.equal(participantArea.fiscalDocument.status, 'NOT_CONFIGURED');
+for (const forbidden of ['registrationData', 'identityHash', 'emailHash', 'tokenHash', 'full_name']) {
+  assert.equal(JSON.stringify(participantArea).includes(forbidden), false);
+}
+
+assert.equal(participantArea.event.profileCode, 'SCIENTIFIC_EVENT');
+await request(`/public/events/${completedEvent.slug}/participant/submissions`, { expected: 401 });
+const authorPath = `/public/events/${completedEvent.slug}/participant/submissions`;
+const authorBefore = await request(authorPath, { token: participantSession.accessToken });
+assert.equal(authorBefore.available, true);
+assert.deepEqual(authorBefore.submissions, []);
+const authorBody = {
+  modalityId: authorModalityId,
+  title: 'Primeiro trabalho de autor confirmado',
+  abstractText: 'Resumo científico submetido pelo participante confirmado no evento de validação.',
+  keywords: ['evento', 'pesquisa'],
+  institution: 'Instituto Evolvia',
+};
+const authorHeaders = { 'idempotency-key': `ci-author-${runId}-first` };
+const authorSubmitted = await request(authorPath, {
+  method: 'POST', expected: 201, token: participantSession.accessToken, headers: authorHeaders, body: authorBody,
+});
+assert.equal(authorSubmitted.status, 'SUBMITTED');
+assert.equal(authorSubmitted.duplicate, false);
+const authorReplay = await request(authorPath, {
+  method: 'POST', expected: 201, token: participantSession.accessToken, headers: authorHeaders, body: authorBody,
+});
+assert.equal(authorReplay.id, authorSubmitted.id);
+assert.equal(authorReplay.duplicate, true);
+await request(authorPath, {
+  method: 'POST', expected: 409, token: participantSession.accessToken, headers: authorHeaders,
+  body: { ...authorBody, title: 'Outro título na mesma chave' },
+});
+const authorAfter = await request(authorPath, { token: participantSession.accessToken });
+assert.equal(authorAfter.submissions.length, 1);
+assert.equal(authorAfter.submissions[0].currentVersion, 1);
+const organizerSubmissions = await request(`/scientific-events/${wizardEventId}/submissions`, { token: ownerToken });
+assert.equal(organizerSubmissions.summary.submitted, 1);
+assert.equal(organizerSubmissions.submissions[0].versions.length, 1);
+assert.equal(organizerSubmissions.submissions[0].authors.length, 1);
+
+assert.match(participantArea.credential.code, /^EVQ1\.[a-z0-9]+\.[a-f0-9]{64}$/u);
+assert.equal(participantArea.credential.checkedInAt, null);
+
+await request(`/events/${wizardEventId}/check-in`, {
+  method: 'POST', body: { code: participantArea.credential.code }, expected: 401,
+});
+await request(`/events/${privateEvent.id}/check-in`, {
+  method: 'POST', token: ownerToken, body: { code: participantArea.credential.code }, expected: 404,
+});
+await request(`/events/${wizardEventId}/check-in`, {
+  method: 'POST', token: ownerToken, body: { code: 'EVQ1.invalid.signature' }, expected: 400,
+});
+const checkIn = await request(`/events/${wizardEventId}/check-in`, {
+  method: 'POST', token: managerToken, body: { code: participantArea.credential.code }, expected: 201,
+});
+assert.equal(checkIn.protocol, reservation.protocol);
+assert.equal(checkIn.alreadyCheckedIn, false);
+const repeatedCheckIn = await request(`/events/${wizardEventId}/check-in`, {
+  method: 'POST', token: ownerToken, body: { code: participantArea.credential.code }, expected: 201,
+});
+assert.equal(repeatedCheckIn.alreadyCheckedIn, true);
+assert.equal(repeatedCheckIn.checkedInAt, checkIn.checkedInAt);
+const refreshedParticipantArea = await request(`/public/events/${completedEvent.slug}/participant/me`, {
+  token: participantSession.accessToken,
+});
+assert.equal(refreshedParticipantArea.credential.checkedInAt, checkIn.checkedInAt);
+await request(`/events/${wizardEventId}/registration-operations`, { expected: 401 });
+await request(`/events/${privateEvent.id}/registration-operations`, { token: ownerToken, expected: 404 });
+await request(`/events/${wizardEventId}/registration-operations?status=INVALID`, { token: ownerToken, expected: 400 });
+const operations = await request(`/events/${wizardEventId}/registration-operations?status=CONFIRMED&protocol=${reservation.protocol}`, {
+  token: managerToken,
+});
+assert.equal(operations.event.id, wizardEventId);
+assert.equal(operations.summary.CONFIRMED, 1);
+assert.equal(operations.summary.checkedIn, 1);
+assert.equal(operations.total, 1);
+assert.equal(operations.items[0].protocol, reservation.protocol);
+assert.equal(operations.items[0].paymentStatus, 'PAID');
+assert.equal(operations.items[0].checkedInAt, checkIn.checkedInAt);
+for (const forbidden of ['registrationData', 'identityHash', 'emailHash', 'tokenHash', 'full_name', 'identity_document']) {
+  assert.equal(JSON.stringify(operations).includes(forbidden), false);
+}
+
+
+const revokedParticipantSession = await request(`/public/events/${completedEvent.slug}/participant/sessions/current`, {
+  method: 'DELETE',
+  token: participantSession.accessToken,
+});
+assert.deepEqual(revokedParticipantSession, { revoked: true });
+await request(`/public/events/${completedEvent.slug}/participant/me`, {
+  token: participantSession.accessToken,
+  expected: 401,
+});
+
+await request(`/public/events/${completedEvent.slug}/registration/reservations`, {
+  method: 'POST',
+  headers: { 'idempotency-key': `ci-reservation-duplicate-${runId}` },
+  body: reservationBody,
+  expected: 409,
+});
+
 assert.equal(publicPage.event.eventType, 'Congresso ou evento científico');
 assert.equal(publicPage.event.profileCode, 'SCIENTIFIC_EVENT');
 assert.equal(publicPage.event.estimatedAudience, 1200);
@@ -503,12 +1078,35 @@ const incompatibleProfile = await request('/public/events?profile=ENTERTAINMENT&
 assert.equal(incompatibleProfile.total, 0);
 assert.deepEqual(incompatibleProfile.items, []);
 
+for (const area of ['educacao', 'saude']) {
+  const marked = await request(`/public/events?area=${area}&q=Congresso%20Automatizado`);
+  assert.equal(marked.total, 1, `área marcada ${area}`);
+  assert.equal(marked.items[0].slug, completedEvent.slug);
+}
+const unmarkedArea = await request('/public/events?area=direito&q=Congresso%20Automatizado');
+assert.equal(unmarkedArea.total, 0);
+const remarked = await request(subjectAreasPath, { method: 'PATCH', token: ownerToken, body: { subjectAreas: ['direito'] } });
+assert.deepEqual(remarked.subjectAreas, ['direito']);
+assert.equal((await request('/public/events?area=direito&q=Congresso%20Automatizado')).total, 1);
+assert.equal((await request('/public/events?area=saude&q=Congresso%20Automatizado')).total, 0);
+const renderedArea = await requestWeb('/eventos?area=direito&q=Congresso%20Automatizado');
+assert.match(renderedArea.html, /Congresso Automatizado Evolvia/u);
+await request(subjectAreasPath, { method: 'PATCH', token: ownerToken, body: { subjectAreas: ['educacao', 'saude'] } });
+
 const renderedCatalog = await requestWeb('/eventos?profile=SCIENTIFIC_EVENT');
 assert.match(renderedCatalog.html, /Pular para o conteúdo principal/u);
 assert.match(renderedCatalog.html, /id="main-content"/u);
 assert.match(renderedCatalog.html, /Congresso Automatizado Evolvia/u);
 assert.match(withoutReactTextSeparators(renderedCatalog.html), /Público estimado:\s*1\.200 pessoas/u);
-assert.match(renderedCatalog.html, new RegExp(`/evento/${completedEvent.slug}`, 'u'));
+assert.ok(renderedCatalog.html.includes(`href="/${completedEvent.slug}"`));
+
+const renderedParticipantEntry = await requestWeb('/participante');
+assert.match(renderedParticipantEntry.html, /Área do participante/u);
+assert.match(renderedParticipantEntry.html, /Carregando sua conta/u);
+
+const renderedParticipantLogin = await requestWeb(`/evento/${completedEvent.slug}/participante`);
+assert.match(renderedParticipantLogin.html, /Acompanhe sua inscrição/u);
+assert.match(renderedParticipantLogin.html, /Código da inscrição/u);
 
 const renderedEvent = await requestWeb(`/evento/${completedEvent.slug}`);
 assert.match(renderedEvent.html, /Pular para o conteúdo principal/u);
@@ -519,6 +1117,8 @@ assert.match(renderedEvent.html, /Congresso Automatizado Evolvia/u);
 assert.match(renderedEvent.html, /Público estimado/u);
 assert.match(withoutReactTextSeparators(renderedEvent.html), /1\.200 pessoas/u);
 assert.match(renderedEvent.html, /Que tipo de evento é\?/u);
+assert.match(renderedEvent.html, /Área do participante/u);
+assert.match(renderedEvent.html, /Já me inscrevi/u);
 assert.match(renderedEvent.html, /alt="Marca do evento de validação"/u);
 assert.equal(renderedEvent.html.includes(ownerOrganizationId), false);
 for (const forbidden of ['storageKey', 'checksumSha256', 'byteSize', 'updatedAt']) {
@@ -531,5 +1131,196 @@ assert.equal(
 );
 
 await requestWeb(`/evento/${completedEvent.slug}-inexistente`, { expected: 404 });
+
+const raceAccount = await request('/auth/register', {
+  method: 'POST', expected: 201,
+  body: { name: 'Teste de concorrência', email: `race-${runId}@evolvia-ci.local`, password },
+});
+const raceRequests = await Promise.all([0, 1].map(() => request('/organizations', {
+  method: 'POST', expected: 201, token: raceAccount.token,
+  headers: { 'idempotency-key': creationKey },
+  body: { name: 'Organização concorrente' },
+})));
+assert.equal(raceRequests[0].id, raceRequests[1].id);
+assert.notEqual(raceRequests[0].id, participantOrganization.id);
+const raceOrganizations = await request('/organizations', { token: raceAccount.token });
+assert.equal(raceOrganizations.length, 2); // pessoal + uma criação concorrente
+
+const participantProfileScenarios = [
+  ['Congresso ou evento científico', 'SCIENTIFIC_EVENT', 'IN_PERSON', 'saude'],
+  ['Evento corporativo ou treinamento', 'CORPORATE_TRAINING', 'HYBRID', 'negocios'],
+  ['Feira ou exposição', 'FAIR_EXHIBITION', 'IN_PERSON', 'empreendedorismo'],
+  ['Show ou entretenimento', 'ENTERTAINMENT', 'IN_PERSON', 'entretenimento'],
+  ['Evento social ou comunitário', 'SOCIAL_COMMUNITY', 'IN_PERSON', 'espiritualidade'],
+  ['Outro tipo de evento', 'OTHER', 'ONLINE', 'tecnologia'],
+];
+const profileJourneys = [];
+const profileNow = Date.now();
+const profileStart = new Date(profileNow + 30 * 86400000).toISOString();
+const profileEnd = new Date(profileNow + 31 * 86400000).toISOString();
+// Fixtures isoladas no banco descartável do CI; não altera contas da homologação.
+for (const [eventType, profileCode, format, subjectArea] of participantProfileScenarios) {
+  const started = await request('/event-wizard/start', {
+    method: 'POST', token: ownerToken, expected: 201,
+    body: { organizationId: ownerOrganizationId, eventType },
+  });
+  assert.equal(started.event.profileCode, profileCode);
+  const eventId = started.event.id;
+  const answers = {
+    ...started.answers, eventType, format, name: `Jornada CI ${profileCode} ${runId}`,
+    estimatedAudience: 20, audiencePending: false, startDate: profileStart, endDate: profileEnd,
+    timeZone: 'America/Sao_Paulo', datesPending: false,
+    venue: format === 'ONLINE' ? 'Evento online' : 'Ambiente descartável de testes',
+    venuePending: false, registrationMode: 'FREE',
+    capabilitiesCustomized: true, capabilities: ['registration', 'credential', 'access_control'],
+    subjectAreas: [subjectArea],
+  };
+  const completed = await request(`/event-wizard/${eventId}/complete`, {
+    method: 'POST', token: ownerToken, expected: 201,
+    body: { currentStep: 'review', revision: started.session.revision, answers },
+  });
+  assert.equal(completed.event.status, 'SETUP');
+  const slug = completed.event.slug;
+  const commercial = await request(`/events/${eventId}/registration-commercial`, {
+    method: 'PUT', token: ownerToken,
+    body: { expectedRevision: 0, categories: [{
+      code: 'participante', name: 'Participante', capacity: 20, proofRequirement: 'NONE',
+      lots: [{ code: 'unico', name: 'Lote único', quantity: 20, priceCents: 0,
+        startsAt: new Date(profileNow - 86400000).toISOString(), endsAt: profileEnd }],
+    }] },
+  });
+  await request(`/events/${eventId}/registration-form/terms`, {
+    method: 'POST', token: ownerToken, expected: 201, body: termsBody,
+  });
+  const editorial = await request(`/events/${eventId}/publication`, {
+    method: 'PATCH', token: ownerToken,
+    body: { revision: 0, shortDescription: 'Teste descartável da jornada de inscrição por perfil.',
+      publicContactEmail: 'teste@evolvia-ci.local', accessibilitySummary: 'Teste de acesso e formulário.' },
+  });
+  const media = await request(`/events/${eventId}/publication/media`, {
+    method: 'POST', token: ownerToken, expected: 201,
+    body: { usage: 'LOGO', contentBase64: logoBase64, altText: 'Marca de teste',
+      decorative: false, publicationRevision: editorial.publication.revision },
+  });
+  for (const targetStatus of ['HOMOLOGATION', 'READY_TO_PUBLISH', 'PUBLISHED']) {
+    await request(`/events/${eventId}/publication/status`, {
+      method: 'POST', token: ownerToken, expected: 201,
+      body: { targetStatus, publicationRevision: media.publicationRevision,
+        ...(targetStatus === 'PUBLISHED' ? { confirmation: 'PUBLICAR' } : {}) },
+    });
+  }
+  const journeyQuery = encodeURIComponent(`Jornada CI ${profileCode} ${runId}`);
+  const byArea = await request(`/public/events?area=${subjectArea}&q=${journeyQuery}`);
+  assert.equal(byArea.total, 1, `${profileCode} encontrado pela área ${subjectArea}`);
+  assert.equal(byArea.items[0].slug, slug);
+  assert.equal((await request(`/public/events?area=direito&q=${journeyQuery}`)).total, 0);
+  const options = await request(`/public/events/${slug}/registration`);
+  // Provider readiness is independent from a free lot; CI configures the Asaas stub.
+  assert.equal(options.paymentEnabled, registrationOptions.paymentEnabled);
+  assert.equal(options.event.registrationMode, 'FREE');
+  const category = commercial.categories[0];
+  const body = { categoryId: category.id, lotId: category.lots[0].id, answers: {
+    ...reservationBody.answers, full_name: 'Participante dos seis perfis',
+  } };
+  const headers = { 'idempotency-key': `ci-profile-${profileCode}-${runId}` };
+  const reserved = await request(`/public/events/${slug}/registration/reservations`, {
+    method: 'POST', expected: 201, headers, body,
+  });
+  assert.equal(reserved.status, 'CONFIRMED');
+  assert.equal(reserved.finalPriceCents, 0);
+  const replay = await request(`/public/events/${slug}/registration/reservations`, {
+    method: 'POST', expected: 201, headers, body,
+  });
+  assert.equal(replay.protocol, reserved.protocol);
+  const linked = await request('/participant/links', {
+    method: 'POST', expected: 201, token: accountLogin.token,
+    body: { identityDocument: reservationBody.answers.identity_document },
+  });
+  assert.equal(linked.linked, true);
+  assert.ok(linked.events.some((item) => item.slug === slug && item.status === 'CONFIRMED'));
+  const session = await request(`/participant/events/${slug}/sessions`, {
+    method: 'POST', expected: 201, token: accountLogin.token, body: {},
+  });
+  await request(`/public/events/${slug}/participant/me`, { expected: 401 });
+  const area = await request(`/public/events/${slug}/participant/me`, { token: session.accessToken });
+  assert.equal(area.event.profileCode, profileCode);
+  assert.equal(area.registration.status, 'CONFIRMED');
+  assert.equal(area.registration.protocol, reserved.protocol);
+  assert.match(area.credential.code, /^EVQ1\.[a-z0-9]+\.[a-f0-9]{64}$/u);
+  const first = await request(`/events/${eventId}/check-in`, {
+    method: 'POST', token: ownerToken, expected: 201, body: { code: area.credential.code },
+  });
+  assert.equal(first.alreadyCheckedIn, false);
+  const second = await request(`/events/${eventId}/check-in`, {
+    method: 'POST', token: ownerToken, expected: 201, body: { code: area.credential.code },
+  });
+  assert.equal(second.alreadyCheckedIn, true);
+  const refreshed = await request(`/public/events/${slug}/participant/me`, { token: session.accessToken });
+  assert.equal(refreshed.credential.checkedInAt, first.checkedInAt);
+
+  const evaluationPath = `/events/${eventId}/evaluation`;
+  const participantEvaluationPath = `/public/events/${slug}/participant/evaluation`;
+  await request(participantEvaluationPath, { token: session.accessToken, expected: 403 });
+  const evaluationConfig = { active: true, title: 'Sua experiência no evento', questions: [
+    { id: 'nota', label: 'Qual sua nota?', kind: 'RATING', required: true },
+    { id: 'comentario', label: 'O que podemos melhorar?', kind: 'TEXT', required: false },
+  ] };
+  await request(evaluationPath, { method: 'PUT', token: raceAccount.token, body: evaluationConfig, expected: 404 });
+  const configuredEvaluation = await request(evaluationPath, { method: 'PUT', token: ownerToken, body: evaluationConfig });
+  assert.equal(configuredEvaluation.responseCount, 0);
+  await request(participantEvaluationPath, { expected: 401 });
+  await request(participantEvaluationPath, { token: ownerToken, expected: 401 });
+  if (profileJourneys.length) {
+    await request(participantEvaluationPath, { token: profileJourneys[0].accessToken, expected: 401 });
+  }
+  const questionnaire = await request(participantEvaluationPath, { token: session.accessToken });
+  assert.equal(questionnaire.title, evaluationConfig.title);
+  assert.equal(questionnaire.submittedAt, null);
+  const evaluationHeaders = { 'idempotency-key': `evaluation-${profileCode}-${runId}` };
+  await request(participantEvaluationPath, { method: 'PUT', token: session.accessToken, headers: evaluationHeaders,
+    body: { nota: 6 }, expected: 400 });
+  const evaluationAnswers = { nota: 5, comentario: `Resposta isolada de ${profileCode}` };
+  const evaluated = await request(participantEvaluationPath, { method: 'PUT', token: session.accessToken,
+    headers: evaluationHeaders, body: evaluationAnswers });
+  assert.equal(evaluated.replay, false);
+  const evaluationReplay = await request(participantEvaluationPath, { method: 'PUT', token: session.accessToken,
+    headers: evaluationHeaders, body: evaluationAnswers });
+  assert.equal(evaluationReplay.replay, true);
+  assert.equal(evaluationReplay.submittedAt, evaluated.submittedAt);
+  await request(participantEvaluationPath, { method: 'PUT', token: session.accessToken,
+    headers: evaluationHeaders, body: { ...evaluationAnswers, nota: 4 }, expected: 409 });
+  await request(participantEvaluationPath, { method: 'PUT', token: session.accessToken,
+    headers: { 'idempotency-key': `evaluation-new-${profileCode}-${runId}` }, body: evaluationAnswers, expected: 409 });
+  const submittedQuestionnaire = await request(participantEvaluationPath, { token: session.accessToken });
+  assert.equal(submittedQuestionnaire.submittedAt, evaluated.submittedAt);
+  await request(`${evaluationPath}/responses`, { token: raceAccount.token, expected: 404 });
+  const evaluationRows = await request(`${evaluationPath}/responses`, { token: ownerToken });
+  assert.equal(evaluationRows.rows.length, 1);
+  assert.deepEqual(evaluationRows.rows[0].answers, evaluationAnswers);
+  for (const forbidden of ['email', 'identityDocument', 'reservationId', 'organizationId']) {
+    assert.equal(Object.hasOwn(evaluationRows.rows[0], forbidden), false);
+  }
+  await request(evaluationPath, { method: 'PUT', token: ownerToken,
+    body: { ...evaluationConfig, questions: [{ ...evaluationConfig.questions[0], label: 'Pergunta alterada' }] }, expected: 409 });
+  // PostgreSQL jsonb reordena chaves: a mesma configuração deve permitir abrir/fechar após respostas.
+  const closedEvaluation = await request(evaluationPath, { method: 'PUT', token: ownerToken,
+    body: { ...evaluationConfig, active: false } });
+  assert.equal(closedEvaluation.config.active, false);
+  assert.equal(closedEvaluation.responseCount, 1);
+  await request(participantEvaluationPath, { token: session.accessToken, expected: 403 });
+  const reopenedEvaluation = await request(evaluationPath, { method: 'PUT', token: ownerToken, body: evaluationConfig });
+  assert.equal(reopenedEvaluation.config.active, true);
+
+  profileJourneys.push({ profileCode, eventId, slug, accessToken: session.accessToken });
+}
+const allProfilesDashboard = await request('/participant/me', { token: accountLogin.token });
+for (const { slug } of profileJourneys) {
+  assert.ok(allProfilesDashboard.events.some((item) => item.slug === slug));
+}
+console.log('CI_PARTICIPANT_PROFILES_OK: 6/6 inscrição gratuita, repetição, conta, credencial e check-in');
+
+
+
+console.log('CI_EVALUATION_PROFILES_OK: 6/6 configuração, sessão, resposta, replay, histórico e isolamento');
 
 console.log('CI_SMOKE_OK');

@@ -30,6 +30,30 @@ export function formatEventDate(
   return formatterWithFallback('pt-BR', timeZone, options).format(date);
 }
 
+export function formatPublicEventWhen(value: string | null, timeZone: string | null): string | null {
+  if (!value) return null;
+  const weekday = formatEventDate(value, timeZone, { weekday: 'long' });
+  const dayMonth = formatEventDate(value, timeZone, { day: 'numeric', month: 'short' });
+  const time = formatEventDate(value, timeZone, { hour: '2-digit', minute: '2-digit' });
+  if (!weekday || !dayMonth || !time) return null;
+  return `${weekday}, ${dayMonth} às ${time}`;
+}
+
+export function formatPublicEventSchedule(
+  startDate: string | null,
+  endDate: string | null,
+  timeZone: string | null,
+): string | null {
+  const startDay = startDate ? formatCalendarDateKey(startDate, timeZone) : null;
+  const endDay = endDate ? formatCalendarDateKey(endDate, timeZone) : null;
+  if (startDay && endDay && startDay !== endDay) {
+    const start = formatEventDate(startDate, timeZone, { dateStyle: 'medium' });
+    const end = formatEventDate(endDate, timeZone, { dateStyle: 'medium' });
+    return start && end ? `${start} a ${end}` : start;
+  }
+  return formatPublicEventWhen(startDate, timeZone);
+}
+
 export function formatCalendarDateKey(
   value: Date | string,
   timeZone: string | null,
@@ -68,3 +92,11 @@ export function canonicalEventDateInstant(value: string): string | null {
   }
   return instant.toISOString();
 }
+
+export function localDateTimeInputValue(value: string | null): string {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  return new Date(date.getTime() - date.getTimezoneOffset() * 60_000).toISOString().slice(0, 19);
+}
+

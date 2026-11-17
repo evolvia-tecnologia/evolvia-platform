@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ApiError, api, getToken } from '../lib/api';
 import EventWizard from './event-wizard';
 
@@ -14,9 +14,14 @@ type WizardRouteProbe = {
 };
 
 const PUBLIC_CONFIGURATION_ERROR = 'Não foi possível abrir a configuração do evento.';
+const PROBE_TIMEOUT_MS = 15000;
 
 function registrationFormHref(eventId: string) {
   return `/eventos/${eventId}/painel/inscricoes/ficha`;
+}
+
+function registrationCommercialHref(eventId: string) {
+  return `/eventos/${eventId}/painel/inscricoes/categorias-lotes`;
 }
 
 function RegistrationFormAccess({
@@ -29,6 +34,7 @@ function RegistrationFormAccess({
   onReviewFoundation?: () => void;
 }) {
   const href = registrationFormHref(eventId);
+  const commercialHref = registrationCommercialHref(eventId);
 
   if (variant === 'landing') {
     return (
@@ -41,10 +47,12 @@ function RegistrationFormAccess({
             <p className="eyebrow">CONFIGURAÇÃO DO EVENTO</p>
             <h1 id="registration-form-access-title">Ficha de inscrição</h1>
             <p id="registration-form-access-lead" className="completion-lead">
-              Preparar e versionar a ficha não abre inscrições ao público. Esta configuração está disponível para todos os perfis de evento.
+              Comece pelas categorias e lotes. Preparar e versionar a ficha não abre inscrições ao público. Esta configuração está disponível para todos os perfis de evento.
             </p>
             <div className="completion-actions">
-              <Link className="btn btn-primary" href={href}>Configurar ficha de inscrição</Link>
+              <Link className="btn btn-primary" href={commercialHref}>Configurar categorias e lotes</Link>
+              <Link className="btn btn-secondary" href={href}>Configurar ficha de inscrição</Link>
+              <Link className="btn btn-secondary" href={`/eventos/${eventId}/painel`}>Voltar ao painel do evento</Link>
               {onReviewFoundation ? (
                 <button type="button" className="btn btn-secondary" onClick={onReviewFoundation}>
                   Revisar fundação
@@ -63,9 +71,12 @@ function RegistrationFormAccess({
         <div>
           <span className="eva-mini">EVA</span>
           <strong id="registration-form-banner-title">Ficha de inscrição</strong>
-          <p id="registration-form-banner-lead">Preparar e versionar a ficha não abre inscrições ao público.</p>
+          <p id="registration-form-banner-lead">Comece pelas categorias e lotes. Preparar e versionar a ficha não abre inscrições ao público.</p>
         </div>
-        <Link className="btn btn-secondary btn-small" href={href}>Configurar ficha de inscrição</Link>
+        <div className="completion-actions">
+          <Link className="btn btn-secondary btn-small" href={commercialHref}>Configurar categorias e lotes</Link>
+          <Link className="btn btn-secondary btn-small" href={href}>Configurar ficha de inscrição</Link>
+        </div>
       </div>
     </aside>
   );
@@ -77,8 +88,19 @@ export default function EventConfigurationRouter({ eventId }: { eventId: string 
   const [error, setError] = useState('');
   const [sessionStatus, setSessionStatus] = useState<WizardSessionStatus | ''>('');
   const [reviewFoundation, setReviewFoundation] = useState(false);
+  const [retryAttempt, setRetryAttempt] = useState(0);
+  const [resolvedEventId, setResolvedEventId] = useState('');
+  const generationRef = useRef(0);
+  const errorHeadingRef = useRef<HTMLHeadingElement>(null);
 
   useEffect(() => {
+    // Invalidar respostas antigas ao trocar de evento ou iniciar nova tentativa.
+    const generation = ++generationRef.current;
+    setReady(false);
+    setError('');
+    setSessionStatus('');
+    setResolvedEventId('');
+    setReviewFoundation(false);
     if (!getToken()) {
       router.replace('/login');
       return;
@@ -88,6 +110,8 @@ export default function EventConfigurationRouter({ eventId }: { eventId: string 
     let inFlight = false;
     let stopped = false;
     let timer: ReturnType<typeof setInterval> | null = null;
+    let requestController: AbortController | null = null;
+    let requestTimeout: ReturnType<typeof setTimeout> | null = null;
 
     function stopPolling() {
       stopped = true;
@@ -99,22 +123,32 @@ export default function EventConfigurationRouter({ eventId }: { eventId: string 
 
     async function probe() {
       if (!active || stopped || inFlight) return;
+      if (generationRef.current !== generation) return;
       inFlight = true;
+      const controller = new AbortController();
+      requestController = controller;
+      requestTimeout = setTimeout(() => controller.abort(), PROBE_TIMEOUT_MS);
       try {
-        const payload = await api<WizardRouteProbe>(`/event-wizard/${eventId}`);
+        const payload = await api<WizardRouteProbe>(`/event-wizard/${eventId}`, { signal: controller.signal });
         if (!active) return;
-        if (payload.event.profileCode === 'SCIENTIFIC_EVENT' && payload.session.status === 'COMPLETED') {
+        if (generationRef.current !== generation) return;
+        const reviewRequested = new URLSearchParams(window.location.search).get('review') === 'foundation';
+        if (payload.session.status === 'COMPLETED' && !reviewRequested) {
           stopPolling();
           router.replace(`/eventos/${eventId}/painel`);
           return;
         }
         setSessionStatus(payload.session.status);
+        setResolvedEventId(eventId);
         setReady(true);
         if (payload.session.status === 'COMPLETED') {
+          // Um link explícito de revisão deve abrir a fundação, não a página de conclusão.
+          setReviewFoundation(reviewRequested);
           stopPolling();
         }
       } catch (caught) {
         if (!active) return;
+        if (generationRef.current !== generation) return;
         if (caught instanceof ApiError && caught.status === 401) {
           stopPolling();
           router.replace('/login');
@@ -122,10 +156,14 @@ export default function EventConfigurationRouter({ eventId }: { eventId: string 
         }
         const reason = new Error(PUBLIC_CONFIGURATION_ERROR);
         setError(reason instanceof Error ? reason.message : 'Não foi possível abrir a configuração do evento.');
+        setResolvedEventId(eventId);
         setReady(true);
         stopPolling();
       } finally {
         inFlight = false;
+        if (requestTimeout) clearTimeout(requestTimeout);
+        requestTimeout = null;
+        if (requestController === controller) requestController = null;
       }
     }
 
@@ -135,15 +173,37 @@ export default function EventConfigurationRouter({ eventId }: { eventId: string 
     return () => {
       active = false;
       stopPolling();
+      // Não deixar requisições penduradas ao trocar evento ou desmontar.
+      requestController?.abort();
+      if (requestTimeout) clearTimeout(requestTimeout);
+      requestTimeout = null;
     };
-  }, [eventId, router]);
+  }, [eventId, router, retryAttempt]);
 
-  if (!ready) {
-    return <main className="shell"><div className="loading-screen"><div className="loading-mark">E</div><p>A EVA está abrindo a configuração do evento...</p></div></main>;
+  // Leitores de tela e teclado recebem o foco no erro após a sonda terminar.
+  useEffect(() => {
+    if (ready && resolvedEventId === eventId && error) {
+      errorHeadingRef.current?.focus();
+    }
+  }, [error, eventId, ready, resolvedEventId]);
+
+  function retryProbe() {
+    // Cancelamento lógico imediato: a sonda antiga não pode concluir o retry.
+    generationRef.current += 1;
+    setError('');
+    setSessionStatus('');
+    setResolvedEventId('');
+    setReviewFoundation(false);
+    setReady(false);
+    setRetryAttempt((current) => current + 1);
+  }
+
+  if (!ready || resolvedEventId !== eventId) {
+    return <main className="shell"><div className="loading-screen"><div className="loading-mark" aria-hidden="true">E</div><p role="status">A EVA está abrindo a configuração do evento...</p><Link className="btn btn-secondary" href={`/eventos/${eventId}/painel`}>Voltar ao painel do evento</Link><Link className="btn btn-secondary" href="/painel">Todos os eventos</Link></div></main>;
   }
 
   if (error) {
-    return <main className="shell"><section className="container wizard-page"><div className="error">{error}</div></section></main>;
+    return <main className="shell"><section className="container wizard-page" aria-live="polite" aria-labelledby="configuration-error-title" aria-describedby="configuration-error-description"><h1 id="configuration-error-title" ref={errorHeadingRef} tabIndex={-1}>Configuração indisponível</h1><div id="configuration-error-description" className="error">{error}</div><div className="completion-actions"><button type="button" className="btn btn-primary" onClick={retryProbe}>Tentar novamente</button><Link className="btn btn-secondary" href={`/eventos/${eventId}/painel`}>Voltar ao painel do evento</Link><Link className="btn btn-secondary" href="/painel">Todos os eventos</Link></div></section></main>;
   }
 
   if (sessionStatus === 'COMPLETED' && !reviewFoundation) {

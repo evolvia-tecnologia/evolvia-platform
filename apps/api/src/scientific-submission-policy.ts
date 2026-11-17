@@ -19,6 +19,7 @@ export type SubmissionRequirement = {
   minAuthors?: number | null;
   maxAuthors?: number | null;
   presenterRequired: boolean;
+  maxPresenters?: number | null;
 };
 
 export type SubmissionDraft = {
@@ -97,11 +98,18 @@ export function validateSubmissionForSubmit(
   }
 
   const presenters = draft.authors.filter((author) => author.presenter);
+  const maxPresenters = requirements.maxPresenters ?? 1;
   if (requirements.presenterRequired && presenters.length === 0) {
     errors.push({ code: 'PRESENTER_REQUIRED', field: 'authors', message: 'Indique quem apresentará o trabalho.' });
   }
-  if (presenters.length > 1) {
-    errors.push({ code: 'MULTIPLE_PRESENTERS', field: 'authors', message: 'Somente um apresentador pode ser indicado para o trabalho.' });
+  if (presenters.length > maxPresenters) {
+    errors.push({
+      code: 'MULTIPLE_PRESENTERS',
+      field: 'authors',
+      message: maxPresenters === 1
+        ? 'Somente um apresentador pode ser indicado para o trabalho.'
+        : `Este trabalho aceita no máximo ${maxPresenters} apresentadores.`,
+    });
   }
 
   return errors;
@@ -130,4 +138,39 @@ export function requiresImmutableSubmittedVersion(status: ScientificSubmissionSt
 
 export function shouldHideAuthorIdentity(reviewMode: ScientificSubmissionReviewMode): boolean {
   return reviewMode === 'SINGLE_BLIND' || reviewMode === 'DOUBLE_BLIND';
+}
+
+export type PresentationFormatSetting = {
+  code: string;
+  label: string;
+  submissionEnabled: boolean;
+  evaluationEnabled: boolean;
+};
+
+export const DEFAULT_PRESENTATION_FORMATS: PresentationFormatSetting[] = [
+  { code: 'ORAL', label: 'Oral', submissionEnabled: true, evaluationEnabled: true },
+  { code: 'TEMA_LIVRE', label: 'Tema livre', submissionEnabled: true, evaluationEnabled: true },
+  { code: 'POSTER', label: 'Pôster', submissionEnabled: true, evaluationEnabled: true },
+  { code: 'EPOSTER', label: 'Pôster digital', submissionEnabled: true, evaluationEnabled: true },
+];
+
+export function readPresentationFormats(
+  value: unknown,
+  fallback: PresentationFormatSetting[],
+): PresentationFormatSetting[] {
+  if (!Array.isArray(value)) return fallback;
+  const items: PresentationFormatSetting[] = [];
+  for (const item of value) {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) continue;
+    const record = item as Record<string, unknown>;
+    if (typeof record.code !== 'string' || typeof record.label !== 'string') continue;
+    if (!record.code || !record.label) continue;
+    items.push({
+      code: record.code,
+      label: record.label,
+      submissionEnabled: record.submissionEnabled !== false,
+      evaluationEnabled: record.evaluationEnabled !== false,
+    });
+  }
+  return items.length ? items : fallback;
 }

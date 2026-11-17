@@ -35,22 +35,22 @@ async function loadParsed() {
   };
 }
 
-test('o contrato real tem exatamente 19 tipos com mapeamento único', async () => {
+test('o contrato real tem exatamente 20 tipos com mapeamento único', async () => {
   const result = await validateRepositoryTaxonomy();
   assert.equal(result.ok, true, result.falhas.join('\n'));
   assert.deepEqual(result.falhas, []);
   assert.equal(result.cardinality.web, EXPECTED_TYPE_COUNT);
   assert.equal(result.cardinality.backend, EXPECTED_TYPE_COUNT);
-  assert.equal(result.cardinality.expected, 19);
+  assert.equal(result.cardinality.expected, EXPECTED_TYPE_COUNT);
 });
 
-test('as fontes canônicas de #199 e #201 extraem os mesmos 19 valores', async () => {
+test('as fontes canônicas de #199 e #201 extraem os mesmos 20 valores', async () => {
   const { webEntries, backendEntries, backendFamilies } = await loadParsed();
 
-  assert.equal(webEntries.length, 19);
-  assert.equal(backendEntries.length, 19);
-  assert.equal(new Set(webEntries.map((item) => item.value)).size, 19);
-  assert.equal(new Set(backendEntries.map((item) => item.eventType)).size, 19);
+  assert.equal(webEntries.length, EXPECTED_TYPE_COUNT);
+  assert.equal(backendEntries.length, EXPECTED_TYPE_COUNT);
+  assert.equal(new Set(webEntries.map((item) => item.value)).size, EXPECTED_TYPE_COUNT);
+  assert.equal(new Set(backendEntries.map((item) => item.eventType)).size, EXPECTED_TYPE_COUNT);
   assert.deepEqual(
     webEntries.map((item) => item.value),
     backendEntries.map((item) => item.eventType),
@@ -67,7 +67,7 @@ test('as fontes canônicas de #199 e #201 extraem os mesmos 19 valores', async (
   }
 });
 
-test('o validador não duplica um terceiro catálogo dos 19 tipos', async () => {
+test('o validador não duplica um terceiro catálogo dos 20 tipos', async () => {
   const { webEntries } = await loadParsed();
   const [validatorSource, testSource] = await Promise.all([
     readFile(VALIDATOR_URL, 'utf8'),
@@ -246,7 +246,7 @@ test('as origens padrão apontam só para os arquivos canônicos do repositório
   assert.match(String(DEFAULT_SOURCES.prismaSchema), /apps\/api\/prisma\/schema\.prisma$/u);
 });
 
-test('CLI do repositório real sai 0 e confirma os 19 tipos', async () => {
+test('CLI do repositório real sai 0 e confirma os 20 tipos', async () => {
   const previousExit = process.exitCode;
   process.exitCode = undefined;
   const code = await runCli();
@@ -258,6 +258,6 @@ test('CLI do repositório real sai 0 e confirma os 19 tipos', async () => {
     env: { ...process.env, NODE_TEST_CONTEXT: '' },
   });
   assert.equal(spawned.status, 0, spawned.stderr);
-  assert.match(spawned.stdout, /19 tipos com exatamente um mapeamento backend/u);
+  assert.match(spawned.stdout, new RegExp(`${EXPECTED_TYPE_COUNT} tipos com exatamente um mapeamento backend`, 'u'));
   assert.equal(spawned.stderr, '');
 });

@@ -54,18 +54,21 @@ test('descoberta pública consulta exclusivamente eventos PUBLISHED e minimiza o
   assert.equal(calls.count[0].where.status, 'PUBLISHED');
   assert.equal(calls.count[0].where.format, 'HYBRID');
   assert.equal(calls.count[0].where.profileCode, 'SCIENTIFIC_EVENT');
-  assert.deepEqual(calls.count[0].where.AND, [{
+  assert.deepEqual(calls.count[0].where.AND[0], {
     OR: [
       { endDate: { gte: new Date('2026-10-01T00:00:00.000Z') } },
-      { endDate: null, startDate: { gte: new Date('2026-10-01T00:00:00.000Z') } },
+      { endDate: null },
     ],
-  }]);
-  assert.deepEqual(calls.count[0].where.OR, [
+  });
+  assert.deepEqual(calls.count[0].where.AND[1].OR.slice(0, 3), [
     { name: { contains: 'Congresso', mode: 'insensitive' } },
     { venue: { contains: 'Congresso', mode: 'insensitive' } },
+    { eventType: { contains: 'Congresso', mode: 'insensitive' } },
   ]);
+  assert.equal(calls.count[0].where.OR, undefined);
   assert.equal(calls.findMany[0].skip, 0);
   assert.equal(calls.findMany[0].take, 24);
+  assert.deepEqual(calls.findMany[0].orderBy, [{ startDate: 'asc' }, { createdAt: 'desc' }]);
   assert.deepEqual(calls.findMany[0].select, {
     name: true,
     slug: true,
@@ -77,7 +80,7 @@ test('descoberta pública consulta exclusivamente eventos PUBLISHED e minimiza o
     timeZone: true,
     venue: true,
     estimatedAudience: true,
-    eventPublication: { select: { shortDescription: true } },
+    eventPublication: { select: { shortDescription: true, coverAssetId: true, logoAssetId: true } },
   });
   assert.deepEqual(result, {
     items: [{
@@ -92,6 +95,7 @@ test('descoberta pública consulta exclusivamente eventos PUBLISHED e minimiza o
       venue: 'Centro de Convenções',
       estimatedAudience: 1200,
       shortDescription: 'Descrição pública',
+      cardMedia: null,
     }],
     page: 1,
     pageSize: 24,
@@ -109,7 +113,7 @@ test('descoberta pública pagina de forma determinística e não aplica filtros 
   assert.deepEqual(calls.count[0].where, { status: 'PUBLISHED' });
   assert.equal(calls.findMany[0].skip, 20);
   assert.equal(calls.findMany[0].take, 10);
-  assert.deepEqual(calls.findMany[0].orderBy, [{ startDate: 'asc' }, { createdAt: 'desc' }]);
+  assert.deepEqual(calls.findMany[0].orderBy, [{ startDate: 'desc' }, { createdAt: 'desc' }]);
   assert.equal(result.page, 3);
   assert.equal(result.pageSize, 10);
   assert.equal(result.total, 26);
@@ -124,12 +128,7 @@ test('descoberta histórica usa término como corte e mostra os realizados mais 
 
   assert.deepEqual(calls.count[0].where, {
     status: 'PUBLISHED',
-    AND: [{
-      OR: [
-        { endDate: { lt: new Date('2026-10-01T00:00:00.000Z') } },
-        { endDate: null, startDate: { lt: new Date('2026-10-01T00:00:00.000Z') } },
-      ],
-    }],
+    AND: [{ endDate: { lt: new Date('2026-10-01T00:00:00.000Z') } }],
   });
   assert.deepEqual(calls.findMany[0].orderBy, [{ startDate: 'desc' }, { createdAt: 'desc' }]);
 });
@@ -150,8 +149,67 @@ test('busca pública limita termos excessivos antes de chegar ao banco', async (
 
   await service.discover({ query: longQuery });
 
-  assert.equal(calls.count[0].where.OR[0].name.contains.length, 120);
-  assert.equal(calls.count[0].where.OR[1].venue.contains.length, 120);
+  assert.equal(calls.count[0].where.AND[0].OR[0].name.contains.length, 120);
+  assert.equal(calls.count[0].where.AND[0].OR[1].venue.contains.length, 120);
+});
+
+test('descoberta mantém publicado sem data de término e ignora área ou região desconhecida', async () => {
+  const { prisma, calls } = createPrisma();
+  const service = new EventPublicationPublicService(prisma);
+
+  await service.discover({ from: '2026-10-04', area: 'script', region: 'ZZ' });
+
+  assert.deepEqual(calls.count[0].where.AND, [{
+    OR: [
+      { endDate: { gte: new Date('2026-10-04T00:00:00.000Z') } },
+      { endDate: null },
+    ],
+  }]);
+});
+
+test('área de negócios usa a marcação e, sem ela, as palavras publicadas; a região usa o local', async () => {
+  const { prisma, calls } = createPrisma();
+  const service = new EventPublicationPublicService(prisma);
+
+  await service.discover({ area: 'negocios', region: 'SP' });
+
+  const [area, region] = calls.count[0].where.AND;
+  assert.equal(area.OR.some((clause) => clause.subjectAreas?.has === 'negocios'), true);
+  assert.equal(JSON.stringify(area).includes('CORPORATE_TRAINING'), false);
+  const fallback = area.OR.find((clause) => clause.AND);
+  assert.deepEqual(fallback.AND[0], { subjectAreas: { isEmpty: true } });
+  assert.equal(fallback.AND[1].OR.some((clause) => clause.name?.contains === 'negócio'), true);
+  assert.equal(region.OR.some((clause) => clause.venue?.contains === 'São Paulo'), true);
+  assert.equal(JSON.stringify(region).includes('"Para"'), false);
+});
+
+test('região do Pará não absorve Paraíba nem Paraná', async () => {
+  const { prisma, calls } = createPrisma();
+  const service = new EventPublicationPublicService(prisma);
+
+  await service.discover({ region: 'PA' });
+
+  const region = calls.count[0].where.AND[0];
+  assert.equal(region.AND[0].OR.some((clause) => clause.venue?.contains === 'Pará'), true);
+  assert.deepEqual(region.AND[1], {
+    NOT: {
+      OR: [
+        { venue: { contains: 'Paraíba', mode: 'insensitive' } },
+        { venue: { contains: 'Paraná', mode: 'insensitive' } },
+      ],
+    },
+  });
+});
+
+test('região de Mato Grosso não absorve Mato Grosso do Sul', async () => {
+  const { prisma, calls } = createPrisma();
+  const service = new EventPublicationPublicService(prisma);
+
+  await service.discover({ region: 'MT' });
+
+  const region = calls.count[0].where.AND[0];
+  assert.equal(region.AND[0].OR.some((clause) => clause.venue?.contains === 'Mato Grosso'), true);
+  assert.deepEqual(region.AND[1], { NOT: { venue: { contains: 'Mato Grosso do Sul', mode: 'insensitive' } } });
 });
 
 test('índice do sitemap usa a atualização pública mais recente sem expor metadados internos', async () => {
@@ -187,4 +245,21 @@ test('índice do sitemap usa a atualização pública mais recente sem expor met
   });
   assert.deepEqual(result, [{ slug: 'congresso-evolvia', updatedAt: sectionUpdatedAt }]);
   assert.deepEqual(Object.keys(result[0]).sort(), ['slug', 'updatedAt']);
+});
+
+
+test('cards usam capa, logo ou ausência explícita, sem expor IDs e sem leitura por evento', async () => {
+  const { prisma, calls } = createPrisma({total:3,events:[
+    {slug:'evento / capa',name:'Capa',eventPublication:{coverAssetId:'private-cover-id',logoAssetId:'private-logo-id'}},
+    {slug:'logo',name:'Logo',eventPublication:{logoAssetId:'private-logo-id'}},
+    {slug:'sem',name:'Sem mídia',eventPublication:null},
+  ]});
+  const result=await new EventPublicationPublicService(prisma).discover({});
+  assert.deepEqual(result.items.map(item=>item.cardMedia),[
+    {url:'/api/public/events/evento%20%2F%20capa/media/COVER',usage:'COVER'},
+    {url:'/api/public/events/logo/media/LOGO',usage:'LOGO'},null,
+  ]);
+  assert.equal(calls.findMany.length,1);
+  assert.equal(calls.findMany[0].where.status,'PUBLISHED');
+  assert.doesNotMatch(JSON.stringify(result),/private-cover-id|private-logo-id|storageKey|organizationId/);
 });

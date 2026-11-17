@@ -50,6 +50,61 @@
 .brandMark span { width: 22px; top: 9px; left: 1px; }
 .brandMark::after { width: 17px; top: 17px; left: 0; }
 
+.search {
+  display: flex;
+  flex: 1 1 16rem;
+  align-items: end;
+  gap: var(--space-8);
+  min-width: 0;
+  max-width: 28rem;
+}
+
+.searchField {
+  display: grid;
+  flex: 1 1 auto;
+  gap: var(--space-4);
+  min-width: 0;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-muted);
+}
+
+.searchField input {
+  min-height: var(--space-44);
+  min-width: 0;
+  width: 100%;
+  padding: 0 var(--space-12);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-control);
+  background: var(--color-surface-subtle);
+  color: var(--color-text);
+  font: inherit;
+}
+
+.searchField input:focus-visible,
+.searchButton:focus-visible {
+  outline: 3px solid var(--color-focus-on-light);
+  outline-offset: 3px;
+}
+
+.searchButton {
+  flex: 0 0 auto;
+  min-height: var(--space-44);
+  padding: 0 var(--space-16);
+  border: 0;
+  border-radius: var(--radius-control);
+  background: var(--color-brand-blue-600);
+  color: var(--color-on-dark);
+  font: inherit;
+  font-weight: var(--font-weight-semibold);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.searchButton:hover {
+  background: var(--color-brand-blue-700);
+}
+
 .nav {
   display: flex;
   flex-wrap: wrap;
@@ -75,7 +130,7 @@
 }
 
 .action {
-  color: var(--color-brand-navy-800);
+  color: var(--color-brand-blue-700);
 }
 
 .action[aria-current='page'] {
@@ -126,9 +181,14 @@
     flex: 1 0 100%;
   }
 
+  .search {
+    flex: 1 1 100%;
+    max-width: none;
+  }
+
   .nav {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 10rem), 1fr));
     flex: 1 1 100%;
     width: 100%;
   }
@@ -136,7 +196,10 @@
   .action,
   .primaryAction {
     width: 100%;
+    max-width: 100%;
     padding: var(--space-8) var(--space-4);
+    overflow-wrap: normal;
+    word-break: normal;
   }
 }
 
@@ -163,9 +226,16 @@
     background: ButtonText;
   }
 
+  .searchField input,
+  .searchButton {
+    border: 1px solid CanvasText;
+  }
+
   .brand:focus-visible,
   .action:focus-visible,
-  .primaryAction:focus-visible {
+  .primaryAction:focus-visible,
+  .searchField input:focus-visible,
+  .searchButton:focus-visible {
     outline: 2px solid Highlight;
     outline-offset: 2px;
   }

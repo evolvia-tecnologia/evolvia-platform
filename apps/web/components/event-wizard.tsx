@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { queueWizardSave } from '../lib/event-wizard-save';
 import { useRouter } from 'next/navigation';
 import {
   useCallback,
@@ -11,7 +12,11 @@ import {
 } from 'react';
 import { api, ApiError, getToken } from '../lib/api';
 import { EVENT_PROFILE_GROUPS } from '../lib/event-profile-catalog';
+import { findEventProfileOption } from '../lib/event-profile-catalog';
 import { canonicalEventDateInstant } from '../lib/event-time-zone';
+import { PUBLIC_SUBJECT_AREAS, publicSubjectAreaLabel } from '../lib/public-discovery';
+
+import { firstIncompleteWizardStep, wizardStepIssues } from '../lib/event-wizard-validation';
 
 type EventFormat = '' | 'IN_PERSON' | 'ONLINE' | 'HYBRID';
 type RegistrationMode = '' | 'FREE' | 'PAID' | 'INVITATION';
@@ -46,6 +51,7 @@ type WizardAnswers = {
   registrationMode?: RegistrationMode;
   capabilities?: string[];
   capabilitiesCustomized?: boolean;
+  subjectAreas?: string[];
 };
 
 type Capability = {
@@ -112,6 +118,7 @@ const initialDraft: WizardAnswers = {
   registrationMode: '',
   capabilities: [],
   capabilitiesCustomized: false,
+  subjectAreas: [],
 };
 
 const formatLabels: Record<string, string> = {
@@ -192,7 +199,12 @@ export default function EventWizard({ eventId }: EventWizardProps) {
   const [starting, setStarting] = useState(false);
   const [finishing, setFinishing] = useState(false);
   const [completed, setCompleted] = useState(false);
-  const [dirty, setDirty] = useState(false);
+  const [dirty, setDirtyState] = useState(false);
+  const dirtyRef = useRef(false);
+  const setDirty = useCallback((value: boolean) => {
+    dirtyRef.current = value;
+    setDirtyState(value);
+  }, []);
   const [saveState, setSaveState] = useState<SaveState>('idle');
   const [error, setError] = useState('');
 
@@ -229,7 +241,7 @@ export default function EventWizard({ eventId }: EventWizardProps) {
     }
     setCompleted(payload.session.status === 'COMPLETED');
     setSaveState('saved');
-  }, []);
+  }, [setDirty]);
 
   useEffect(() => {
     if (!getToken()) {
@@ -248,11 +260,25 @@ export default function EventWizard({ eventId }: EventWizardProps) {
           const payload = await api<WizardPayload>(`/event-wizard/${eventId}`);
           if (active) applyPayload(payload);
         } else {
+          const restored = { ...initialDraft };
           const saved = localStorage.getItem('evolvia_wizard_prestart_v2');
-          const restored = saved ? { ...initialDraft, ...JSON.parse(saved) } : { ...initialDraft };
-          if (!restored.organizationId) {
-            const first = (me.memberships ?? []).find((item) => editorRoles.has(item.role));
-            restored.organizationId = first?.organization.id ?? '';
+          if (saved) {
+            try {
+              const parsed: unknown = JSON.parse(saved);
+              if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+                const previous = parsed as Record<string, unknown>;
+                restored.organizationId = typeof previous.organizationId === 'string' ? previous.organizationId : '';
+                restored.eventType = findEventProfileOption(previous.eventType)?.value ?? '';
+              } else {
+                localStorage.removeItem('evolvia_wizard_prestart_v2');
+              }
+            } catch {
+              localStorage.removeItem('evolvia_wizard_prestart_v2');
+            }
+          }
+          const editors = (me.memberships ?? []).filter((item) => editorRoles.has(item.role));
+          if (!editors.some((item) => item.organization.id === restored.organizationId)) {
+            restored.organizationId = editors[0]?.organization.id ?? '';
           }
           if (active) {
             setDraft(restored);
@@ -283,7 +309,7 @@ export default function EventWizard({ eventId }: EventWizardProps) {
     });
     if (currentEventId) setDirty(true);
     setError('');
-  }, [currentEventId]);
+  }, [currentEventId, setDirty]);
 
   const recoverLatest = useCallback(async () => {
     if (!currentEventId) return;
@@ -294,38 +320,26 @@ export default function EventWizard({ eventId }: EventWizardProps) {
 
   const queueSave = useCallback((targetStep: string, snapshot = draftRef.current) => {
     if (!currentEventId) return Promise.resolve();
-    const snapshotJson = serialize(snapshot);
-
-    const operation = saveQueueRef.current.then(async () => {
-      if (!dirty && savedStepRef.current === targetStep) return;
-      setSaveState('saving');
-      try {
-        const payload = await api<WizardPayload>(`/event-wizard/${currentEventId}`, {
-          method: 'PATCH',
-          body: JSON.stringify({
-            currentStep: targetStep,
-            answers: withRequiredCapabilities(snapshot, catalogRef.current),
-            revision: revisionRef.current,
-          }),
-        });
-        const stillCurrent = serialize(draftRef.current) === snapshotJson;
-        applyPayload(payload, stillCurrent);
-        savedStepRef.current = targetStep;
-        if (!stillCurrent) setDirty(true);
-        setSaveState('saved');
-      } catch (reason) {
-        setSaveState('error');
-        if (reason instanceof ApiError && reason.status === 409) {
-          await recoverLatest();
-          return;
-        }
-        throw reason;
-      }
+    return queueWizardSave(targetStep, snapshot, {
+      queue: saveQueueRef,
+      savedStep: savedStepRef,
+      getDirty: () => dirtyRef.current,
+      currentDraft: () => draftRef.current,
+      request: (currentStep, snapshot) => api<WizardPayload>(`/event-wizard/${currentEventId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          currentStep,
+          answers: withRequiredCapabilities(snapshot, catalogRef.current),
+          revision: revisionRef.current,
+        }),
+      }),
+      applyPayload,
+      setDirty,
+      setSaveState,
+      isConflict: (reason) => reason instanceof ApiError && reason.status === 409,
+      recoverLatest,
     });
-
-    saveQueueRef.current = operation.catch(() => undefined);
-    return operation;
-  }, [applyPayload, currentEventId, dirty, recoverLatest]);
+  }, [applyPayload, currentEventId, recoverLatest, setDirty]);
 
   useEffect(() => {
     if (!currentEventId || !dirty || loading || completed) return;
@@ -341,31 +355,13 @@ export default function EventWizard({ eventId }: EventWizardProps) {
   }, [completed, currentEventId, dirty, loading, queueSave, stepIndex]);
 
   function validationMessage(index: number): string {
-    if (index === 0) {
-      if (!draft.organizationId) return 'Selecione a organização responsável.';
-      if (!draft.eventType) return 'Escolha o perfil do evento.';
-    }
-    if (index === 1 && !draft.format) return 'Escolha o formato do evento.';
-    if (index === 2) {
-      if (!draft.name || draft.name.trim().length < 3) return 'Informe um nome com pelo menos 3 caracteres.';
-      if (!draft.startDate && !draft.datesPending) return 'Informe a data de início ou marque “Definir depois”.';
-      if (!draft.timeZone) return 'Escolha o fuso horário do evento.';
-      if (draft.startDate && draft.endDate && draft.endDate < draft.startDate) return 'A data de término não pode ser anterior à data de início.';
-    }
-    if (index === 3 && !draft.venue && !draft.venuePending) {
-      return draft.format === 'ONLINE'
-        ? 'Informe a plataforma ou marque “Definir depois”.'
-        : 'Informe o local ou marque “Definir depois”.';
-    }
-    if (index === 4 && !draft.registrationMode) return 'Escolha o modelo de inscrição.';
-    if (index === 5) {
-      const selected = new Set(draft.capabilities ?? []);
-      if (!selected.has('registration')) return 'Inscrições é um recurso obrigatório.';
-      if (getRequiredWizardCapabilities(draft.eventType).includes('access_control') && !selected.has('access_control')) {
-        return 'Controle de acesso é um recurso obrigatório para show e festival.';
-      }
-    }
-    return '';
+    return wizardStepIssues(index, draftRef.current, getRequiredWizardCapabilities(draftRef.current.eventType)).join(' ');
+  }
+
+  function showValidation(index: number, issues: string[]) {
+    setStepIndex(index);
+    setError(issues.join(' '));
+    requestAnimationFrame(() => document.getElementById('wizard-validation-error')?.focus());
   }
 
   async function startWizard() {
@@ -381,8 +377,16 @@ export default function EventWizard({ eventId }: EventWizardProps) {
           eventType: draft.eventType,
         }),
       });
+      const saved = await api<WizardPayload>(`/event-wizard/${payload.event.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          currentStep: 'format',
+          revision: payload.session.revision,
+          answers: { ...payload.answers, subjectAreas: draftRef.current.subjectAreas ?? [] },
+        }),
+      });
       localStorage.removeItem('evolvia_wizard_prestart_v2');
-      applyPayload(payload);
+      applyPayload(saved);
       router.replace(`/eventos/${payload.event.id}/configuracao`);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'Não foi possível iniciar o evento.');
@@ -393,8 +397,8 @@ export default function EventWizard({ eventId }: EventWizardProps) {
 
   async function goTo(index: number) {
     if (index > stepIndex) {
-      const message = validationMessage(stepIndex);
-      if (message) { setError(message); return; }
+      const incomplete = firstIncompleteWizardStep(draftRef.current, stepIndex, getRequiredWizardCapabilities(draftRef.current.eventType));
+      if (incomplete) { showValidation(incomplete.index, incomplete.issues); return; }
     }
 
     if (!currentEventId) {
@@ -414,8 +418,8 @@ export default function EventWizard({ eventId }: EventWizardProps) {
   }
 
   async function finish() {
-    const message = validationMessage(5);
-    if (message) { setError(message); return; }
+    const incomplete = firstIncompleteWizardStep(draftRef.current, 5, getRequiredWizardCapabilities(draftRef.current.eventType));
+    if (incomplete) { showValidation(incomplete.index, incomplete.issues); return; }
     if (!currentEventId) return;
     if (timerRef.current) clearTimeout(timerRef.current);
     setFinishing(true);
@@ -491,7 +495,39 @@ export default function EventWizard({ eventId }: EventWizardProps) {
   }
 
   if (completed) {
-    return <main className="shell"><header className="topbar"><Link className="brand" href="/painel">EVOLVIA</Link></header><section className="container completion-page"><div className="completion-card"><div className="completion-icon">✓</div><p className="eyebrow">FUNDAÇÃO CONCLUÍDA</p><h1>{draft.name}</h1><p className="completion-lead">Seu evento já tem uma estrutura inicial segura. Agora você poderá configurar detalhes, testar e homologar antes de publicar.</p><div className="completion-grid"><div><strong>{formatLabels[draft.format ?? '']}</strong><span>Formato</span></div><div><strong>{registrationLabels[draft.registrationMode ?? '']}</strong><span>Inscrição</span></div><div><strong>{draft.capabilities?.length ?? 0}</strong><span>Recursos ativados</span></div></div><div className="completion-actions"><Link className="btn btn-primary" href="/painel">Ir para o painel</Link><button className="btn btn-secondary" onClick={() => setCompleted(false)}>Revisar respostas</button></div></div></section></main>;
+    return (
+      <main className="shell">
+        <header className="topbar">
+          <Link className="brand" href="/painel">EVOLVIA</Link>
+        </header>
+        <section className="container completion-page">
+          <div className="completion-card">
+            <div className="completion-icon">✓</div>
+            <p className="eyebrow">FUNDAÇÃO CONCLUÍDA</p>
+            <h1>{draft.name}</h1>
+            <p className="completion-lead">
+              Seu evento já tem uma estrutura inicial segura. Agora você poderá configurar detalhes, testar e homologar antes de publicar.
+            </p>
+            <div className="completion-grid">
+              <div><strong>{formatLabels[draft.format ?? '']}</strong><span>Formato</span></div>
+              <div><strong>{registrationLabels[draft.registrationMode ?? '']}</strong><span>Inscrição</span></div>
+              <div><strong>{draft.capabilities?.length ?? 0}</strong><span>Recursos ativados</span></div>
+            </div>
+            <div className="completion-actions">
+              <Link className="btn btn-primary" href={`/eventos/${currentEventId}/painel/inscricoes/categorias-lotes`}>
+                Configurar categorias e lotes
+              </Link>
+              <Link className="btn btn-secondary" href={`/eventos/${currentEventId}/painel`}>
+                Abrir painel do evento
+              </Link>
+              <button className="btn btn-secondary" onClick={() => setCompleted(false)}>
+                Revisar respostas
+              </button>
+            </div>
+          </div>
+        </section>
+      </main>
+    );
   }
 
   const current = steps[stepIndex];
@@ -513,7 +549,7 @@ export default function EventWizard({ eventId }: EventWizardProps) {
           <small>{selectedOrganization?.organization.name || 'Organização responsável'}</small>
         </div>
         <nav className="step-list" aria-label="Etapas do evento">
-          {steps.map((item, index) => <button key={item.id} className={`step-item ${index === stepIndex ? 'active' : ''} ${index < stepIndex ? 'done' : ''}`} onClick={() => index <= stepIndex && goTo(index)} disabled={index > stepIndex}><span>{index < stepIndex ? '✓' : index + 1}</span><div><strong>{item.label}</strong><small>{index === stepIndex ? 'Em andamento' : index < stepIndex ? 'Concluída' : 'Próxima'}</small></div></button>)}
+          {steps.map((item, index) => <button key={item.id} className={`step-item ${index === stepIndex ? 'active' : ''} ${index < stepIndex ? 'done' : ''}`} onClick={() => index <= stepIndex && goTo(index)} disabled={index > stepIndex} aria-current={index === stepIndex ? 'step' : undefined}><span>{index < stepIndex ? '✓' : index + 1}</span><div><strong>{item.label}</strong><small>{index === stepIndex ? 'Em andamento' : index < stepIndex ? 'Concluída' : 'Próxima'}</small></div></button>)}
         </nav>
         <div className="sidebar-security"><span>◎</span><p><strong>Ambiente seguro</strong>Nada será publicado sem sua aprovação.</p></div>
       </aside>
@@ -527,18 +563,43 @@ export default function EventWizard({ eventId }: EventWizardProps) {
             <p className="eyebrow">{current.label.toUpperCase()}</p>
             <h1>{current.title}</h1>
             <p className="wizard-subtitle">{current.subtitle}</p>
-            {error && <div className="error" role="alert">{error}</div>}
+            {error && <div id="wizard-validation-error" className="error" role="alert" tabIndex={-1}>{error}</div>}
 
             {stepIndex === 0 && <div className="wizard-section-stack">
               <div className="form-group"><label htmlFor="organization">Organização responsável</label><select id="organization" className="select" value={draft.organizationId ?? ''} disabled={Boolean(currentEventId)} onChange={(event) => update('organizationId', event.target.value)}><option value="">Selecione</option>{editableMemberships.map((membership) => <option key={membership.organization.id} value={membership.organization.id}>{membership.organization.name}</option>)}</select>{currentEventId && <span className="field-help">A organização fica bloqueada após o início para proteger o isolamento dos dados.</span>}</div>
               {EVENT_PROFILE_GROUPS.map((group) => <div className="form-group" role="group" aria-labelledby={`profile-group-${group.id}`} key={group.id}><strong id={`profile-group-${group.id}`}>{group.label}</strong><span className="field-help">{group.description}</span><div className="profile-grid">{group.options.map((profile) => <button type="button" className={`profile-option ${draft.eventType === profile.value ? 'selected' : ''}`} aria-pressed={draft.eventType === profile.value} key={profile.value} onClick={() => update('eventType', profile.value)}><span className="profile-icon">{profile.icon}</span><div><strong>{profile.title}</strong><p>{profile.description}</p></div><span className="selection-mark">✓</span></button>)}</div></div>)}
+              <fieldset className="form-group">
+                <legend>Área de atuação</legend>
+                <span className="field-help">Marque de uma a três áreas. Educação, Saúde, Direito, Engenharias e as demais só encontram o evento quando esta informação é salva. O tipo do evento não substitui a área.</span>
+                <div className="subject-areas">
+                  {PUBLIC_SUBJECT_AREAS.map((area) => {
+                    const checked = draft.subjectAreas?.includes(area.id) === true;
+                    return <label className={`subject-area ${checked ? 'selected' : ''}`} key={area.id}>
+                      <input type="checkbox" checked={checked} onChange={() => {
+                        const selected = draft.subjectAreas ?? [];
+                        if (selected.includes(area.id)) {
+                          update('subjectAreas', selected.filter((item) => item !== area.id));
+                          return;
+                        }
+                        if (selected.length >= 3) {
+                          setError('Escolha no máximo 3 áreas de atuação.');
+                          return;
+                        }
+                        setError('');
+                        update('subjectAreas', [...selected, area.id]);
+                      }} />
+                      <div><strong>{area.label}</strong><p>{area.description}</p></div>
+                    </label>;
+                  })}
+                </div>
+              </fieldset>
             </div>}
 
             {stepIndex === 1 && <div className="choice-grid three-columns">{[
               ['IN_PERSON', 'Presencial', 'Recepção, credenciamento e experiência no local.', '⌂'],
               ['ONLINE', 'Online', 'Participação digital com acesso remoto.', '◉'],
               ['HYBRID', 'Híbrido', 'Público presencial e online no mesmo evento.', '⇄'],
-            ].map(([value, title, description, icon]) => <button type="button" className={`choice-card ${draft.format === value ? 'selected' : ''}`} key={value} onClick={() => update('format', value as EventFormat)}><span className="choice-icon">{icon}</span><strong>{title}</strong><p>{description}</p><span className="selection-mark">✓</span></button>)}</div>}
+            ].map(([value, title, description, icon]) => <button type="button" className={`choice-card ${draft.format === value ? 'selected' : ''}`} key={value} aria-pressed={draft.format === value} onClick={() => update('format', value as EventFormat)}><span className="choice-icon">{icon}</span><strong>{title}</strong><p>{description}</p><span className="selection-mark">✓</span></button>)}</div>}
 
             {stepIndex === 2 && <div className="wizard-section-stack">
               <div className="form-group"><label htmlFor="name">Nome do evento</label><input className="input input-large" id="name" value={draft.name ?? ''} maxLength={120} onChange={(event) => update('name', event.target.value)} placeholder="Ex.: Congresso Brasileiro de Inovação" /><span className="field-help">Use um nome que o participante reconheça facilmente.</span></div>
@@ -555,11 +616,11 @@ export default function EventWizard({ eventId }: EventWizardProps) {
               ['FREE', 'Inscrição gratuita', 'Ideal quando não existe cobrança para participar.', 'R$ 0'],
               ['PAID', 'Inscrição paga', 'Prepara o evento para categorias, valores e pagamentos.', 'R$'],
               ['INVITATION', 'Somente convidados', 'Controle por convite, lista ou liberação da organização.', '✉'],
-            ].map(([value, title, description, icon]) => <button type="button" className={`choice-card ${draft.registrationMode === value ? 'selected' : ''}`} key={value} onClick={() => update('registrationMode', value as RegistrationMode)}><span className="choice-icon text-icon">{icon}</span><strong>{title}</strong><p>{description}</p><span className="selection-mark">✓</span></button>)}</div>}
+            ].map(([value, title, description, icon]) => <button type="button" className={`choice-card ${draft.registrationMode === value ? 'selected' : ''}`} key={value} aria-pressed={draft.registrationMode === value} onClick={() => update('registrationMode', value as RegistrationMode)}><span className="choice-icon text-icon">{icon}</span><strong>{title}</strong><p>{description}</p><span className="selection-mark">✓</span></button>)}</div>}
 
             {stepIndex === 5 && <div className="wizard-section-stack"><div className="recommendation-banner"><div><span className="eva-mini">EVA</span><strong>Pré-configuração inteligente aplicada</strong><p>Você pode confirmar a recomendação ou personalizar agora. Recursos estruturais obrigatórios não podem ser removidos.</p></div><button className="btn btn-secondary btn-small" type="button" onClick={restoreRecommendations}>Restaurar sugestões</button></div><div className="capability-grid">{catalog.map((item) => renderCapabilityCard(item))}</div></div>}
 
-            {stepIndex === 6 && <div className="review-premium"><div className="review-hero"><span className="review-check">✓</span><div><strong>Pronto para seguir para a configuração</strong><p>A fundação está organizada. Publicação, pagamentos e acessos ainda dependerão de homologação.</p></div></div><div className="review-grid"><div className="review-block"><span>Evento</span><strong>{draft.name}</strong><p>{draft.eventType}</p></div><div className="review-block"><span>Responsável</span><strong>{selectedOrganization?.organization.name}</strong><p>{formatLabels[draft.format ?? '']} · Inscrição {registrationLabels[draft.registrationMode ?? '']?.toLowerCase()}</p></div><div className="review-block"><span>Data</span><strong>{draft.datesPending ? 'A definir' : toDateInput(draft.startDate) || 'A definir'}</strong><p>{draft.datesPending ? 'Pendência registrada' : draft.endDate ? `até ${toDateInput(draft.endDate)}` : 'Evento de um dia'} · {timeZoneLabels[draft.timeZone ?? ''] ?? draft.timeZone}</p></div><div className="review-block"><span>Público estimado</span><strong>{draft.audiencePending ? 'A definir' : formatAudience(draft.estimatedAudience)}</strong><p>{draft.audiencePending ? 'Pendência registrada' : draft.estimatedAudience ? 'Estimativa operacional, não capacidade' : 'Opcional nesta etapa'}</p></div><div className="review-block"><span>Local</span><strong>{draft.venuePending ? 'A definir' : draft.venue || (draft.format === 'ONLINE' ? 'Online' : 'A definir')}</strong><p>{draft.venuePending ? 'Pendência registrada' : 'Informação salva'}</p></div></div><div className="review-capabilities"><div className="review-section-title"><strong>Recursos iniciais</strong><span>{draft.capabilities?.length ?? 0} ativados</span></div><div className="chip-list">{catalog.filter((item) => draft.capabilities?.includes(item.code)).map((item) => <span key={item.code}>{item.shortLabel}</span>)}</div></div></div>}
+            {stepIndex === 6 && <div className="review-premium"><div className="review-hero"><span className="review-check">✓</span><div><strong>Pronto para seguir para a configuração</strong><p>A fundação está organizada. Publicação, pagamentos e acessos ainda dependerão de homologação.</p></div></div><div className="review-grid"><div className="review-block"><span>Evento</span><strong>{draft.name}</strong><p>{draft.eventType}</p><p>{(draft.subjectAreas ?? []).map((area) => publicSubjectAreaLabel(area)).filter(Boolean).join(', ') || 'Área não informada'}</p></div><div className="review-block"><span>Responsável</span><strong>{selectedOrganization?.organization.name}</strong><p>{formatLabels[draft.format ?? '']} · Inscrição {registrationLabels[draft.registrationMode ?? '']?.toLowerCase()}</p></div><div className="review-block"><span>Data</span><strong>{draft.datesPending ? 'A definir' : toDateInput(draft.startDate) || 'A definir'}</strong><p>{draft.datesPending ? 'Pendência registrada' : draft.endDate ? `até ${toDateInput(draft.endDate)}` : 'Evento de um dia'} · {timeZoneLabels[draft.timeZone ?? ''] ?? draft.timeZone}</p></div><div className="review-block"><span>Público estimado</span><strong>{draft.audiencePending ? 'A definir' : formatAudience(draft.estimatedAudience)}</strong><p>{draft.audiencePending ? 'Pendência registrada' : draft.estimatedAudience ? 'Estimativa operacional, não capacidade' : 'Opcional nesta etapa'}</p></div><div className="review-block"><span>Local</span><strong>{draft.venuePending ? 'A definir' : draft.venue || (draft.format === 'ONLINE' ? 'Online' : 'A definir')}</strong><p>{draft.venuePending ? 'Pendência registrada' : 'Informação salva'}</p></div></div><div className="review-capabilities"><div className="review-section-title"><strong>Recursos iniciais</strong><span>{draft.capabilities?.length ?? 0} ativados</span></div><div className="chip-list">{catalog.filter((item) => draft.capabilities?.includes(item.code)).map((item) => <span key={item.code}>{item.shortLabel}</span>)}</div></div></div>}
 
             <div className="wizard-actions premium-actions"><button className="btn btn-secondary" type="button" onClick={() => stepIndex === 0 ? router.push('/painel') : goTo(stepIndex - 1)}>{stepIndex === 0 ? 'Cancelar' : 'Voltar'}</button>{stepIndex < steps.length - 1 ? <button className="btn btn-primary btn-next" type="button" disabled={starting || saveState === 'saving'} onClick={() => goTo(stepIndex + 1)}>{starting ? 'Criando ambiente…' : 'Continuar'}<span>→</span></button> : <button className="btn btn-primary btn-next" type="button" disabled={finishing || saveState === 'saving'} onClick={finish}>{finishing ? 'Concluindo…' : 'Concluir fundação'}<span>✓</span></button>}</div>
           </section>
@@ -586,3 +647,4 @@ export default function EventWizard({ eventId }: EventWizardProps) {
     </section>
   </main>;
 }
+

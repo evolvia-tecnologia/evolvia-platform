@@ -8,6 +8,7 @@ const baseEvent = {
   name: 'Congresso Evolvia',
   slug: 'congresso-evolvia',
   status: 'SETUP',
+  registrationMode: 'FREE',
   format: 'ONLINE',
   startDate: new Date('2026-10-10T12:00:00.000Z'),
   endDate: null,
@@ -36,12 +37,15 @@ const basePublication = {
   updatedAt: new Date('2026-08-15T06:00:00.000Z'),
 };
 
-function makeHarness({ role = 'OWNER', event = baseEvent, publication = basePublication } = {}) {
+function makeHarness({ role = 'OWNER', event = baseEvent, publication = basePublication, responsibility = null, seller = null } = {}) {
   let transitionCalls = 0;
   const audits = [];
   const prisma = {
     event: { findUnique: async () => event },
     $transaction: async (callback) => callback({
+      event: { findUnique: async () => event },
+      eventFinancialResponsibility: { findUnique: async () => responsibility },
+      organizationLegalProfile: { findUnique: async () => seller },
       auditLog: { create: async (entry) => { audits.push(entry); return entry; } },
     }),
   };
@@ -222,4 +226,37 @@ test('repetir publicação exige a confirmação original e não grava nova tran
   assert.equal(result.event.status, 'PUBLISHED');
   assert.equal(harness.transitionCalls, 0);
   assert.equal(harness.audits.length, 0);
+});
+
+test('evento pago exige responsável financeiro vigente antes de homologar', async () => {
+  const event = { ...baseEvent, registrationMode: 'PAID' };
+  const seller = { revision: 2 };
+  const incomplete = makeHarness({ event, seller });
+  await assert.rejects(
+    () => incomplete.service.transitionStatus('user_owner', event.id, {
+      targetStatus: 'HOMOLOGATION', publicationRevision: 3,
+    }),
+    (error) => error?.response?.code === 'FINANCIAL_RESPONSIBILITY_REQUIRED',
+  );
+  assert.equal(incomplete.transitionCalls, 0);
+
+  const stale = makeHarness({
+    event, seller,
+    responsibility: { organizationId: event.organizationId, sellerLegalProfileRevision: 1 },
+  });
+  await assert.rejects(
+    () => stale.service.transitionStatus('user_owner', event.id, {
+      targetStatus: 'HOMOLOGATION', publicationRevision: 3,
+    }),
+    (error) => error?.response?.code === 'FINANCIAL_RESPONSIBILITY_REQUIRED',
+  );
+
+  const ready = makeHarness({
+    event, seller,
+    responsibility: { organizationId: event.organizationId, sellerLegalProfileRevision: 2 },
+  });
+  const result = await ready.service.transitionStatus('user_owner', event.id, {
+    targetStatus: 'HOMOLOGATION', publicationRevision: 3,
+  });
+  assert.equal(result.event.status, 'HOMOLOGATION');
 });

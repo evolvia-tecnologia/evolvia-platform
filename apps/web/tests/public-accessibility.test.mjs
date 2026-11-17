@@ -102,9 +102,10 @@ test('public experience honors the reduced-motion preference', async () => {
   assert.match(globalStyles, /transition-duration: 0\.01ms !important/u);
 });
 
-test('sete rotas públicas reutilizam o mesmo cabeçalho canônico sem marca paralela', async () => {
+test('rotas públicas reutilizam o mesmo cabeçalho canônico sem marca paralela', async () => {
   const routes = [
     ['app/page.tsx', 'home'],
+    ['app/participante/page.tsx', 'participante'],
     ['app/login/page.tsx', 'login'],
     ['app/cadastro/page.tsx', 'cadastro'],
     ['app/eventos/page.tsx', 'eventos'],
@@ -114,10 +115,13 @@ test('sete rotas públicas reutilizam o mesmo cabeçalho canônico sem marca par
 
   const header = await readFile(new URL('../components/public-site-header.tsx', import.meta.url), 'utf8');
   assert.match(header, /current: PublicSiteHeaderCurrent/u);
-  assert.match(header, /'home' \| 'login' \| 'cadastro' \| 'eventos' \| 'evento' \| 'legal'/u);
+  assert.match(header, /'participante' \| 'home' \| 'login' \| 'cadastro' \| 'eventos' \| 'evento' \| 'legal'/u);
   assert.match(header, /evento: \[[\s\S]*label: 'Eventos'[\s\S]*label: 'Área do organizador'/u);
   assert.match(header, /legal: \[[\s\S]*label: 'Eventos'[\s\S]*label: 'Entrar'[\s\S]*label: 'Criar conta', primary: true/u);
-  assert.doesNotMatch(header, /evento: \[[\s\S]*current: true/u);
+  const eventNav = header.match(/  evento: \[([\s\S]*?)\n  \],/u)?.[1];
+  assert.ok(eventNav);
+  assert.doesNotMatch(eventNav, /current: true/u);
+  assert.match(eventNav, /label: 'Área do participante'/u);
 
   for (const [path, current] of routes) {
     const source = await readFile(new URL(`../${path}`, import.meta.url), 'utf8');
@@ -150,7 +154,7 @@ test('home navigation reflows without hiding public actions at 320px', async () 
   const headerStyles = await readFile(new URL('../components/public-site-header.module.css', import.meta.url), 'utf8');
 
   assert.match(home, /<PublicSiteHeader current="home" \/>/u);
-  assert.match(headerStyles, /@media \(max-width: 520px\) \{[\s\S]*\.header \{[\s\S]*height: auto;[\s\S]*\.nav \{[\s\S]*display: grid;[\s\S]*grid-template-columns: repeat\(auto-fit, minmax\(0, 1fr\)\)/u);
+  assert.match(headerStyles, /@media \(max-width: 520px\) \{[\s\S]*\.header \{[\s\S]*height: auto;[\s\S]*\.nav \{[\s\S]*display: grid;[\s\S]*grid-template-columns: repeat\(auto-fit, minmax\(min\(100%, 10rem\), 1fr\)\)/u);
   assert.match(headerStyles, /\.action,[\s\S]*\.primaryAction \{[\s\S]*min-height: var\(--space-44\)/u);
 });
 

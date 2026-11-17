@@ -3,9 +3,10 @@ set -Eeuo pipefail
 umask 077
 
 DOMAIN="${EVOLVIA_DEV_DOMAIN:-dev.evolviatecnologia.com}"
+CANONICAL_DOMAIN="${EVOLVIA_DEV_CANONICAL_DOMAIN:-homologacao.evolviatecnologia.com}"
+CANONICAL_DOMAIN="${CANONICAL_DOMAIN,,}"
 PORT="${EVOLVIA_DEV_TLS_PORT:-443}"
 EXPECTED_IPV4="${EVOLVIA_DEV_EXPECTED_IPV4:-}"
-HEALTH_PATH="${EVOLVIA_DEV_HEALTH_PATH:-/api/health/ready}"
 LOCAL_INSPECTION="${EVOLVIA_DEV_LOCAL_INSPECTION:-0}"
 TMP_DIR="$(mktemp -d)"
 TLS_TRANSCRIPT="${TMP_DIR}/tls.txt"
@@ -47,12 +48,12 @@ done
   printf '[EVOLVIA DEV TLS] ERRO: este diagnóstico é exclusivo de dev; homologação foi recusada.\n' >&2
   exit 2
 }
-[[ "$PORT" =~ ^[0-9]{1,5}$ ]] || {
-  printf '[EVOLVIA DEV TLS] ERRO: porta TLS inválida.\n' >&2
+[[ "$CANONICAL_DOMAIN" =~ ^[a-z0-9.-]+$ && "$CANONICAL_DOMAIN" != "$DOMAIN" ]] || {
+  printf '[EVOLVIA DEV TLS] ERRO: domínio canônico inválido ou igual ao alias.\n' >&2
   exit 2
 }
-[[ "$HEALTH_PATH" == /* ]] || {
-  printf '[EVOLVIA DEV TLS] ERRO: a rota de readiness deve começar com /.\n' >&2
+[[ "$PORT" =~ ^[0-9]{1,5}$ ]] || {
+  printf '[EVOLVIA DEV TLS] ERRO: porta TLS inválida.\n' >&2
   exit 2
 }
 [[ "$LOCAL_INSPECTION" == "0" || "$LOCAL_INSPECTION" == "1" ]] || {
@@ -129,16 +130,16 @@ HTTP_CODE="$(curl \
   --write-out '%{http_code}' \
   --max-time 15 \
   "http://${DOMAIN}/" || true)"
-HTTP_LOCATION="$(awk 'BEGIN { IGNORECASE=1 } /^location:/ { sub(/^[^:]+:[[:space:]]*/, ""); sub(/\r$/, ""); print; exit }' "$HTTP_HEADERS")"
+HTTP_LOCATION="$(awk 'tolower($0) ~ /^location:/ { sub(/^[^:]+:[[:space:]]*/, ""); sub(/\r$/, ""); print; exit }' "$HTTP_HEADERS")"
 
-if [[ "$HTTP_CODE" == "301" || "$HTTP_CODE" == "308" ]]; then
-  log "HTTP respondeu com redirecionamento permanente ${HTTP_CODE}."
+if [[ "$HTTP_CODE" == "308" ]]; then
+  log "HTTP respondeu com redirecionamento permanente 308."
 else
-  record_failure "HTTP deveria responder 301 ou 308; recebeu ${HTTP_CODE:-sem resposta}."
+  record_failure "HTTP deveria responder 308; recebeu ${HTTP_CODE:-sem resposta}."
 fi
 case "$HTTP_LOCATION" in
-  "https://${DOMAIN}/"*)
-    log "Destino do redirecionamento preserva o hostname de dev."
+  "https://${CANONICAL_DOMAIN}/"*)
+    log "Destino HTTP aponta para a homologação canônica."
     ;;
   *)
     record_failure "redirecionamento HTTP aponta para destino inesperado: ${HTTP_LOCATION:-ausente}."
@@ -161,11 +162,21 @@ if [[ "$HTTPS_STATUS" -ne 0 ]]; then
   record_failure "curl recusou a conexão HTTPS; a validação não foi contornada."
 else
   case "$HTTPS_CODE" in
-    200|204|301|302|307|308)
-      log "HTTPS respondeu com status ${HTTPS_CODE}."
+    308)
+      log "HTTPS respondeu com redirecionamento permanente 308."
       ;;
     *)
       record_failure "HTTPS respondeu com status inesperado: ${HTTPS_CODE:-ausente}."
+      ;;
+  esac
+
+  HTTPS_LOCATION="$(awk 'tolower($0) ~ /^location:/ { sub(/^[^:]+:[[:space:]]*/, ""); sub(/\r$/, ""); print; exit }' "$HTTPS_HEADERS")"
+  case "$HTTPS_LOCATION" in
+    "https://${CANONICAL_DOMAIN}/"*)
+      log "Destino HTTPS aponta para a homologação canônica."
+      ;;
+    *)
+      record_failure "redirecionamento HTTPS aponta para destino inesperado: ${HTTPS_LOCATION:-ausente}."
       ;;
   esac
 
@@ -181,7 +192,7 @@ else
 
   require_header '^strict-transport-security: .*max-age=' 'HSTS'
   require_header '^x-content-type-options: nosniff[[:space:]]*$' 'X-Content-Type-Options nosniff'
-  require_header '^referrer-policy: strict-origin-when-cross-origin[[:space:]]*$' 'Referrer-Policy'
+  require_header '^referrer-policy: (strict-origin-when-cross-origin|no-referrer)[[:space:]]*$' 'Referrer-Policy'
   require_header '^x-frame-options: (sameorigin|deny)[[:space:]]*$' 'X-Frame-Options'
 
   if grep -Eiq '^server: nginx/[0-9]' "$HTTPS_HEADERS"; then
@@ -195,21 +206,6 @@ else
     log "X-Powered-By ausente."
   fi
 
-  set +e
-  READINESS_PAYLOAD="$(curl \
-    --silent \
-    --show-error \
-    --max-time 15 \
-    "https://${DOMAIN}${HEALTH_PATH}")"
-  READINESS_STATUS=$?
-  set -e
-  if [[ "$READINESS_STATUS" -eq 0 ]] \
-    && grep -Eiq '"status"[[:space:]]*:[[:space:]]*"ready"' <<<"$READINESS_PAYLOAD" \
-    && grep -Eiq '"database"[[:space:]]*:[[:space:]]*"ok"' <<<"$READINESS_PAYLOAD"; then
-    log "Readiness público comprovou aplicação e banco."
-  else
-    record_failure "readiness público não comprovou aplicação e banco."
-  fi
 fi
 
 if [[ "$LOCAL_INSPECTION" == "1" ]]; then

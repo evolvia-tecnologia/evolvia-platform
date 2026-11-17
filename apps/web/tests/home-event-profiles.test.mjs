@@ -6,16 +6,23 @@ async function homeSource() {
   return readFile(new URL('../app/page.tsx', import.meta.url), 'utf8');
 }
 
+async function pickerSource() {
+  return readFile(new URL('../components/public-profile-picker.tsx', import.meta.url), 'utf8');
+}
+
 async function profileCatalogSource() {
   return readFile(new URL('../lib/event-profile-catalog.ts', import.meta.url), 'utf8');
 }
 
 test('Home e Wizard compartilham um único catálogo de perfis', async () => {
-  const [home, catalog] = await Promise.all([homeSource(), profileCatalogSource()]);
+  const [home, picker, catalog] = await Promise.all([homeSource(), pickerSource(), profileCatalogSource()]);
 
-  assert.match(home, /EVENT_PROFILE_GROUPS, findEventProfileGroup/u);
-  assert.match(home, /EVENT_PROFILE_GROUPS\.map/u);
-  assert.match(home, /activeGroup\.options\.map/u);
+  assert.match(home, /import \{ findEventProfileGroup \} from '\.\.\/lib\/event-profile-catalog'/u);
+  assert.match(picker, /EVENT_PROFILE_GROUPS, findEventProfileGroup/u);
+  assert.match(picker, /EVENT_PROFILE_GROUPS\.map/u);
+  assert.match(picker, /family\.options\.map/u);
+  assert.doesNotMatch(picker, /EVENT_PROFILE_GROUPS\s*=/u);
+  assert.match(catalog, /value: 'Corrida', icon: '◎', title: 'Corrida'/u);
 
   for (const group of [
     'Científicos e acadêmicos',
@@ -29,30 +36,47 @@ test('Home e Wizard compartilham um único catálogo de perfis', async () => {
   }
 });
 
-test('Home revela tipos progressivamente e permite retornar aos perfis', async () => {
-  const source = await homeSource();
+test('Home mostra uma família por vez e esconde a versão interna', async () => {
+  const [home, picker] = await Promise.all([homeSource(), pickerSource()]);
 
-  assert.match(source, /activeGroup \? <>/u);
-  assert.match(source, /Escolha primeiro um perfil para ver somente os tipos relacionados\./u);
-  assert.match(source, /← Escolher outro perfil/u);
-  assert.match(source, /function returnToGroups\(\)/u);
-  assert.match(source, /clearPersistedEventType\(\)/u);
+  assert.match(home, /<h2>Seu evento começa com uma conversa\.<\/h2>/u);
+  assert.doesNotMatch(home, /EVOLVIA CORE v0\.2/u);
+  assert.doesNotMatch(home, /<h1(?:\s|>)/u);
+  const discovery = await readFile(new URL('../components/public-discovery-strip.tsx', import.meta.url), 'utf8');
+  assert.equal((discovery.match(/<h1(?:\s|>)/gu) || []).length, 1,
+    'a descoberta fornece o único título principal da composição');
+  assert.match(picker, /<h3 id=\{\x60home-profile-/u,
+    'família permanece subordinada ao h2 do herói');
+  assert.match(picker, /Voltar às famílias/u);
+  assert.match(picker, /criação do evento/u);
+  assert.doesNotMatch(picker, /Wizard/u);
+  assert.doesNotMatch(home, /max-height/u);
 });
 
 test('Home restaura e persiste somente tipos válidos do catálogo', async () => {
   const source = await homeSource();
 
   assert.match(source, /findEventProfileGroup\(parsed\.eventType\)/u);
-  assert.match(source, /setActiveGroupId\(findEventProfileGroup\(persistedEventType\)\?\.id \?\? ''\)/u);
+  assert.match(source, /setSelectedEventType\(readPersistedEventType\(\)\)/u);
   assert.match(source, /JSON\.stringify\(\{ \.\.\.previous, eventType \}\)/u);
+  assert.match(source, /evolvia_wizard_prestart_v2/u);
 });
 
 test('seletores públicos mantêm nome, estado e anúncio para tecnologia assistiva', async () => {
-  const source = await homeSource();
+  const [home, picker, css] = await Promise.all([
+    homeSource(),
+    pickerSource(),
+    readFile(new URL('../components/public-profile-picker.module.css', import.meta.url), 'utf8'),
+  ]);
 
-  assert.match(source, /role="group"/u);
-  assert.match(source, /aria-labelledby="event-type-question"/u);
-  assert.match(source, /aria-describedby="event-group-description"/u);
-  assert.match(source, /aria-pressed=\{selected\}/u);
-  assert.match(source, /aria-live="polite"/u);
+  assert.match(home, /id="event-type-question"/u);
+  assert.match(picker, /role="group"/u);
+  assert.match(picker, /aria-labelledby=\{`home-profile-\$\{family\.id\}`\}/u);
+  assert.match(picker, /aria-pressed=\{selected\}/u);
+  assert.match(picker, /aria-live="polite"/u);
+  assert.match(css, /\.families:focus-visible \{\s*outline: 3px solid var\(--color-focus-on-light\);/u);
+  assert.match(css, /@media \(max-width: 390px\)/u);
+  assert.match(css, /min-height: 44px/u);
+  assert.doesNotMatch(css, /#[0-9a-f]{3,8}/iu);
+  assert.doesNotMatch(css, /max-height/u);
 });

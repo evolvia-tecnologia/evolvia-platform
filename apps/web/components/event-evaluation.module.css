@@ -1,0 +1,35 @@
+.page { padding: var(--space-24); max-width: 72rem; margin: 0 auto; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: var(--space-24); display: grid; gap: var(--space-16); }
+.eyebrow { color: var(--color-brand-blue-600); font-weight: 700; letter-spacing: .06em; }
+.form, .questions { display: grid; gap: var(--space-16); }
+.card label, .card fieldset { min-width: 0; display: grid; gap: var(--space-8); }
+.card input, .card select, .card textarea { width: 100%; min-width: 0; max-width: 100%; font: inherit; padding: .75rem; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--surface); color: var(--color-text); }
+.card textarea { min-height: 7rem; resize: vertical; }
+.rating, .actions { display: flex; gap: var(--space-12); flex-wrap: wrap; align-items: center; }
+.rating label, .card .toggle { display: flex; grid-auto-flow: column; justify-content: start; align-items: center; }
+.card button { min-height: 2.75rem; padding: .65rem 1rem; }
+.card :focus-visible { outline: 3px solid var(--color-focus-on-light); outline-offset: 2px; }
+@media (max-width: 700px) { .page, .card { padding: var(--space-16); } .actions { align-items: stretch; flex-direction: column; } }
+@media (prefers-reduced-motion: reduce) { .card * { scroll-behavior: auto; transition: none; } }
+@media (forced-colors: active) { .card { border: 1px solid CanvasText; } }
+
+.backLink { display: inline-flex; min-height: 44px; align-items: center; margin-bottom: var(--space-16); text-decoration: underline; }
+.backLink:focus-visible { outline: 3px solid var(--color-focus-on-light); outline-offset: 2px; }
+.card fieldset { margin: 0; border: 1px solid var(--color-border); padding: var(--space-16); }
+.card legend { overflow-wrap: anywhere; }
+
+/* Embedded screens use the common event frame, matching the Cursor layout. */
+:global([data-shell="panel"]) .page { min-height: 0; min-width: 0; max-width: none; width: 100%; margin: 0; padding: 0; background: transparent; font-family: var(--font-family-sans); font-weight: var(--font-weight-regular); line-height: var(--line-height-body); }
+:global([data-shell="panel"]) .workspace { width: 100%; max-width: none; min-width: 0; margin: 0; padding: 0; }
+:global([data-shell="panel"]) .topbar { display: none; }
+
+.page { font-family: var(--font-family-sans); font-weight: var(--font-weight-regular); line-height: var(--line-height-body); }
+.page h1 { font-size: var(--font-size-title-responsive); line-height: var(--line-height-compact); font-weight: var(--font-weight-semibold); overflow-wrap: anywhere; }
+.page h2 { font-size: var(--font-size-xl); line-height: var(--line-height-compact); font-weight: var(--font-weight-semibold); overflow-wrap: anywhere; }
+.page h3 { font-size: var(--font-size-lg); line-height: var(--line-height-compact); font-weight: var(--font-weight-medium); overflow-wrap: anywhere; }
+.page :is(input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=color]),select,textarea) { font-family: inherit; font-size: var(--font-size-md); font-weight: var(--font-weight-regular); min-width: 0; max-width: 100%; }
+
+.card button { border: 1px solid var(--color-brand-blue-600); border-radius: var(--radius-control); background: var(--color-brand-blue-600); color: var(--color-on-dark); padding: var(--space-12) var(--space-16); font-weight: var(--font-weight-semibold); }
+.card input:not([type=checkbox]):not([type=radio]), .card select { min-height: var(--space-44); }
+.card input[type=checkbox], .card input[type=radio] { width: auto; accent-color: var(--color-brand-blue-600); }
+.card { box-shadow: var(--shadow-soft); }

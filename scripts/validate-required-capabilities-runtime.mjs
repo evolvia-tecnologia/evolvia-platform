@@ -9,7 +9,7 @@ import {
 } from './validate-public-accessibility-runtime.mjs';
 
 export const TIMEOUT_MESSAGE = 'A prova visual das capabilities obrigatórias excedeu o tempo máximo de execução.';
-export const EXPECTED_TYPE_COUNT = 19;
+export const EXPECTED_TYPE_COUNT = 20;
 export const MANIFEST_LIMIT_BYTES = 64 * 1024;
 export const OBRIGATORIA_RE = /Obrigat[oó]ri[oa]/iu;
 

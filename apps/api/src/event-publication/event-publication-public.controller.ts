@@ -1,4 +1,4 @@
-import { Controller, Get, NotFoundException, Param, Query, Res } from '@nestjs/common';
+import { Controller, Get, NotFoundException, Param, Post, Query, Res } from '@nestjs/common';
 import { EventFormat, EventProfileCode } from '@prisma/client';
 import { EventPublicationPublicService } from './event-publication-public.service';
 import { EVENT_MEDIA_USAGES, EventMediaUsageValue } from './event-publication-media.policy';
@@ -11,11 +11,18 @@ export class EventPublicationPublicController {
     private readonly media: EventPublicationMediaService,
   ) {}
 
+  @Post(':slug/visit')
+  recordVisit(@Param('slug') slug: string) {
+    return this.publication.recordVisit(slug);
+  }
+
   @Get()
   discover(
     @Query('q') query?: string,
     @Query('format') format?: string,
     @Query('profile') profile?: string,
+    @Query('area') area?: string,
+    @Query('region') region?: string,
     @Query('from') from?: string,
     @Query('until') until?: string,
     @Query('page') page?: string,
@@ -33,6 +40,8 @@ export class EventPublicationPublicController {
       query,
       format: normalizedFormat,
       profileCode: normalizedProfile,
+      area,
+      region,
       from,
       until,
       page: page ? Number(page) : undefined,

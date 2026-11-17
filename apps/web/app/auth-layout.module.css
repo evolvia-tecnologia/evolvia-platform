@@ -153,13 +153,13 @@
   display: grid;
   place-items: center;
   border-radius:var(--radius-md);
-  background: linear-gradient(145deg, var(--color-surface-soft), var(--color-surface-violet-soft));
-  color: var(--color-accent-violet-500);
+  background: var(--color-brand-blue-600);
+  color: var(--color-on-dark);
   font-size:var(--font-size-xl);
 }
 
 .evaCard strong { display: block; font-size:var(--font-size-xs); }
-.evaCard span { display: block; margin-top:var(--space-2); color: var(--color-text-muted); font-size:var(--font-size-xs); line-height:var(--line-height-ui); }
+.evaCard span:not(.evaIcon) { display: block; margin-top:var(--space-2); color: var(--color-text-muted); font-size:var(--font-size-xs); line-height:var(--line-height-ui); }
 
 .panel {
   display: flex;
@@ -777,3 +777,11 @@
 
   .primaryButton { border: 1px solid ButtonText; }
 }
+
+.accountChoices { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-8); margin-bottom: var(--space-12); }
+.accountChoices span, .accountChoices a { display: flex; align-items: center; justify-content: center; min-height: 44px; padding: var(--space-8); border: 1px solid var(--color-on-dark-muted); border-radius: var(--radius-field); text-align: center; font-weight: var(--font-weight-bold); font-size: var(--font-size-sm); }
+.accountChoices span { color: var(--color-brand-blue-700); background: var(--color-surface-subtle); border-color: var(--color-brand-blue-600); }
+.accountChoices a { color: var(--color-text); text-decoration: none; }
+.accountChoices a:hover, .accountChoices a:focus-visible { border-color: var(--color-brand-blue-600); text-decoration: underline; }
+.choiceHelp { margin: 0 0 var(--space-12); color: var(--color-text-muted); font-size: var(--font-size-xs); line-height: var(--line-height-ui); }
+@media (max-width: 520px) { .accountChoices { grid-template-columns: 1fr; } }

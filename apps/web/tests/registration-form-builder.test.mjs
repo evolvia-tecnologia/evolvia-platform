@@ -10,7 +10,18 @@ const service = readFileSync(new URL('../../api/src/registration-forms.service.t
 test('construtor é encontrável no painel sem prometer inscrição pública', () => {
   assert.match(dashboard, /Ficha de inscrição/u);
   assert.match(dashboard, /Configurar ficha de inscrição/u);
-  assert.match(dashboard, /não abre inscrições ao público/u);
+  assert.match(dashboard, /sem abrir inscrições ao público/u);
+});
+
+test('o organizador anexa o PDF que abre no aceite dos termos', () => {
+  assert.match(builder, /Anexar PDF/u);
+  assert.match(builder, /Abrir PDF anexado/u);
+  const openTerms = builder.slice(builder.indexOf('async function openTerms'), builder.indexOf('async function publish'));
+  assert.ok(openTerms.indexOf("window.open('', '_blank')") < openTerms.indexOf('await fetch'));
+  assert.match(openTerms, /preview\.location\.href = url/u);
+  assert.match(builder, /terms_acceptance/u);
+  assert.match(builder, /type="checkbox"/u);
+  assert.match(service, /termsDocument/u);
 });
 
 test('UX oferece catálogo, ordem, obrigatoriedade, campo próprio, prévia e versão', () => {

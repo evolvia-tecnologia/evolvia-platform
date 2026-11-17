@@ -4,6 +4,8 @@
 
 Toda tela, etapa e campo criado na jornada científica da Evolvia deve ensinar o organizador a decidir **se precisa daquela informação**, **para que ela será usada**, **como preenchê-la** e **qual é o próximo passo**.
 
+Trabalhos e programação científica são fluxos separados. A configuração da submissão, o envio do resumo pelo participante, a distribuição, a avaliação e os resultados não compartilham menu nem sequência com o cadastro de palestrantes, atividades, locais, dias e horários.
+
 Este padrão é obrigatório para A3–A9 e para módulos científicos transversais, incluindo comunicação, presença, certificados e relatórios.
 
 A experiência deve ser pensada para um organizador que não conhece a arquitetura da Evolvia e não precisa conhecer termos técnicos para colocar o evento no ar.

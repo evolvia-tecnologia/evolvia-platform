@@ -22,6 +22,7 @@ const EVENT_TYPE_AVAILABILITY_TABLE = [
   { eventType: 'Evento social ou comunitário', title: 'Social ou comunitário', profileCode: 'SOCIAL_COMMUNITY' },
   { eventType: 'Evento religioso ou beneficente', title: 'Religioso ou beneficente', profileCode: 'SOCIAL_COMMUNITY' },
   { eventType: 'Evento esportivo ou torneio', title: 'Esportivo ou torneio', profileCode: 'SOCIAL_COMMUNITY' },
+  { eventType: 'Corrida', title: 'Corrida', profileCode: 'SOCIAL_COMMUNITY' },
   { eventType: 'Outro tipo de evento', title: 'Outro perfil', profileCode: 'OTHER' },
 ];
 
@@ -38,6 +39,10 @@ async function dashboardSource() {
   return readFile(new URL('../components/event-admin-dashboard.tsx', import.meta.url), 'utf8');
 }
 
+async function workspaceSource() {
+  return readFile(new URL('../components/event-workspace.tsx', import.meta.url), 'utf8');
+}
+
 async function dashboardCss() {
   return readFile(new URL('../components/event-admin-dashboard.module.css', import.meta.url), 'utf8');
 }
@@ -50,13 +55,13 @@ function scientificNavBlock(source) {
   return source.match(/\{isScientific && <>[\s\S]*?<\/>\}/u)?.[0] ?? '';
 }
 
-test('catálogo canônico possui os 19 tipos de evento da tabela', () => {
+test('catálogo canônico possui os 20 tipos de evento da tabela', () => {
   const types = catalogTypes();
   const tableTypes = EVENT_TYPE_AVAILABILITY_TABLE.map((row) => row.eventType);
 
-  assert.equal(types.length, 19);
-  assert.equal(new Set(types).size, 19);
-  assert.equal(EVENT_TYPE_AVAILABILITY_TABLE.length, 19);
+  assert.equal(types.length, 20);
+  assert.equal(new Set(types).size, 20);
+  assert.equal(EVENT_TYPE_AVAILABILITY_TABLE.length, 20);
   assert.deepEqual([...types].sort(), [...tableTypes].sort());
 
   const options = EVENT_PROFILE_GROUPS.flatMap((group) => [...group.options]);
@@ -71,25 +76,28 @@ test('catálogo canônico possui os 19 tipos de evento da tabela', () => {
   assert.ok(tableTypes.includes('Show ou entretenimento'));
 });
 
-test('CTA da ficha aparece no painel para qualquer um dos 19 tipos', async () => {
+test('CTA da ficha aparece no painel para qualquer um dos 20 tipos', async () => {
   const dashboard = await dashboardSource();
 
   assert.match(dashboard, /function registrationFormHref\(eventId: string\)/u);
   assert.match(dashboard, /return `\/eventos\/\$\{eventId\}\/painel\/inscricoes\/ficha`/u);
   assert.match(dashboard, /<RegistrationFormDashboardAccess eventId=\{eventId\} \/>/u);
   assert.match(dashboard, /<h2 id="registration-form-dashboard-title">Ficha de inscrição<\/h2>/u);
-  assert.match(dashboard, /className=\{styles\.primaryButton\} href=\{href\}>Configurar ficha de inscrição/u);
+  assert.match(dashboard, /className=\{styles\.primaryButton\} href=\{commercialHref\}>Categorias e lotes/u);
+  assert.match(dashboard, /className=\{styles\.secondaryButton\} href=\{href\}>Editar ficha/u);
   assert.match(
     dashboard,
     /\{configurationAvailable && <Link className=\{styles\.secondaryButton\} href=\{registrationFormHref\(eventId\)\}>Configurar ficha de inscrição<\/Link>\}/u,
   );
-  assert.match(dashboard, /href=\{registrationFormHref\(eventId\)\}[\s\S]{0,400}<strong>Ficha de inscrição<\/strong>/u);
+  const workspace = await workspaceSource();
+  assert.match(workspace, /painel\/inscricoes\/ficha[\s\S]{0,240}<strong>Ficha de inscrição<\/strong>/u);
 
   assert.match(dashboard, /const configurationAvailable = item\.phase === 2/u);
   assert.doesNotMatch(dashboard, /configurationAvailable && isScientific|isScientific && configurationAvailable/u);
 
-  const scientificBlock = scientificNavBlock(dashboard);
-  assert.match(scientificBlock, /Científico/u);
+  const scientificBlock = scientificNavBlock(await workspaceSource());
+  assert.match(scientificBlock, /aria-label="Trabalhos científicos"/u);
+  assert.match(scientificBlock, /aria-label="Programação científica"/u);
   assert.doesNotMatch(scientificBlock, /inscricoes\/ficha|Configurar ficha|RegistrationFormDashboardAccess/u);
 
   for (const row of EVENT_TYPE_AVAILABILITY_TABLE) {
@@ -128,24 +136,27 @@ test('redirecionamento científico permanece seletivo e não privilegia a ficha'
 test('preparação da ficha se distingue da abertura pública das inscrições', async () => {
   const dashboard = await dashboardSource();
 
-  assert.match(dashboard, /Preparar e versionar a ficha não abre inscrições ao público/u);
-  assert.match(dashboard, /disponível para todos os perfis de evento/u);
+  assert.match(dashboard, /A ficha pode ser preparada sem abrir inscrições ao público/u);
+  assert.match(dashboard, /const configurationAvailable = item\.phase === 2/u);
   assert.doesNotMatch(dashboard, /inscrição pública disponível|publicar inscrições|abrir inscrição pública/iu);
   assert.doesNotMatch(dashboard, /RegistrationFormBuilder/u);
 });
 
 test('oferta da ficha no painel permanece autenticada, em português e acessível', async () => {
-  const [dashboard, css] = await Promise.all([dashboardSource(), dashboardCss()]);
+  const [dashboard, workspace, css] = await Promise.all([dashboardSource(), workspaceSource(), dashboardCss()]);
 
   assert.match(dashboard, /if \(!getToken\(\)\)/u);
+  assert.match(workspace, /if \(!getToken\(\)\)/u);
   assert.match(dashboard, /router\.replace\('\/login'\)/u);
   assert.doesNotMatch(dashboard, /Authorization:\s*['"]Bearer|bypass|skipAuth|disableAuth/u);
+  assert.doesNotMatch(workspace, /Authorization:\s*['"]Bearer|bypass|skipAuth|disableAuth/u);
 
   assert.match(dashboard, /aria-labelledby="registration-form-dashboard-title"/u);
   assert.match(dashboard, /aria-describedby="registration-form-dashboard-lead"/u);
-  assert.match(dashboard, /aria-describedby="registration-form-dashboard-note"/u);
-  assert.match(dashboard, /<a className=\{styles\.skipLink\} href="#event-admin-content">Pular para o conteúdo<\/a>/u);
-  assert.match(dashboard, /if \(event\.key !== 'Escape'\) return/u);
+  assert.match(dashboard, /<details className=\{styles\.journey\}>/u);
+  assert.match(dashboard, /journeySummaryText/u);
+  assert.match(workspace, /<a className=\{styles\.skipLink\} href="#event-admin-content">Pular para o conteúdo<\/a>/u);
+  assert.match(workspace, /if \(event\.key !== 'Escape'\) return/u);
   assert.doesNotMatch(dashboard, /Configure registration|Get started|Open registrations/u);
 
   assert.match(
@@ -162,3 +173,4 @@ test('oferta da ficha no painel permanece autenticada, em português e acessíve
     /@media \(max-width: 700px\)[\s\S]*\.hero,[\s\S]*\.nextStep \{[\s\S]*flex-direction: column/u,
   );
 });
+

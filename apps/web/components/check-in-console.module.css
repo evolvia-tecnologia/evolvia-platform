@@ -1,0 +1,221 @@
+.page {
+  display: grid;
+  gap: var(--space-24);
+  color: var(--color-text);
+}
+
+.header {
+  display: grid;
+  gap: var(--space-8);
+  max-width: 42rem;
+}
+
+.eyebrow {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: var(--letter-spacing-kicker);
+}
+
+.header h1 {
+  margin: 0;
+  color: var(--color-text-strong);
+  font-size: var(--font-size-title-responsive);
+  line-height: var(--line-height-heading);
+}
+
+.header p,
+.guidance p,
+.desk p,
+.result p {
+  margin: 0;
+  color: var(--color-text-muted);
+  line-height: var(--line-height-body);
+}
+
+.layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) minmax(16rem, 0.8fr);
+  gap: var(--space-24);
+  align-items: start;
+}
+
+.desk,
+.guidance {
+  display: grid;
+  gap: var(--space-16);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  background: var(--color-surface);
+  padding: var(--space-24);
+}
+
+.desk label {
+  display: grid;
+  gap: var(--space-8);
+  color: var(--color-text-strong);
+  font-weight: var(--font-weight-bold);
+}
+
+.desk input {
+  width: 100%;
+  min-height: var(--space-56);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-control);
+  padding: var(--space-12) var(--space-16);
+  background: var(--color-surface);
+  color: var(--color-text-strong);
+  font: inherit;
+  font-size: var(--font-size-xl);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-12);
+}
+
+.desk button,
+.guidance a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--space-44);
+  border-radius: var(--radius-control);
+  padding: var(--space-12) var(--space-16);
+  font: inherit;
+  font-weight: var(--font-weight-bold);
+  text-decoration: none;
+}
+
+.desk button {
+  border: 0;
+  background: var(--color-brand-blue-600);
+  color: var(--color-surface);
+  cursor: pointer;
+}
+
+.desk button.secondary {
+  border: 1px solid var(--color-border-strong);
+  background: var(--color-surface);
+  color: var(--color-text-strong);
+}
+
+.desk button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.guidance a {
+  justify-self: start;
+  border: 1px solid var(--color-border-strong);
+  background: var(--color-surface-subtle);
+  color: var(--color-brand-navy-800);
+}
+
+.notice {
+  border-radius: var(--radius-md);
+  background: var(--color-warning-surface);
+  color: var(--color-warning);
+  padding: var(--space-12);
+}
+
+.guidance ol {
+  display: grid;
+  gap: var(--space-8);
+  margin: 0;
+  padding-left: 1.25rem;
+  color: var(--color-text);
+}
+
+.error,
+.result {
+  display: grid;
+  gap: var(--space-8);
+  border-radius: var(--radius-md);
+  padding: var(--space-16);
+}
+
+.error {
+  border: 1px solid var(--color-danger);
+  background: var(--color-danger-surface);
+  color: var(--color-danger);
+}
+
+.result[data-state="ok"] {
+  border: 1px solid var(--color-success);
+  background: var(--color-success-surface);
+}
+
+.result[data-state="repeat"] {
+  border: 1px solid var(--color-warning);
+  background: var(--color-warning-surface);
+}
+
+.result strong {
+  color: var(--color-text-strong);
+  font-size: var(--font-size-xl);
+}
+
+.result dl {
+  display: grid;
+  gap: var(--space-12);
+  margin: 0;
+}
+
+.result dt {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+}
+
+.result dd {
+  margin: 0;
+  color: var(--color-text-strong);
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
+}
+
+.page :is(a, button, input):focus-visible {
+  outline: 3px solid var(--color-focus-on-light);
+  outline-offset: 2px;
+}
+
+@media (max-width: 800px) {
+  .layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 320px) {
+  .desk,
+  .guidance {
+    padding: var(--space-16);
+  }
+
+  .actions,
+  .desk button,
+  .guidance a {
+    width: 100%;
+  }
+
+  .desk input {
+    font-size: var(--font-size-md);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page * {
+    scroll-behavior: auto;
+  }
+}
+
+@media (forced-colors: active) {
+  .desk button,
+  .guidance a,
+  .error,
+  .result {
+    border: 1px solid ButtonText;
+  }
+}
+

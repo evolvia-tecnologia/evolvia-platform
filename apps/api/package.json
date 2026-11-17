@@ -11,6 +11,9 @@
     "prisma:migrate:deploy": "prisma migrate deploy",
     "test:unit": "node --test tests/*.test.mjs"
   },
+  "prisma": {
+    "schema": "./prisma"
+  },
   "dependencies": {
     "@nestjs/common": "11.1.28",
     "@nestjs/core": "11.1.28",
@@ -20,6 +23,7 @@
     "bcryptjs": "3.0.3",
     "class-transformer": "0.5.1",
     "class-validator": "0.14.4",
+    "dejavu-fonts-ttf": "2.37.3",
     "prisma": "6.19.3",
     "reflect-metadata": "0.2.2",
     "rxjs": "7.8.2"
@@ -30,7 +34,10 @@
     "typescript": "5.9.3"
   },
   "overrides": {
-    "deepmerge-ts": "8.0.0"
+    "deepmerge-ts": "8.0.0",
+    "multer": "2.5.0",
+    "proxy-addr": "2.0.8",
+    "body-parser": "2.4.0"
   },
   "engines": {
     "node": ">=22 <23",

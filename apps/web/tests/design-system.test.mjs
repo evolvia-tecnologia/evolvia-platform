@@ -21,6 +21,7 @@ const publicationStyles = await Promise.all([
   '../components/publication-preview.module.css',
   '../components/publication-release-gate.module.css',
   '../components/publication-sections-editor.module.css',
+  '../components/publication-rich-text-field.module.css',
 ].map((path) => readFile(new URL(path, import.meta.url), 'utf8')));
 
 const transversalStyles = await Promise.all([
@@ -33,12 +34,16 @@ const transversalStyles = await Promise.all([
   '../components/event-admin-dashboard.module.css',
   '../components/legal-document-page.module.css',
   '../components/public-events-preview.module.css',
+  '../components/public-event-collections.module.css',
+  '../components/public-discovery-strip.module.css',
   '../components/publication-editor.module.css',
   '../components/publication-media-editor.module.css',
   '../components/publication-preview.module.css',
   '../components/publication-release-gate.module.css',
   '../components/publication-sections-editor.module.css',
+  '../components/publication-rich-text-field.module.css',
   '../components/registration-form-builder.module.css',
+  '../components/integrations-hub.module.css',
   '../components/scientific-eva-help.module.css',
   '../components/scientific-event-central.module.css',
   '../components/scientific-guests.module.css',
@@ -46,6 +51,7 @@ const transversalStyles = await Promise.all([
   '../components/scientific-reviews.module.css',
   '../components/scientific-structure.module.css',
   '../components/scientific-submissions.module.css',
+  '../components/scientific-station.module.css',
 ].map(async (path) => [path, await readFile(new URL(path, import.meta.url), 'utf8')]));
 
 test('design system preserva a assinatura azul-escura aprovada', () => {
@@ -125,13 +131,17 @@ test('painel apresenta a jornada canônica sem criar ações fictícias', () => 
     assert.match(adminDashboard, new RegExp(phase, 'u'), phase);
   }
 
-  assert.match(adminDashboard, /Disponível agora/u);
-  assert.match(adminDashboard, /Bloqueada pelo Gate anterior/u);
-  assert.match(adminDashboard, /Não se aplica ao perfil atual/u);
-  assert.match(adminDashboard, /Preparar e versionar a ficha não abre inscrições ao público/u);
+  assert.match(adminDashboard, /Configuração disponível/u);
+  assert.match(adminDashboard, /Em desenvolvimento/u);
+  assert.match(adminDashboard, /Não se aplica/u);
+  assert.match(adminDashboard, /A ficha pode ser preparada sem abrir inscrições ao público/u);
   assert.doesNotMatch(adminDashboard, /href=.*fase-(?:2|3|4|5|6|7|8|9|10|11)/u);
   assert.match(admin, /\.journeyList \{[\s\S]*grid-template-columns: repeat\(2, minmax\(0, 1fr\)\)/u);
   assert.match(admin, /@media \(max-width: 700px\)[\s\S]*\.journeyList \{[\s\S]*grid-template-columns: 1fr/u);
+  assert.match(adminDashboard, /<details className=\{styles\.journey\}>/u);
+  assert.match(adminDashboard, /journeySummaryText/u);
+  assert.match(adminDashboard, /<h3>Credenciamento<\/h3>/u);
+  assert.doesNotMatch(adminDashboard, /Começamos pela divulgação\. As próximas áreas entram no menu/u);
 });
 
 
@@ -235,3 +245,4 @@ test('espaçamento transversal usa somente a escala canônica', () => {
     assert.doesNotMatch(source, /(?:margin|padding|gap|row-gap|column-gap)(?:-[a-z]+)?:\s*[^;}]*-?(?:\d+(?:\.\d+)?|\.\d+)(?:px|rem)\b/iu, path);
   }
 });
+

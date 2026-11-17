@@ -31,6 +31,8 @@ test('as quatro rotas públicas reutilizam o mesmo cabeçalho canônico', async 
   assert.match(header, /login: \[[\s\S]*label: 'Eventos'[\s\S]*label: 'Criar conta', primary: true/u);
   assert.match(header, /cadastro: \[[\s\S]*label: 'Eventos'[\s\S]*label: 'Entrar'/u);
   assert.match(header, /eventos: \[[\s\S]*label: 'Eventos', current: true[\s\S]*label: 'Área do organizador'/u);
+  assert.match(header, /action="\/eventos"/u);
+  assert.match(header, /Buscar eventos/u);
 });
 
 test('cabeçalho canônico usa tokens, alvo de 44px e reflow sem overflow', () => {
@@ -101,7 +103,7 @@ test('matriz de período gera from/until coerentes e preserva from legado', () =
     assert.deepEqual(resolved, { from: row.from, until: row.until }, `${row.period}:${row.requestedFrom || '∅'}`);
   }
 
-  assert.match(catalog, /if \(input\.period !== 'CURRENT'\) params\.set\('period', input\.period\)/u);
+  assert.match(catalog, /if \(input\.period !== 'ALL'\) params\.set\('period', input\.period\)/u);
   assert.match(catalog, /if \(input\.from\) params\.set\('from', input\.from\)/u);
   assert.match(catalog, /from: requestedFrom, page: result\.page - 1/u);
   assert.match(catalog, /from: requestedFrom, page: result\.page \+ 1/u);
@@ -119,6 +121,13 @@ test('busca por período reflui até 320px e o vazio permite limpar filtros', ()
   assert.doesNotMatch(catalogStyles, /minmax\(240px/u);
   assert.doesNotMatch(catalogStyles, /minmax\(150px/u);
   assert.match(catalog, /hasActiveFilters && <Link className=\{styles\.clearLink\} href="\/eventos">Limpar filtros<\/Link>/u);
-  assert.match(catalog, /Os filtros atuais de nome, formato, perfil ou período/u);
+  assert.match(catalog, /Os filtros atuais de nome, formato, perfil, área, região ou período/u);
   assert.match(catalog, /role="search"/u);
+});
+
+test('cabeçalho público sem estado renderiza no servidor no catálogo sem ilha de hidratação', () => {
+  assert.doesNotMatch(header, /['"]use client['"]\s*;?/u);
+  assert.doesNotMatch(header, /\buse(?:Effect|State|Ref|Memo|Callback|LayoutEffect)\b/u);
+  assert.doesNotMatch(header, /\b(?:window|document|localStorage|navigator)\b/u);
+  assert.match(catalog, /<PublicSiteHeader current="eventos" \/>/u);
 });

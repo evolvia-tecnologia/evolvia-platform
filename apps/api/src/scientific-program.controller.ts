@@ -1,9 +1,10 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Put, Req, UseGuards } from '@nestjs/common';
 import { AuthGuard, AuthenticatedRequest } from './auth.guard';
 import {
   AddScientificProgramParticipantDto,
   CreateScientificProgramActivityDto,
   CreateScientificProgramSpaceDto,
+  LinkScientificProgramWorkDto,
   UpdateScientificProgramActivityDto,
   UpdateScientificProgramSpaceDto,
 } from './dto';
@@ -82,6 +83,16 @@ export class ScientificProgramController {
     return this.program.removeParticipant(request.user!.id, eventId, activityId, participantId);
   }
 
+  @Put('activities/:activityId/confirmed-work')
+  linkConfirmedWork(
+    @Req() request: AuthenticatedRequest,
+    @Param('eventId') eventId: string,
+    @Param('activityId') activityId: string,
+    @Body() dto: LinkScientificProgramWorkDto,
+  ) {
+    return this.program.linkConfirmedWork(request.user!.id, eventId, activityId, dto.submissionId);
+  }
+
   @Post('activities/:activityId/ready-for-review')
   markReady(
     @Req() request: AuthenticatedRequest,
@@ -89,5 +100,23 @@ export class ScientificProgramController {
     @Param('activityId') activityId: string,
   ) {
     return this.program.markReadyForReview(request.user!.id, eventId, activityId);
+  }
+
+  @Post('activities/:activityId/publish')
+  publish(
+    @Req() request: AuthenticatedRequest,
+    @Param('eventId') eventId: string,
+    @Param('activityId') activityId: string,
+  ) {
+    return this.program.publishActivity(request.user!.id, eventId, activityId);
+  }
+
+  @Post('activities/:activityId/unpublish')
+  unpublish(
+    @Req() request: AuthenticatedRequest,
+    @Param('eventId') eventId: string,
+    @Param('activityId') activityId: string,
+  ) {
+    return this.program.unpublishActivity(request.user!.id, eventId, activityId);
   }
 }

@@ -1,0 +1,178 @@
+'use client';
+
+import { useEffect, useRef, useState } from 'react';
+import { downloadCertificatePdf } from '../lib/certificate-pdf-download';
+import PublicRichText from './public-rich-text';
+import PublicSiteHeader from './public-site-header';
+import ScientificEvaHelp from './scientific-eva-help';
+import styles from './presence-certificate-view.module.css';
+
+const CERTIFICATE_ROLES = new Set(['participation', 'activity', 'approved_submission', 'presentation', 'guest', 'reviewer']);
+
+type CertificateView = {
+  authentic: true;
+  originalSnapshot?: boolean;
+  role: 'participation' | 'activity' | 'approved_submission' | 'presentation' | 'guest' | 'reviewer';
+  eventName: string;
+  displayName: string;
+  hours: number | null;
+  issuedAt: string;
+  feeCents: 0;
+  title: string;
+  body: string;
+  back?: string | null;
+  artAlt: string | null;
+  hasArt: boolean;
+};
+
+const CODE = /^[a-f0-9]{32}$/u;
+
+export default function PresenceCertificateView({ code }: { code: string }) {
+  const normalized = code.trim().toLowerCase();
+  return <ScopedCertificateView key={normalized} normalized={normalized} />;
+}
+
+function ScopedCertificateView({ normalized }: { normalized: string }) {
+  const [view, setView] = useState<CertificateView | null>(null);
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(CODE.test(normalized));
+  const [pdfError, setPdfError] = useState('');
+  const [pdfBusy, setPdfBusy] = useState(false);
+  const mounted = useRef(true);
+  const pdfInFlight = useRef(false);
+
+  useEffect(() => {
+    mounted.current = true;
+    return () => { mounted.current = false; };
+  }, []);
+
+  useEffect(() => {
+    if (!CODE.test(normalized)) return;
+    const controller = new AbortController();
+    fetch(`/api/public/certificates/${normalized}`, { cache: 'no-store', signal: controller.signal })
+      .then(async (response) => {
+        const payload: unknown = await response.json().catch(() => null);
+        if (controller.signal.aborted) return;
+        if (!response.ok || !isCertificateView(payload)) {
+          throw new Error(readMessage(payload));
+        }
+        setView(payload);
+      })
+      .catch((caught: unknown) => {
+        if (!controller.signal.aborted) setError(caught instanceof Error ? caught.message : 'Certificado não encontrado.');
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setLoading(false);
+      });
+    return () => controller.abort();
+  }, [normalized]);
+
+  async function downloadPdf() {
+    if (pdfInFlight.current) return;
+    pdfInFlight.current = true;
+    setPdfBusy(true);
+    setPdfError('');
+    try {
+      const message = await downloadCertificatePdf(normalized);
+      if (mounted.current) setPdfError(message ?? '');
+    } catch {
+      if (mounted.current) setPdfError('Não foi possível preparar o PDF. Tente novamente.');
+    } finally {
+      pdfInFlight.current = false;
+      if (mounted.current) setPdfBusy(false);
+    }
+  }
+
+  const hours = view?.hours == null ? 'Não informada' : `${view.hours} h`;
+
+  return <div className={styles.page}>
+    <a className="skip-link" href="#main-content">Pular para o conteúdo principal</a>
+    <div className={styles.chrome}>
+      <PublicSiteHeader current="evento" />
+    </div>
+    <main id="main-content" className={styles.sheet} tabIndex={-1}>
+      <article className={styles.card} aria-labelledby="certificate-title">
+        <p className={styles.eyebrow}>EVOLVIA</p>
+        <h1 id="certificate-title" className={view ? styles.srOnly : undefined}>{view ? plainTitle(view.title) : 'Certificado de participação'}</h1>
+        {!CODE.test(normalized) && <p className={styles.error} role="alert">Código de certificado inválido.</p>}
+        {loading && <p role="status">Conferindo autenticidade…</p>}
+        {error && <p className={styles.error} role="alert">{error}</p>}
+        {view && <>
+          {view.hasArt && <img className={styles.art} src={`/api/public/certificates/${normalized}/art`} alt={view.artAlt || 'Arte do certificado'} />}
+          <PublicRichText text={view.title} className={styles.statement} />
+          <p className={styles.seal} role="status">Autêntico</p>
+          <PublicRichText text={view.body} className={styles.statement} />
+          <dl className={styles.details}>
+            <div><dt>Nome</dt><dd>{view.displayName}</dd></div>
+            <div><dt>Evento</dt><dd>{view.eventName}</dd></div>
+            <div><dt>Carga horária</dt><dd>{hours}</dd></div>
+            <div><dt>Emitido em</dt><dd suppressHydrationWarning>{new Date(view.issuedAt).toLocaleString('pt-BR')}</dd></div>
+            <div><dt>Código</dt><dd><code>{normalized}</code></dd></div>
+          </dl>
+          {view.back && <section className={styles.verso} aria-label="Verso do certificado"><h2>Verso</h2><PublicRichText text={view.back} className={styles.statement} /></section>}
+          {view.originalSnapshot === false && <p className={styles.note}>Emissão anterior à preservação do modelo. A autenticidade está confirmada; a aparência original não foi arquivada.</p>}
+          <p className={styles.note}>O download não é cobrado. A segunda via usa o mesmo código. Esta consulta não mostra e-mail, CPF nem protocolo.</p>
+          {pdfError && <p className={styles.error} role="alert">{pdfError}</p>}
+          <div className={styles.actions}>
+            <a href={`/api/public/certificates/${normalized}/pdf`} aria-disabled={pdfBusy} onClick={(event) => {
+              event.preventDefault();
+              void downloadPdf();
+            }}>{pdfBusy ? 'Preparando PDF…' : 'Baixar PDF'}</a>
+            <button type="button" onClick={() => window.print()}>Imprimir</button>
+          </div>
+        </>}
+        <div className={styles.chrome}>
+          <ScientificEvaHelp
+            context="Consulta do certificado"
+            intro="A EVA confirma o que esta página mostra. Ela não lê documento e não envia dado para fora da Evolvia."
+            questions={[
+              { question: 'Este certificado é autêntico?', answer: 'O selo aparece quando o código foi emitido pela Evolvia para uma presença registrada.' },
+              { question: 'O download é cobrado?', answer: 'Não. O certificado de participação não tem taxa.' },
+              { question: 'A EVA envia meus dados?', answer: 'Não. A EVA só explica esta página e não mostra e-mail, CPF nem protocolo.' },
+            ]}
+          />
+        </div>
+      </article>
+    </main>
+  </div>;
+}
+
+function readMessage(payload: unknown): string {
+  if (!payload || typeof payload !== 'object') return 'Certificado não encontrado.';
+  const record = payload as { message?: unknown; error?: { message?: unknown } };
+  if (typeof record.error?.message === 'string' && record.error.message.trim()) return record.error.message;
+  if (typeof record.message === 'string' && record.message.trim()) return record.message;
+  return 'Certificado não encontrado.';
+}
+
+function isCertificateView(value: unknown): value is CertificateView {
+  if (!value || typeof value !== 'object') return false;
+  const record = value as Record<string, unknown>;
+  return record.authentic === true
+    && typeof record.role === 'string'
+    && CERTIFICATE_ROLES.has(record.role)
+    && typeof record.eventName === 'string'
+    && typeof record.displayName === 'string'
+    && (record.hours === null || typeof record.hours === 'number')
+    && typeof record.issuedAt === 'string'
+    && record.feeCents === 0
+    && typeof record.title === 'string'
+    && typeof record.body === 'string'
+    && (record.back === undefined || record.back === null || typeof record.back === 'string')
+    && typeof record.hasArt === 'boolean'
+    && (record.artAlt === null || typeof record.artAlt === 'string')
+    && !('protocol' in record)
+    && !('email' in record)
+    && !('storageKey' in record)
+    && !('organizationId' in record);
+}
+
+function plainTitle(value: string): string {
+  const plain = value
+    .replace(/\[([^\]]+)]\([^)]*\)/g, '$1')
+    .replace(/[#*_`]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return plain || 'Certificado de participação';
+}
+

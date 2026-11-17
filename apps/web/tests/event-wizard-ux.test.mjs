@@ -40,6 +40,7 @@ test('Wizard organiza tipos de evento por universos reconhecíveis', async () =>
     'Networking ou meetup',
     'Evento religioso ou beneficente',
     'Evento esportivo ou torneio',
+    'Corrida',
   ]) {
     assert.match(catalog, new RegExp(eventType, 'u'), eventType);
   }
@@ -66,4 +67,25 @@ test('EVA explica a diferença entre estimativa operacional e capacidade real', 
   const source = await wizardSource();
 
   assert.match(source, /Público estimado orienta planejamento; capacidade real será configurada nas áreas próprias\./u);
+});
+
+test('conclusão oferece categorias e lotes antes da ficha sem publicar', async () => {
+  const source = await wizardSource();
+  assert.match(source, /painel\/inscricoes\/categorias-lotes`\}>\s*Configurar categorias e lotes/u);
+  assert.match(source, /painel`\}>\s*Abrir painel do evento/u);
+  assert.match(source, /Nada será publicado agora/u);
+});
+
+test('escolhas e etapa atual informam o estado à tecnologia assistiva', async () => {
+  const source = await wizardSource();
+  assert.ok(source.includes("aria-current={index === stepIndex ? 'step' : undefined}"));
+  assert.ok(source.includes('aria-pressed={draft.format === value}'));
+  assert.ok(source.includes('aria-pressed={draft.registrationMode === value}'));
+});
+
+test('rascunho local corrompido não impede nova criação nem reutiliza organização inacessível', async () => {
+  const source = await wizardSource();
+  assert.match(source, /try \{\s*const parsed: unknown = JSON.parse\(saved\)/u);
+  assert.match(source, /findEventProfileOption\(previous.eventType\)/u);
+  assert.match(source, /editors.some\(\(item\) => item.organization.id === restored.organizationId\)/u);
 });

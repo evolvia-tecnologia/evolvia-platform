@@ -187,9 +187,9 @@ export default function ScientificGuests({ eventId }: { eventId: string }) {
 
     return {
       title: 'A4 organizado: prepare-se para montar a programação',
-      detail: 'Os membros e confirmações estão estruturados. O próximo Gate vinculará essas pessoas às atividades, salas, datas e horários.',
-      href: `/eventos/${eventId}/cientifico`,
-      label: 'Voltar à Central científica',
+      detail: 'Os membros e confirmações estão estruturados. O próximo passo desta grade é vincular essas pessoas às atividades, locais, dias e horários.',
+      href: `/eventos/${eventId}/cientifico/programacao`,
+      label: 'Abrir locais, dias e horários',
     };
   }, [eventId, payload]);
 
@@ -289,18 +289,22 @@ export default function ScientificGuests({ eventId }: { eventId: string }) {
   }
 
   if (loading) return <main className={styles.page}><div className={styles.loading}><strong>EVA</strong><p>Organizando palestrantes e convites...</p></div></main>;
-  if (!payload) return <main className={styles.page}><section className={styles.container}><div className={styles.error}>{error || 'Não foi possível carregar o Gate A4.'}</div><Link href="/painel" className={styles.primary}>Voltar ao painel</Link></section></main>;
+  if (!payload) return <main className={styles.page}><section className={styles.container}><div className={styles.error}>{error || 'Não foi possível carregar o Gate A4.'}</div><Link href={`/eventos/${eventId}/painel`} className={styles.primary}>Voltar ao menu do evento</Link></section></main>;
 
   return <main className={styles.page}>
     <header className={styles.topbar}>
       <Link className={styles.brand} href="/painel">EVOLVIA</Link>
       <div className={styles.topActions}>
-        <Link href={`/eventos/${eventId}/cientifico`} className={styles.ghost}>Central científica</Link>
+        <Link href={`/eventos/${eventId}/cientifico/grade`} className={styles.ghost}>Programação científica</Link>
         <Link href={`/eventos/${eventId}/cientifico/estrutura`} className={styles.ghost}>Grade científica A3</Link>
       </div>
     </header>
 
     <section className={styles.container}>
+      <nav className={styles.flowReturn} aria-label="Retorno do fluxo">
+        <Link href={`/eventos/${eventId}/cientifico/grade`}>Voltar à programação</Link>
+        <Link href={`/eventos/${eventId}/painel`}>Voltar ao painel</Link>
+      </nav>
       <div className={styles.hero}>
         <div><p className={styles.eyebrow}>GATE A4 · PALESTRANTES E CONVIDADOS</p><h1>{payload.event.name}</h1><p className={styles.lead}>Reutilize membros cadastrados na Grade científica ou adicione um novo membro, defina o tipo de participação e acompanhe o convite até a confirmação ou recusa.</p></div>
         <aside className={styles.eva}><strong>EVA</strong><p>Você não precisa preencher tudo. Comece pelo nome e tipo de participação; detalhes profissionais e necessidades especiais ficam em uma seção opcional.</p></aside>

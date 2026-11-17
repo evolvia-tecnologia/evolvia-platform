@@ -100,3 +100,16 @@ test('parecer completo é válido e score ponderado é derivado', () => {
   assert.equal(validateReviewForSubmit(criteria, scores, 'CLEAR', 'ACCEPT').length, 0);
   assert.equal(calculateWeightedReviewScore(criteria, scores), 6.25);
 });
+
+test('nota única fica entre 0 e 10 e o coordenador reserva a situação', () => {
+  const tooHigh = validateReviewForSubmit(criteria, [{ criterionId: 'overall', value: 55 }], 'CLEAR', 'ACCEPT', { style: 'SYNTHETIC' });
+  assert.equal(tooHigh.some((item) => item.code === 'SCORE_OUT_OF_RANGE'), true);
+  const typed = validateReviewForSubmit([], [{ criterionId: 'overall', value: 8 }], 'CLEAR', null, {
+    style: 'SYNTHETIC', coordinatorDecidesStatus: true,
+  });
+  assert.equal(typed.length, 0);
+  const statusFromReviewer = validateReviewForSubmit([], [{ criterionId: 'overall', value: 8 }], 'CLEAR', 'ACCEPT', {
+    style: 'SYNTHETIC', coordinatorDecidesStatus: true,
+  });
+  assert.equal(statusFromReviewer.some((item) => item.code === 'STATUS_RESERVED_FOR_COORDINATOR'), true);
+});

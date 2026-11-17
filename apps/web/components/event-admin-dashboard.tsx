@@ -2,12 +2,22 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { api, getToken } from '../lib/api';
+import { useEffect, useState } from 'react';
+import { ApiError, api, getToken } from '../lib/api';
+import {
+  acceptWorkspacePayload,
+  initialWorkspaceView,
+  rejectWorkspaceLoad,
+  replaceWorkspaceEvent,
+  visibleWorkspacePayload,
+} from '../lib/event-flow';
+import EventSubjectAreas from './event-subject-areas';
 import PublicationEditor from './publication-editor';
+import IntegrationsHub from './integrations-hub';
+import EventWorkspace from './event-workspace';
 import styles from './event-admin-dashboard.module.css';
 
-type EventAdminSection = 'overview' | 'publication';
+type EventAdminSection = 'overview' | 'publication' | 'integrations';
 
 type EventFormat = 'IN_PERSON' | 'ONLINE' | 'HYBRID' | '';
 
@@ -38,6 +48,7 @@ type EventAdminPayload = {
     venuePending?: boolean;
     registrationMode?: 'FREE' | 'PAID' | 'INVITATION' | '';
     capabilities?: string[];
+    subjectAreas?: string[];
   };
 };
 
@@ -116,19 +127,22 @@ const eventJourney = [
   },
 ] as const;
 
-function publicationStatus(status: string): string {
-  if (status === 'PUBLISHED') return 'Publicado';
-  if (status === 'READY_TO_PUBLISH') return 'Pronto para publicar';
-  if (status === 'HOMOLOGATION') return 'Em homologação';
-  return 'Em preparação';
-}
-
 function registrationFormHref(eventId: string) {
   return `/eventos/${eventId}/painel/inscricoes/ficha`;
 }
 
+function registrationCommercialHref(eventId: string) {
+  return `/eventos/${eventId}/painel/inscricoes/categorias-lotes`;
+}
+
+function registrationBenefitsHref(eventId: string) {
+  return `/eventos/${eventId}/painel/inscricoes/beneficios`;
+}
+
 function RegistrationFormDashboardAccess({ eventId }: { eventId: string }) {
   const href = registrationFormHref(eventId);
+  const commercialHref = registrationCommercialHref(eventId);
+  const benefitsHref = registrationBenefitsHref(eventId);
 
   return (
     <section
@@ -143,85 +157,52 @@ function RegistrationFormDashboardAccess({ eventId }: { eventId: string }) {
         </div>
       </div>
       <p id="registration-form-dashboard-lead">
-        Preparar e versionar a ficha não abre inscrições ao público. Esta configuração está disponível para todos os perfis de evento.
+        Defina os dados pedidos ao participante. A ficha pode ser preparada sem abrir inscrições ao público.
       </p>
-      <Link className={styles.primaryButton} href={href}>Configurar ficha de inscrição</Link>
+      <div className={styles.actionLinks}>
+        <Link className={styles.primaryButton} href={commercialHref}>Categorias e lotes</Link>
+        <Link className={styles.secondaryButton} href={href}>Editar ficha</Link>
+        <Link className={styles.secondaryButton} href={benefitsHref}>Cupons e convites</Link>
+      </div>
     </section>
   );
 }
 
 export default function EventAdminDashboard({ eventId, section }: { eventId: string; section: EventAdminSection }) {
   const router = useRouter();
-  const menuButtonRef = useRef<HTMLButtonElement>(null);
-  const [payload, setPayload] = useState<EventAdminPayload | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [menuOpen, setMenuOpen] = useState(false);
-  const [mobileNavigation, setMobileNavigation] = useState(false);
+  const safeEventId = eventId || '';
+  const [view, setView] = useState(() => initialWorkspaceView<EventAdminPayload>(safeEventId));
+  if (view.eventId !== safeEventId) setView(replaceWorkspaceEvent(safeEventId));
 
   useEffect(() => {
+    if (!safeEventId) return;
     if (!getToken()) {
       router.replace('/login');
       return;
     }
 
     let active = true;
-    api<EventAdminPayload>(`/event-wizard/${eventId}`)
+    api<EventAdminPayload>(`/event-wizard/${safeEventId}`)
       .then((result) => {
-        if (active) setPayload(result);
+        if (active) setView((current) => acceptWorkspacePayload(current, safeEventId, result));
       })
       .catch((reason) => {
-        if (active) setError(reason instanceof Error ? reason.message : 'Não foi possível abrir o painel deste evento.');
-      })
-      .finally(() => {
-        if (active) setLoading(false);
+        if (!active) return;
+        if (reason instanceof ApiError && reason.status === 401) {
+          router.replace('/login');
+          return;
+        }
+        const message = reason instanceof Error ? reason.message : 'Não foi possível abrir o painel deste evento.';
+        setView((current) => rejectWorkspaceLoad(current, safeEventId, message));
       });
 
     return () => {
       active = false;
     };
-  }, [eventId, router]);
+  }, [safeEventId, router]);
 
-  useEffect(() => {
-    const media = window.matchMedia('(max-width: 900px)');
-    const syncViewport = () => {
-      setMobileNavigation(media.matches);
-      if (!media.matches) setMenuOpen(false);
-    };
-
-    syncViewport();
-    media.addEventListener('change', syncViewport);
-    return () => media.removeEventListener('change', syncViewport);
-  }, []);
-
-  useEffect(() => {
-    if (!mobileNavigation || !menuOpen) return;
-
-    const handleEscape = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape') return;
-      setMenuOpen(false);
-      menuButtonRef.current?.focus();
-    };
-
-    window.addEventListener('keydown', handleEscape);
-    return () => window.removeEventListener('keydown', handleEscape);
-  }, [mobileNavigation, menuOpen]);
-
-  const foundationChecks = useMemo(() => {
-    if (!payload) return [];
-    const answers = payload.answers;
-    return [
-      { label: 'Nome do evento', complete: payload.event.name.trim().length >= 3 },
-      { label: 'Formato', complete: Boolean(answers.format) },
-      { label: 'Datas', complete: Boolean(answers.startDate) && answers.datesPending !== true },
-      {
-        label: answers.format === 'ONLINE' ? 'Referência online' : 'Local',
-        complete: Boolean(answers.venue) && answers.venuePending !== true,
-      },
-    ];
-  }, [payload]);
-
-  if (loading) {
+  const payload = visibleWorkspacePayload(view, safeEventId);
+  if (!payload && (view.phase === 'loading' || view.eventId !== safeEventId)) {
     return <main className={styles.loadingPage} aria-busy="true">
       <div className={styles.loadingMark} aria-hidden="true">E</div>
       <p>A EVA está organizando o painel do evento...</p>
@@ -230,181 +211,134 @@ export default function EventAdminDashboard({ eventId, section }: { eventId: str
 
   if (!payload) {
     return <main className={styles.errorPage}>
-      <div className={styles.error} role="alert">{error || 'Não foi possível carregar este evento.'}</div>
+      <div className={styles.error} role="alert">{view.error || 'Não foi possível carregar este evento.'}</div>
       <Link className={styles.secondaryButton} href="/painel">Voltar ao painel</Link>
     </main>;
   }
 
   const capabilities = payload.answers.capabilities ?? [];
   const isScientific = payload.event.profileCode === 'SCIENTIFIC_EVENT' || capabilities.includes('scientific_submission');
-  const completeCount = foundationChecks.filter((item) => item.complete).length;
   const eventStatus = statusLabels[payload.event.status] ?? payload.event.status;
-  const navigationHidden = mobileNavigation && !menuOpen;
-  const navigationTabIndex = navigationHidden ? -1 : undefined;
-  const closeMenu = () => setMenuOpen(false);
 
-  return <div className={styles.page}>
-    <a className={styles.skipLink} href="#event-admin-content">Pular para o conteúdo</a>
-
-    <header className={styles.topbar}>
-      <div className={styles.topbarIdentity}>
-        <button
-          ref={menuButtonRef}
-          className={styles.menuButton}
-          type="button"
-          aria-expanded={menuOpen}
-          aria-controls="event-admin-navigation"
-          onClick={() => setMenuOpen((current) => !current)}
-        >
-          Menu
-        </button>
-        <Link className={styles.brand} href="/painel">EVOLVIA</Link>
-        <div className={styles.eventIdentity}>
-          <strong>{payload.event.name}</strong>
-          <span>{payload.event.organization.name}</span>
-        </div>
-      </div>
-      <div className={styles.topbarStatus}>
-        <span className={styles.statusDot} aria-hidden="true" />
-        <span>{eventStatus}</span>
-      </div>
-    </header>
-
-    <div className={styles.workspace}>
-      <button
-        className={`${styles.backdrop} ${menuOpen ? styles.backdropVisible : ''}`}
-        type="button"
-        aria-label="Fechar menu"
-        tabIndex={-1}
-        onClick={closeMenu}
-      />
-
-      <aside
-        id="event-admin-navigation"
-        className={`${styles.sidebar} ${menuOpen ? styles.sidebarOpen : ''}`}
-        aria-hidden={navigationHidden ? true : undefined}
-      >
-        <div className={styles.sidebarHeading}>
-          <span>PAINEL DO EVENTO</span>
-          <strong>{payload.event.name}</strong>
-          <small>{payload.answers.eventType ?? 'Evento'}</small>
-        </div>
-
-        <nav className={styles.navigation} aria-label="Navegação do evento">
-          <span className={styles.navGroupLabel}>Jornada do evento</span>
-          <Link
-            className={`${styles.navItem} ${section === 'overview' ? styles.navItemActive : ''}`}
-            aria-current={section === 'overview' ? 'page' : undefined}
-            href={`/eventos/${eventId}/painel`}
-            tabIndex={navigationTabIndex}
-            onClick={closeMenu}
-          >
-            <span aria-hidden="true">⌂</span>
-            <span><strong>Visão geral</strong><small>Próximos passos e pendências</small></span>
-          </Link>
-          <Link className={styles.navItem} href={registrationFormHref(eventId)} tabIndex={navigationTabIndex} onClick={closeMenu}>
-            <span aria-hidden="true">▤</span>
-            <span><strong>Ficha de inscrição</strong><small>Fase 2 · preparar e testar</small></span>
-          </Link>
-          <Link
-            className={`${styles.navItem} ${section === 'publication' ? styles.navItemActive : ''}`}
-            aria-current={section === 'publication' ? 'page' : undefined}
-            href={`/eventos/${eventId}/painel/divulgacao`}
-            tabIndex={navigationTabIndex}
-            onClick={closeMenu}
-          >
-            <span aria-hidden="true">◫</span>
-            <span><strong>Divulgação</strong><small>Fase 1 · presença pública</small></span>
-          </Link>
-
-          {isScientific && <>
-            <span className={styles.navGroupLabel}>Jornadas já existentes</span>
-            <Link className={styles.navItem} href={`/eventos/${eventId}/cientifico`} tabIndex={navigationTabIndex} onClick={closeMenu}>
-              <span aria-hidden="true">◇</span>
-              <span><strong>Científico</strong><small>Estrutura já construída</small></span>
-            </Link>
-          </>}
-        </nav>
-
-        <div className={styles.sidebarFooter}>
-          <span aria-hidden="true">◎</span>
-          <p><strong>Ambiente de configuração</strong>Nada é publicado automaticamente.</p>
-        </div>
-      </aside>
-
-      <main id="event-admin-content" className={styles.content} tabIndex={-1}>
-        <div className={styles.breadcrumb} aria-label="Você está em">
-          <Link href="/painel">Eventos</Link>
-          <span aria-hidden="true">/</span>
-          <span>{payload.event.name}</span>
-          <span aria-hidden="true">/</span>
-          <strong>{section === 'overview' ? 'Visão geral' : 'Divulgação'}</strong>
-        </div>
-
-        {error && <div className={styles.error} role="alert">{error}</div>}
+  return <EventWorkspace eventId={safeEventId} section={section} payload={payload}>
 
         {section === 'overview' ? <>
           <section className={styles.hero} aria-labelledby="overview-title">
             <div>
-              <p className={styles.eyebrow}>VISÃO GERAL</p>
-              <h1 id="overview-title">Seu evento, organizado pela jornada real</h1>
-              <p>Começamos pela divulgação. As próximas áreas entram no menu somente quando a fase correspondente estiver pronta para uso.</p>
+              <p className={styles.eyebrow}>PAINEL DO EVENTO</p>
+              <h1 id="overview-title">Visão geral</h1>
+              <p>Escolha uma tarefa para continuar a configuração ou acompanhar a operação.</p>
             </div>
-            <Link className={styles.primaryButton} href={`/eventos/${eventId}/painel/divulgacao`}>Preparar divulgação</Link>
+            <Link className={styles.primaryButton} href={`/eventos/${eventId}/painel/divulgacao`}>Editar divulgação</Link>
           </section>
 
           <section className={styles.metrics} aria-label="Resumo do evento">
-            <article><span>Status</span><strong>{eventStatus}</strong><small>Estado administrativo atual</small></article>
-            <article><span>Fundação</span><strong>{payload.session.completionPercent}%</strong><small>Wizard do evento</small></article>
-            <article><span>Recursos</span><strong>{capabilities.length}</strong><small>Capabilities ativadas</small></article>
+            <article><span>Estado</span><strong>{eventStatus}</strong><small>Situação atual do evento</small></article>
+            <article><span>Configuração</span><strong>{payload.session.completionPercent}%</strong><small>Fundação da criação. A publicação é outra etapa.</small></article>
+            <article><span>Recursos ativos</span><strong>{capabilities.length}</strong><small>Funções escolhidas para o evento</small></article>
+          </section>
+
+          <section className={styles.dashboardSection} aria-labelledby="quick-actions-title">
+            <div className={styles.sectionHeading}>
+              <div>
+                <p className={styles.eyebrow}>O QUE VOCÊ PODE FAZER</p>
+                <h2 id="quick-actions-title">Acessos rápidos</h2>
+              </div>
+              <span className={styles.safeBadge}>Configuração sem publicação automática</span>
+            </div>
+            <div className={styles.quickGrid}>
+              <article className={styles.card}>
+                <p className={styles.eyebrow}>GERAL</p>
+                <h3>Informações do evento</h3>
+                <p>Revise o nome, as datas, o local e o formato na Fundação do evento.</p>
+                <Link className={styles.secondaryButton} href={`/eventos/${eventId}/configuracao?review=foundation`}>Editar informações do evento</Link>
+              </article>
+              <article className={styles.card}>
+                <p className={styles.eyebrow}>DIVULGAÇÃO</p>
+                <h3>Apresentar o evento</h3>
+                <p>Revise a página pública, as informações e a identidade visual.</p>
+                <Link className={styles.primaryButton} href={`/eventos/${eventId}/painel/divulgacao`}>Abrir divulgação</Link>
+              </article>
+              <RegistrationFormDashboardAccess eventId={eventId} />
+              <article className={styles.card}>
+                <p className={styles.eyebrow}>RESULTADOS</p>
+                <h3>Relatórios do evento</h3>
+                <p>Consulte inscrições, credenciamento, pagamentos e os resultados dos recursos habilitados.</p>
+                <Link className={styles.primaryButton} href={`/eventos/${eventId}/painel/relatorios`}>Abrir relatórios</Link>
+              </article>
+              <article className={styles.card}>
+                <p className={styles.eyebrow}>REUTILIZAR</p>
+                <h3>Usar como base</h3>
+                <p>Crie outro rascunho com novas datas, sem copiar participantes, cobranças ou arquivos.</p>
+                <Link className={styles.secondaryButton} href={`/eventos/${eventId}/painel/reutilizar`}>Reutilizar com segurança</Link>
+              </article>
+              <article className={styles.card}>
+                <p className={styles.eyebrow}>OPERAÇÃO</p>
+                <h3>Credenciamento</h3>
+                <p>Busque a inscrição, imprima a etiqueta, corrija o cadastro e registre a entrada.</p>
+                <div className={styles.actionLinks}>
+                  <Link className={styles.primaryButton} href={`/eventos/${eventId}/painel/check-in`}>Abrir posto</Link>
+                  <Link className={styles.secondaryButton} href={`/eventos/${eventId}/painel/inscricoes`}>Ver inscrições</Link>
+                  <Link className={styles.secondaryButton} href={`/eventos/${eventId}/painel/show`}>Acessos e catracas</Link>
+                </div>
+              </article>
+            </div>
+          </section>
+
+          {capabilities.includes('exhibitor') && <section className={styles.card} aria-labelledby="exhibitor-dashboard-title">
+            <p className={styles.eyebrow}>EXPOSITOR E SERVIÇOS</p>
+            <h2 id="exhibitor-dashboard-title">Expositor e serviços</h2>
+            <p>Gerencie empresas, prestadores, cotas de credenciais, formulários e pedidos deste evento.</p>
+            <div className={styles.actionLinks}>
+              <Link className={styles.primaryButton} href={`/eventos/${eventId}/painel/expositores`}>Abrir central do expositor</Link>
+              <Link className={styles.secondaryButton} href={`/eventos/${eventId}/painel/caex`}>Abrir CAEX</Link>
+            </div>
+          </section>}
+
+          <section className={styles.card} aria-labelledby="event-evaluation-title">
+            <h2 id="event-evaluation-title">Avaliação do evento</h2>
+            <p>Abra um questionário curto e exporte as respostas deste evento no pós-evento.</p>
+            <Link className={styles.secondaryButton} href={`/eventos/${eventId}/painel/avaliacao`}>Configurar avaliação</Link>
+          </section>
+
+          <section className={styles.card} aria-labelledby="financial-responsibility-title">
+            <h2 id="financial-responsibility-title">Responsável financeiro</h2>
+            <p>Confirme quem responde pela organização neste evento. A confirmação não emite nota fiscal.</p>
+            <Link className={styles.secondaryButton} href={`/eventos/${eventId}/painel/financeiro`}>Revisar responsável</Link>
           </section>
 
           <section className={styles.evaCard} aria-labelledby="eva-overview-title">
             <div className={styles.evaMark} aria-hidden="true">EVA</div>
             <div>
-              <h2 id="eva-overview-title">Orientação para este momento</h2>
-              <p>Sua fundação está preservada. O próximo passo cronológico é preparar o que o público verá sobre o evento antes de abrir inscrições, áreas reservadas ou jornadas científicas para participantes.</p>
-              <small>A conversa inteligente da EVA será conectada por capability própria; esta orientação não executa nenhuma alteração silenciosa.</small>
+              <h2 id="eva-overview-title">Precisa conectar outra ferramenta?</h2>
+              <p>Explore as integrações previstas para o evento. O catálogo explica possibilidades e ainda não conecta contas nem envia dados.</p>
+              <Link className={styles.journeyAction} href={`/eventos/${eventId}/painel/integracoes`}>Ver catálogo de integrações</Link>
             </div>
           </section>
 
-          <RegistrationFormDashboardAccess eventId={eventId} />
-
-          <section className={styles.nextStep} aria-labelledby="next-step-title">
-            <div>
-              <p className={styles.eyebrow}>PRÓXIMO PASSO</p>
-              <h2 id="next-step-title">1. Divulgação do evento</h2>
-              <p>Vamos aproveitar os dados que você já informou e completar apenas o que pertence à presença pública: apresentação, identidade visual, informações úteis, acessibilidade, preview e homologação.</p>
-            </div>
-            <div className={styles.nextStepStatus}>
-              <span>{publicationStatus(payload.event.status)}</span>
-              <strong>{completeCount} de {foundationChecks.length}</strong>
-              <small>dados básicos já aproveitáveis</small>
-            </div>
-          </section>
-
-          <section className={styles.journey} aria-labelledby="event-journey-title" aria-describedby="registration-form-dashboard-note">
-            <div className={styles.journeyHeading}>
-              <div>
-                <p className={styles.eyebrow}>JORNADA COMPLETA</p>
-                <h2 id="event-journey-title">As 11 fases do seu evento</h2>
-                <p>Você enxerga o caminho inteiro desde agora. Somente fases prontas e autorizadas ganham ações; as demais permanecem informativas até o Gate anterior ser aprovado.</p>
-              </div>
-              <span className={styles.journeyLegend}>1 fase ativa · ficha da Fase 2 em preparação</span>
-            </div>
+          <details className={styles.journey}>
+            <summary className={styles.journeyHeading}>
+              <span className={styles.journeySummaryText}>
+                <span className={styles.eyebrow}>JORNADA COMPLETA</span>
+                <span className={styles.journeySummaryTitle}>As 11 fases do seu evento</span>
+                <span>Abra para consultar a sequência completa e o que já está disponível.</span>
+              </span>
+              <span className={styles.journeyLegend}>11 etapas</span>
+            </summary>
 
             <ol className={styles.journeyList}>
               {eventJourney.map((item) => {
                 const notApplicable = 'scientific' in item && item.scientific === true && !isScientific;
                 const current = item.phase === 1;
                 const configurationAvailable = item.phase === 2;
-                const state = current
-                  ? 'Disponível agora'
-                  : configurationAvailable
+                const checkInAvailable = item.phase === 10;
+                const state = notApplicable
+                  ? 'Não se aplica'
+                  : current || configurationAvailable
                     ? 'Configuração disponível'
-                  : notApplicable
-                    ? 'Não se aplica ao perfil atual'
-                    : 'Bloqueada pelo Gate anterior';
+                    : checkInAvailable
+                      ? 'Check-in disponível'
+                      : 'Em desenvolvimento';
 
                 return <li
                   key={item.phase}
@@ -418,15 +352,27 @@ export default function EventAdminDashboard({ eventId, section }: { eventId: str
                     </div>
                     <p>{item.summary}</p>
                     {configurationAvailable && <Link className={styles.secondaryButton} href={registrationFormHref(eventId)}>Configurar ficha de inscrição</Link>}
+                    {checkInAvailable && <div className={styles.actionLinks}>
+                      <Link className={styles.secondaryButton} href={`/eventos/${eventId}/painel/inscricoes`}>Ver relatório de presenças</Link>
+                      <Link className={styles.secondaryButton} href={`/eventos/${eventId}/painel/check-in`}>Abrir posto</Link>
+                      <Link className={styles.secondaryButton} href={`/eventos/${eventId}/painel/check-in#totens`}>Abrir totens</Link>
+                    </div>}
                   </div>
                 </li>;
               })}
             </ol>
 
-            <p id="registration-form-dashboard-note" className={styles.journeyNote}>Preparar e versionar a ficha não abre inscrições ao público. Esta configuração está disponível para todos os perfis de evento. A ativação da Fase 2 continuará dependendo de implementação, testes, segurança, acessibilidade e Go/No-Go próprios.</p>
-          </section>
-        </> : <PublicationEditor eventId={eventId} embedded supportsScientificSources={isScientific} />}
-      </main>
-    </div>
-  </div>;
+            <p className={styles.journeyNote}>A disponibilidade de cada recurso depende da configuração do evento. A publicação e a abertura de inscrições exigem etapas próprias de validação.</p>
+          </details>
+        </> : section === 'publication'
+          ? <>
+            <EventSubjectAreas eventId={eventId} initial={payload.answers.subjectAreas ?? []} />
+            <PublicationEditor eventId={eventId} embedded supportsScientificSources={isScientific} running={payload.answers.eventType === 'Corrida'} />
+          </>
+          : <IntegrationsHub eventId={eventId} />}
+  </EventWorkspace>;
 }
+
+
+
+
