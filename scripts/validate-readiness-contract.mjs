@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
+import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const LEGACY_DOMAIN = 'dev.evolviatecnologia.com';
@@ -159,7 +160,13 @@ for (const relativo of rastreados) {
     continue;
   }
 
-  const absoluto = `${raiz}${relativo}`;
+  // path.join, e não o auxiliar caminho(): git ls-files sempre devolve barra
+  // normal, e no Windows fileURLToPath devolve barra invertida. A API URL
+  // resolveria o separador, mas corta fragmento e consulta e decodifica
+  // porcentagem — um arquivo rastreado chamado "nota#1.md" viraria "nota",
+  // existsSync devolveria falso e ele seria pulado em silêncio. Numa varredura
+  // que serve para provar ausência, pular em silêncio é o pior defeito possível.
+  const absoluto = join(raiz, relativo);
   if (!existsSync(absoluto)) {
     continue;
   }
