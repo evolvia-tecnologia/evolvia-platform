@@ -34,6 +34,11 @@ export default function PublicEventProgram({ program, wide = false }: { program:
             </ul>
             <h4>{activity.title}</h4>
             {activity.description && <p className={styles.description}>{activity.description}</p>}
+            {activity.work && <p className={styles.work}>
+              Trabalho confirmado: <strong>{activity.work.title}</strong>
+              {activity.work.code != null && <> · código {activity.work.code}</>}
+              {activity.work.authors.length > 0 && <> · {activity.work.authors.join(', ')}</>}
+            </p>}
             {activity.people.length > 0 && <ul className={styles.people} aria-label="Participantes confirmados">
               {activity.people.map((person, index) => <li key={`${person.name}-${index}`}><strong>{person.name}</strong><span>{person.detail}</span></li>)}
             </ul>}

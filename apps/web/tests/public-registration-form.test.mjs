@@ -19,6 +19,9 @@ test('evento oferece inscrição para quem ainda não comprou, com o rótulo do 
   assert.match(preview, /\/public\/events\/\$\{encodeURIComponent\(preview\.event\.slug\)\}\/registration/u);
   assert.match(preview, /registrationMode=\{offer\?\.mode \?\? null\}/u);
   assert.match(page, /categories=\{offer\?\.categories \?\? \[\]\}/u);
+  assert.match(page, /readPublishedShirtSizes\(payload\)/u);
+  assert.match(page, /shirtSizes=\{registration\.shirtSizes\}/u);
+  assert.match(page, /athletePrompts=\{registration\.athletePrompts\}/u);
 });
 
 test('formulário entrega categoria, lote, ficha, benefício, protocolo e checkout', async () => {
@@ -26,11 +29,16 @@ test('formulário entrega categoria, lote, ficha, benefício, protocolo e checko
     read('../app/evento/[slug]/inscricao/page.tsx'),
     read('../components/public-registration-form.tsx'),
   ]);
-  assert.match(page, /PublicRegistrationForm slug=\{slug\}/u);
+  assert.match(page, /<PublicRegistrationForm/u);
+  assert.match(page, /context="registration"/u);
+  assert.match(page, /isRunningProfile\(profile\.eventType\)/u);
+  assert.match(page, /slug=\{slug\}/u);
   assert.match(form, /categoryId/u);
   assert.match(form, /lotId/u);
   assert.match(form, /benefitCode/u);
   assert.match(form, /field\.type === 'CONSENT'/u);
+  assert.match(form, /field\.help && <small>\{field\.help\}<\/small>/u);
+  assert.match(form, /publishedChoiceError\(visibleFields, answers\)/u);
   assert.match(form, /id="terms-acceptance"/u);
   assert.match(form, /Abrir \{options\.terms\.fileName\}/u);
   assert.match(form, /disabled=\{sending \|\| !options\.terms\}/u);
@@ -42,6 +50,26 @@ test('formulário entrega categoria, lote, ficha, benefício, protocolo e checko
   assert.match(form, /window\.location\.assign/u);
   assert.match(form, /Atualizar confirmação/u);
   assert.match(form, /Por segurança, seus dados pessoais não são exibidos/u);
+});
+
+test('a corrida fica dentro da ficha, depois do título, também enquanto carrega', async () => {
+  const [page, form] = await Promise.all([
+    read('../app/evento/[slug]/inscricao/page.tsx'),
+    read('../components/public-registration-form.tsx'),
+  ]);
+  const markup = page.slice(page.indexOf('return <>'));
+  assert.equal(markup.match(/<PublicRegistrationForm\b/gu)?.length, 1);
+  assert.doesNotMatch(markup, /<PublicSportsLanding/u);
+  assert.match(markup, /<PublicRegistrationForm[\s\S]*preface=\{sportsPreface\}/u);
+  assert.match(page, /heading=\{runningEvent\?\.event\.name\}/u);
+
+  const loading = form.slice(form.indexOf('if (loading)'), form.indexOf('if (error && !options)'));
+  assert.ok(loading.indexOf('<h1>{heading}</h1>') < loading.indexOf('{preface}'), 'o título precede a corrida no carregamento');
+  assert.ok(loading.indexOf('{preface}') < loading.indexOf('role="status"'), 'a corrida fica dentro do main de carregamento');
+
+  const filled = form.slice(form.lastIndexOf('return <main'));
+  assert.ok(filled.indexOf('<h1>{options.event.name}</h1>') < filled.indexOf('{preface}'));
+  assert.ok(filled.indexOf('{preface}') < filled.indexOf('<form'));
 });
 
 test('retorno do provedor consulta o estado do servidor e não confirma pelo callback', async () => {
@@ -70,7 +98,7 @@ test('lote esgotado leva à fila e a oferta da fila confirma pela mesma ficha au
   assert.match(form, /\/waitlist\/\$\{encodeURIComponent\(offerLotId\)\}\/accept/u);
   assert.match(form, /Authorization: `Bearer \$\{token\}`/u);
   assert.match(form, /'idempotency-key': idempotencyKey/u);
-  assert.match(form, /Confirmar minha vaga/u);
+  assert.match(form, /publicRegistrationSubmitLabel/u);
   assert.match(form, /As vagas disponíveis acabaram/u);
 });
 

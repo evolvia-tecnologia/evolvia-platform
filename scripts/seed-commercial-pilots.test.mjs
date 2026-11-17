@@ -1,0 +1,258 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { buildSynthetic, validateTarget, seedPilots, verifyExhibitorReadback } from './seed-commercial-pilots.mjs';
+
+const env = {
+  EVOLVIA_API_URL: 'https://homolog.example.test/api',
+  EVOLVIA_PILOT_ALLOWED_HOST: 'homolog.example.test',
+  EVOLVIA_PILOT_TARGET: 'HOMOLOGATION',
+  EVOLVIA_PILOT_ORGANIZATION_ID: 'orgtest12345',
+};
+const executionEnv = {
+  ...env,
+  EVOLVIA_API_URL: 'https://homologacao.evolviatecnologia.com/api',
+  EVOLVIA_PILOT_ALLOWED_HOST: 'homologacao.evolviatecnologia.com',
+};
+
+test('rejeita produção, HTTP e host não autorizado', () => {
+  assert.equal(validateTarget(env), 'https://homolog.example.test/api');
+  assert.throws(() => validateTarget({
+    ...env, EVOLVIA_API_URL: 'http://homolog.example.test/api',
+  }), /TLS/);
+  assert.throws(() => validateTarget({
+    ...env, EVOLVIA_API_URL: 'https://production.example.test/api',
+  }), /allowlist/);
+  assert.throws(() => validateTarget({
+    ...env, EVOLVIA_PILOT_ALLOWED_HOST: 'production.example.test',
+    EVOLVIA_API_URL: 'https://production.example.test/api',
+  }), /homologação/);
+  assert.throws(() => validateTarget({
+    ...env, EVOLVIA_PILOT_TARGET: 'PRODUCTION',
+  }), /HOMOLOGATION/);
+  assert.throws(() => validateTarget({
+    ...executionEnv, EVOLVIA_PILOT_EXECUTE: 'YES',
+  }), /Token/);
+});
+
+test('execução só permite origem oficial HTTPS:443 e /api', () => {
+  const active = { ...executionEnv, EVOLVIA_PILOT_EXECUTE: 'YES',
+    EVOLVIA_PILOT_TOKEN: 'token-sintetico' };
+  assert.equal(validateTarget(active), 'https://homologacao.evolviatecnologia.com/api');
+  assert.throws(() => validateTarget({ ...active,
+    EVOLVIA_API_URL: 'https://homologacao.evolviatecnologia.com:8443/api',
+  }), /host oficial/);
+  assert.throws(() => validateTarget({ ...active,
+    EVOLVIA_API_URL: 'https://homologacao.evolviatecnologia.com/',
+  }), /Execução exige a base/);
+  assert.throws(() => validateTarget({ ...active,
+    EVOLVIA_API_URL: 'https://homologacao.evolviatecnologia.com.attacker.example/api',
+    EVOLVIA_PILOT_ALLOWED_HOST: 'homologacao.evolviatecnologia.com.attacker.example',
+  }), /host oficial/);
+  assert.throws(() => validateTarget({ ...active,
+    EVOLVIA_API_URL: 'https://homologacao-outro.example.test/api',
+    EVOLVIA_PILOT_ALLOWED_HOST: 'homologacao-outro.example.test',
+  }), /host oficial/);
+});
+
+test('fixtures têm quantidades, dados sintéticos e cotas corretas', () => {
+  const data = buildSynthetic('20261030');
+  assert.equal(data.participants.length, 30);
+  assert.equal(data.speakers.length, 5);
+  assert.equal(data.staff.length, 3);
+  assert.equal(data.operators.length, 2);
+  assert.equal(data.exhibitors.length, 8);
+  assert.equal(data.exhibitors.filter((c) => c.kind === 'PROVIDER').length, 2);
+  assert.ok(data.exhibitors.every((c) => c.loginEmail.endsWith('@evolvia-ci.invalid')));
+  assert.ok(data.exhibitors.filter((c) => c.kind === 'PROVIDER')
+    .every((c) => c.quotaExhibitor === 0));
+  assert.equal(new Set(data.exhibitors.map((c) => c.document)).size, 8);
+});
+
+test('readback CAEX exige identidade, tipo, cotas e evento corretos, não apenas 8 registros', () => {
+  const expected = buildSynthetic('20261030').exhibitors;
+  const home = { event: { id: 'event-feira-001' }, companies: expected.map((company, index) => ({
+    ...company, id: 'company-test-' + index,
+  })) };
+  assert.equal(verifyExhibitorReadback(home, 'event-feira-001', expected), 8);
+  assert.throws(() => verifyExhibitorReadback({ ...home, event: { id: 'outro-evento' } },
+    'event-feira-001', expected), /outro evento/);
+  const wrongCompany = structuredClone(home);
+  wrongCompany.companies[0].document = 'OUTRO-DOCUMENTO';
+  assert.throws(() => verifyExhibitorReadback(wrongCompany, 'event-feira-001', expected),
+    /não persistiu/);
+  const wrongLogin = structuredClone(home);
+  wrongLogin.companies[0].loginEmail = 'outro-login@evolvia-ci.invalid';
+  assert.throws(() => verifyExhibitorReadback(wrongLogin, 'event-feira-001', expected),
+    /loginEmail/);
+  const wrongLegalName = structuredClone(home);
+  wrongLegalName.companies[0].legalName = 'Empresa alheia';
+  assert.throws(() => verifyExhibitorReadback(wrongLegalName, 'event-feira-001', expected),
+    /legalName/);
+  const wrongContact = structuredClone(home);
+  wrongContact.companies[0].contactEmail = 'contato-alheio@evolvia-ci.invalid';
+  assert.throws(() => verifyExhibitorReadback(wrongContact, 'event-feira-001', expected),
+    /contactEmail/);
+  const wrongBooth = structuredClone(home);
+  wrongBooth.companies[0].booth = 'OUTRO-ESTANDE';
+  assert.throws(() => verifyExhibitorReadback(wrongBooth, 'event-feira-001', expected),
+    /booth/);
+  const wrongQuota = structuredClone(home);
+  wrongQuota.companies[0].quotaExhibitor += 1;
+  assert.throws(() => verifyExhibitorReadback(wrongQuota, 'event-feira-001', expected),
+    /quotaExhibitor/);
+  const wrongKind = structuredClone(home);
+  wrongKind.companies[7].kind = 'EXHIBITOR';
+  assert.throws(() => verifyExhibitorReadback(wrongKind, 'event-feira-001', expected),
+    /kind/);
+  const duplicateId = structuredClone(home);
+  duplicateId.companies[1].id = duplicateId.companies[0].id;
+  assert.throws(() => verifyExhibitorReadback(duplicateId, 'event-feira-001', expected),
+    /duplicado/);
+});
+
+test('dry-run não acessa rede, não cria IDs e não simula impressão', async () => {
+  const result = await seedPilots(env);
+  assert.equal(result.mode, 'DRY_RUN');
+  assert.deepEqual(result.created, []);
+  assert.ok(result.notExecuted.includes('impressão física/PDF'));
+  assert.ok(result.notExecuted.includes('login externo'));
+});
+
+
+test('falha após criar wizard registra ID persistido sem fingir piloto completo', async (t) => {
+  const checkpoints = [];
+  const json = (data, status = 200) => new Response(JSON.stringify(data), {
+    status, headers: { 'content-type': 'application/json' },
+  });
+  t.mock.method(globalThis, 'fetch', async (url) => {
+    const path = new URL(url).pathname;
+    if (path === '/api/health/ready') return json({ status: 'ready', dependencies: { database: 'ok' } });
+    if (path === '/api/events') return json([]);
+    if (path === '/api/event-wizard/start') return json({
+      event: { id: 'event-test-partial-001', profileCode: 'CORPORATE_TRAINING', organizationId: env.EVOLVIA_PILOT_ORGANIZATION_ID },
+      session: { revision: 0 }, answers: {},
+    }, 201);
+    if (path === '/api/event-wizard/event-test-partial-001/complete') {
+      return json({ message: 'Falha sintética' }, 500);
+    }
+    throw new Error('Endpoint não previsto no teste: ' + path);
+  });
+  await assert.rejects(
+    seedPilots({ ...executionEnv, EVOLVIA_PILOT_EXECUTE: 'YES', EVOLVIA_PILOT_TOKEN: 'token-sintetico' },
+      (checkpoint) => checkpoints.push(checkpoint)),
+    /HTTP 500/,
+  );
+  assert.deepEqual(checkpoints, [{
+    phase: 'wizard_started', id: 'event-test-partial-001',
+    name: 'Summit Evolvia Corporativo 2026', profile: 'CORPORATE_TRAINING',
+  }]);
+  assert.ok(!checkpoints.some((checkpoint) => checkpoint.phase === 'seed_verified'));
+});
+
+
+test('bloqueia resposta 201 de outro tenant antes de configurar inscrições', async (t) => {
+  const calls = [];
+  const json = (data, status = 200) => new Response(JSON.stringify(data), {
+    status, headers: { 'content-type': 'application/json' },
+  });
+  t.mock.method(globalThis, 'fetch', async (url) => {
+    const path = new URL(url).pathname;
+    calls.push(path);
+    if (path === '/api/health/ready') return json({ status: 'ready', dependencies: { database: 'ok' } });
+    if (path === '/api/events') return json([]);
+    if (path === '/api/event-wizard/start') return json({
+      event: { id: 'event-wrong-tenant', profileCode: 'CORPORATE_TRAINING', organizationId: 'another-tenant' },
+      session: { revision: 0 }, answers: {},
+    }, 201);
+    throw new Error('Mutação indevida após tenant divergente: ' + path);
+  });
+  await assert.rejects(
+    seedPilots({ ...executionEnv, EVOLVIA_PILOT_EXECUTE: 'YES', EVOLVIA_PILOT_TOKEN: 'token-sintetico' }),
+    /organização divergente/,
+  );
+  assert.deepEqual(calls, ['/api/health/ready', '/api/events', '/api/event-wizard/start']);
+});
+
+test('bloqueia listagem com evento de outro tenant antes de qualquer POST', async (t) => {
+  const calls = [];
+  const json = (data, status = 200) => new Response(JSON.stringify(data), {
+    status, headers: { 'content-type': 'application/json' },
+  });
+  t.mock.method(globalThis, 'fetch', async (url, options) => {
+    const path = new URL(url).pathname;
+    calls.push({ path, method: options?.method ?? 'GET' });
+    if (path === '/api/health/ready') {
+      return json({ status: 'ready', dependencies: { database: 'ok' } });
+    }
+    if (path === '/api/events') {
+      return json([{ id: 'foreign-event', organizationId: 'another-tenant',
+        name: 'Evento de outra organização' }]);
+    }
+    throw new Error('Mutação ou leitura indevida após listagem divergente: ' + path);
+  });
+  await assert.rejects(
+    seedPilots({ ...executionEnv, EVOLVIA_PILOT_EXECUTE: 'YES', EVOLVIA_PILOT_TOKEN: 'token-sintetico' }),
+    /Listagem retornou evento fora da organização solicitada/,
+  );
+  assert.deepEqual(calls, [
+    { path: '/api/health/ready', method: 'GET' },
+    { path: '/api/events', method: 'GET' },
+  ]);
+});
+
+
+test('não considera piloto concluído quando GET diverge do lote gratuito salvo', async (t) => {
+  const calls = [];
+  const checkpoints = [];
+  const id = 'event-corporate-readback-test';
+  const json = (data, status = 200) => new Response(JSON.stringify(data), {
+    status, headers: { 'content-type': 'application/json' },
+  });
+  t.mock.method(globalThis, 'fetch', async (url, options) => {
+    const path = new URL(url).pathname;
+    const method = options?.method ?? 'GET';
+    calls.push(method + ' ' + path);
+    if (path === '/api/health/ready') {
+      return json({ status: 'ready', dependencies: { database: 'ok' } });
+    }
+    if (path === '/api/events' && method === 'GET') return json([]);
+    if (path === '/api/event-wizard/start' && method === 'POST') {
+      return json({ event: {
+        id, profileCode: 'CORPORATE_TRAINING',
+        organizationId: executionEnv.EVOLVIA_PILOT_ORGANIZATION_ID,
+      }, session: { revision: 0 }, answers: {} }, 201);
+    }
+    if (path === '/api/event-wizard/' + id + '/complete') {
+      return json({ event: {
+        id, slug: 'summit-evolvia-corporativo-2026',
+        name: 'Summit Evolvia Corporativo 2026', status: 'SETUP',
+        profileCode: 'CORPORATE_TRAINING',
+        organizationId: executionEnv.EVOLVIA_PILOT_ORGANIZATION_ID,
+      } }, 201);
+    }
+    if (path === '/api/events/' + id + '/registration-commercial' && method === 'PUT') {
+      return json({ categories: [{
+        id: 'cat-1', code: 'participante', capacity: 40,
+        lots: [{ code: 'unico', quantity: 40, priceCents: 0 }],
+      }] });
+    }
+    if (path === '/api/events/' + id + '/registration-commercial' && method === 'GET') {
+      return json({ event: { id, status: 'SETUP', registrationMode: 'FREE' },
+        categories: [{
+          id: 'cat-1', code: 'participante', capacity: 40,
+          lots: [{ code: 'unico', quantity: 40, priceCents: 100 }],
+        }],
+      });
+    }
+    throw new Error('Chamada indevida após divergência de persistência: ' + method + ' ' + path);
+  });
+  await assert.rejects(
+    seedPilots({ ...executionEnv, EVOLVIA_PILOT_EXECUTE: 'YES',
+      EVOLVIA_PILOT_TOKEN: 'token-sintetico' },
+    (checkpoint) => checkpoints.push(checkpoint)),
+    /Lote gratuito não persistiu/,
+  );
+  assert.equal(calls.filter((call) => call.endsWith('/registration-commercial')).length, 2);
+  assert.ok(!calls.some((call) => call.includes('/exhibitor')));
+  assert.ok(!checkpoints.some((checkpoint) => checkpoint.phase === 'seed_verified'));
+});

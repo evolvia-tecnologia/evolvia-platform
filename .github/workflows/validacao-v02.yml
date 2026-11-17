@@ -43,6 +43,11 @@ jobs:
           node scripts/validate-readiness-contract.mjs
           npm run validate:gate1-human-evidence
           node --test scripts/validate-gate1-human-accessibility-evidence.test.mjs
+          # Guardrails do seed comercial rodam na raiz; a imagem API tem contexto ./apps/api.
+          node --test scripts/seed-commercial-pilots.test.mjs
+
+      - name: Instalar o Poppler
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq poppler-utils
 
       - name: Validar API
         working-directory: apps/api
@@ -394,6 +399,22 @@ jobs:
             -p "$COMPOSE_PROJECT_NAME" \
             run --rm migrate | tee migrate-segunda-execucao.log
           grep -q "No pending migrations to apply" migrate-segunda-execucao.log
+
+      - name: Provar hidratação isolada do catálogo público
+        if: ${{ needs.detectar_mudancas_arm64.outputs.web == 'true' }}
+        env:
+          EVOLVIA_WEB_URL: http://127.0.0.1:3000
+          EVOLVIA_A11Y_OUTPUT: visual-evidence/public-catalog-hydration-runtime.json
+        run: node scripts/validate-public-catalog-hydration.mjs
+
+      - name: Preservar evidência de hidratação do catálogo
+        if: ${{ always() && needs.detectar_mudancas_arm64.outputs.web == 'true' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: catalogo-hidratacao-${{ github.sha }}
+          path: visual-evidence/public-catalog-hydration-runtime.json
+          if-no-files-found: error
+          retention-days: 7
 
       - name: Provar acessibilidade runtime das rotas públicas
         if: ${{ needs.detectar_mudancas_arm64.outputs.web == 'true' }}

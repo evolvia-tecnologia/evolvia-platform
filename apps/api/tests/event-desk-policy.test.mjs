@@ -14,11 +14,22 @@ import {
   operationalCapabilities,
   defaultLabelConfig,
   labelFieldAllowed,
+  labelText,
   normalizeLabelConfig,
   readLabelConfig,
   readSelfServiceMethods,
   DeskPolicyError,
 } from '../src/event-desk-policy.ts';
+
+test('etiqueta combina cidade/UF e usa nome preferido, cargo e empresa sem dados sensíveis', () => {
+  const config = normalizeLabelConfig({ ...defaultLabelConfig(), extraFields: ['job_title', 'city_state'], showCategory: false });
+  const label = labelText({ preferred_name: 'Bia', full_name: 'Beatriz de Teste', job_title: 'Pesquisadora', institution: 'Instituto Fictício', city: 'Osasco', state: 'SP', email: 'nao-expor@example.test', identity_document: 'nao-expor' }, 'Congressista', config);
+  assert.deepEqual(label, { name: 'Bia', company: 'Instituto Fictício', lines: ['Pesquisadora', 'Osasco / SP'], category: null });
+  assert.deepEqual(labelText({ full_name: 'Nome completo', city: 'Campinas' }, '', config).lines, ['Campinas']);
+  assert.deepEqual(labelText({ state: 'SP' }, '', config).lines, ['SP']);
+  assert.deepEqual(labelText({}, '', config).lines, []);
+  assert.deepEqual(labelText({ city_state: 'Valor legado', city: 'Outra cidade', state: 'SP' }, '', config).lines, ['Valor legado']);
+});
 
 test('recursos operacionais não dependem do perfil do evento', () => {
   assert.deepEqual(
@@ -112,3 +123,4 @@ test('a credencial mostra o nome de tratamento e a inscrição paga não confirm
   assert.equal(deskCanConfirmFreeRegistration(0), true);
   assert.equal(deskCanConfirmFreeRegistration(1500), false);
 });
+

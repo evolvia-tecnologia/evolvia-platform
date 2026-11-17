@@ -7,6 +7,7 @@ const compile=path=>ts.transpileModule(readFileSync(new URL(path,import.meta.url
 const legacy=url(compile('../lib/post-event-report.ts'));
 const options=url(compile('../lib/post-event-report-options.ts').replace(/from ['"]\.\/post-event-report['"]/g,'from '+JSON.stringify(legacy)));
 const source=compile('../components/post-event-reports.tsx');
+const reportLinks=url(compile('../lib/event-report-links.ts'));
 const text=node=>Array.isArray(node)?node.map(text).join(''):node&&typeof node==='object'?text(node.props?.children):String(node??'');
 function nodes(node){if(!node||typeof node!=='object')return [];if(Array.isArray(node))return node.flatMap(nodes);return [node,...nodes(node.props?.children)];}
 async function harness(payload){
@@ -20,6 +21,7 @@ async function harness(payload){
   'next/navigation':url('const router={replace(){}};export const useRouter=()=>router;'),
   '../lib/api':url(`export const api=globalThis[${JSON.stringify(key)}].api;export const getToken=()=>"fixture";export class ApiError extends Error{}`),
   '../lib/event-time-zone':url('export const formatEventDate=()=>"06/10/2026";'),
+  '../lib/event-report-links':reportLinks,
   '../lib/post-event-report':legacy,'../lib/post-event-report-options':options,
   './post-event-reports.module.css':url('export default new Proxy({}, {get:(_,key)=>key});'),
   './post-event-overview':url('export default ()=>null;'),

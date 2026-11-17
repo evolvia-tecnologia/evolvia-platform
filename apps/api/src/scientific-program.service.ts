@@ -9,6 +9,7 @@ import {
   EventStatus,
   Prisma,
   ScientificProgramActivityStatus,
+  ScientificSubmissionStatus,
   ScientificTaxonomyLevel,
 } from '@prisma/client';
 import { AuthorizationService } from './authorization.service';
@@ -48,7 +49,7 @@ export class ScientificProgramService {
   async get(userId: string, eventId: string) {
     const event = await this.requireScientificEvent(userId, eventId);
     const scope = { eventId, organizationId: event.organizationId! };
-    const [spaces, activities, people, taxonomy] = await Promise.all([
+    const [spaces, activities, people, taxonomy, acceptedWorks] = await Promise.all([
       this.prisma.scientificProgramSpace.findMany({
         where: scope,
         orderBy: [{ active: 'desc' }, { name: 'asc' }],
@@ -66,6 +67,7 @@ export class ScientificProgramService {
           taxonomyArea: true,
           taxonomySubarea: true,
           taxonomyTopic: true,
+          submission: { select: { id: true, title: true, status: true, stationPublicCode: true } },
         },
         orderBy: [{ startAt: 'asc' }, { title: 'asc' }],
       }),
@@ -77,6 +79,14 @@ export class ScientificProgramService {
       this.prisma.scientificTaxonomyNode.findMany({
         where: { ...scope, active: true },
         orderBy: [{ level: 'asc' }, { sortOrder: 'asc' }, { name: 'asc' }],
+      }),
+      this.prisma.scientificSubmission.findMany({
+        where: {
+          ...scope,
+          status: { in: [ScientificSubmissionStatus.ACCEPTED, ScientificSubmissionStatus.ACCEPTED_WITH_CHANGES] },
+        },
+        select: { id: true, title: true, status: true, stationPublicCode: true },
+        orderBy: [{ title: 'asc' }, { id: 'asc' }],
       }),
     ]);
 
@@ -110,6 +120,7 @@ export class ScientificProgramService {
         invitationStatus: item.guestProfile?.invitationStatus ?? null,
       })),
       taxonomy,
+      acceptedWorks,
       conflicts,
       nextAction: this.nextAction(spaces, activities, conflicts),
     };
@@ -314,6 +325,72 @@ export class ScientificProgramService {
         personId: participant.personId,
       });
     });
+    return this.get(userId, eventId);
+  }
+
+  async linkConfirmedWork(userId: string, eventId: string, activityId: string, submissionId: string | null) {
+    const event = await this.requireScientificEvent(userId, eventId);
+    if (PUBLICATION_CLOSED_EVENT_STATUSES.has(event.status)) {
+      throw new ConflictException({
+        code: 'INVALID_EVENT_STATE',
+        message: 'Não é possível alterar o vínculo científico de um evento suspenso, encerrado ou cancelado.',
+        context: { eventStatus: event.status },
+      });
+    }
+    const organizationId = event.organizationId!;
+    const nextId = submissionId?.trim() || null;
+    if (nextId && !/^[a-z0-9]{10,40}$/u.test(nextId)) throw new NotFoundException('Trabalho não encontrado neste evento.');
+    await this.requireActivity(eventId, organizationId, activityId);
+
+    try {
+      await this.prisma.$transaction(async (tx) => {
+        // Row locks make a concurrent decision or correction on the same work wait for this link, or this link see its result.
+        const [current] = await tx.$queryRaw<{ status: EventStatus }[]>`
+          SELECT "status" FROM "Event" WHERE "id" = ${eventId} AND "organizationId" = ${organizationId} FOR SHARE`;
+        if (!current || PUBLICATION_CLOSED_EVENT_STATUSES.has(current.status)) {
+          throw new ConflictException({
+            code: 'INVALID_EVENT_STATE',
+            message: 'Não é possível alterar o vínculo científico de um evento suspenso, encerrado ou cancelado.',
+            context: { eventStatus: current?.status ?? null },
+          });
+        }
+        const [activity] = await tx.$queryRaw<{ id: string; submissionId: string | null }[]>`
+          SELECT "id", "submissionId" FROM "ScientificProgramActivity"
+          WHERE "id" = ${activityId} AND "eventId" = ${eventId} AND "organizationId" = ${organizationId} FOR UPDATE`;
+        if (!activity) throw new NotFoundException('Atividade não encontrada nesta programação.');
+        if ((activity.submissionId ?? null) === nextId) return;
+        if (nextId) {
+          const [work] = await tx.$queryRaw<{ status: ScientificSubmissionStatus }[]>`
+            SELECT "status" FROM "ScientificSubmission"
+            WHERE "id" = ${nextId} AND "eventId" = ${eventId} AND "organizationId" = ${organizationId} FOR UPDATE`;
+          if (!work) throw new NotFoundException('Trabalho não encontrado neste evento.');
+          if (work.status !== ScientificSubmissionStatus.ACCEPTED && work.status !== ScientificSubmissionStatus.ACCEPTED_WITH_CHANGES) {
+            throw new BadRequestException('Só um trabalho aceito ou aceito com ressalvas pode entrar na programação.');
+          }
+          const taken = await tx.scientificProgramActivity.findFirst({
+            where: { eventId, organizationId, submissionId: nextId, NOT: { id: activity.id } },
+            select: { id: true },
+          });
+          if (taken) throw new ConflictException('Este trabalho já está em outra atividade da programação.');
+        }
+        const linked = await tx.scientificProgramActivity.updateMany({
+          where: { id: activity.id, eventId, organizationId, submissionId: activity.submissionId },
+          data: { submissionId: nextId },
+        });
+        if (linked.count !== 1) throw new ConflictException('A atividade mudou. Atualize a programação.');
+        await this.audit(
+          tx,
+          event,
+          userId,
+          nextId ? 'scientific.program_work_linked' : 'scientific.program_work_unlinked',
+          'ScientificProgramActivity',
+          activity.id,
+          { submissionId: nextId, previousSubmissionId: activity.submissionId ?? null },
+        );
+      });
+    } catch (reason) {
+      this.rethrowUnique(reason, 'Este trabalho já está em outra atividade da programação.');
+    }
     return this.get(userId, eventId);
   }
 

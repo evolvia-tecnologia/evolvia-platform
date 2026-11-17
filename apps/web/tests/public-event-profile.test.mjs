@@ -41,7 +41,8 @@ test('página pública diferencia fatos e condiciona a inscrição à disponibil
   assert.match(presentation, /<dt>Público estimado<\/dt>/u);
   assert.match(presentation, /formatEstimatedAudience/u);
   assert.match(presentation, /registrationMode &&/u);
-  assert.match(presentation, /id="inscricoes"/u);
+  assert.match(presentation, /id=\{offerAnchor\}/u);
+  assert.match(presentation, /offerTitle === 'Ingressos' \? 'ingressos' : 'inscricoes'/u);
   assert.match(presentation, /PublicRichText/u);
   assert.match(presentation, /aria-label="Seções da página"/u);
   assert.match(presentation, /publicRegistrationCtaLabel/u);

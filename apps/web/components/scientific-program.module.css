@@ -3,6 +3,10 @@
 
 .editForm { grid-column: 1 / -1; min-width: 0; }
 .srOnly { position: absolute; width: 1px; height: 1px; padding: 0; margin: 0; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+.confirmedWork { margin: var(--space-8) 0 0; }
+.workForm { display: flex; flex-wrap: wrap; align-items: end; gap: var(--space-8); margin-top: var(--space-12); }
+.workForm label { flex: 1 1 220px; }
+.workForm .secondary { min-height: 44px; }
 
 /* Embedded screens use the common event frame, matching the Cursor layout. */
 :global([data-shell="panel"]) .page { min-height: 0; min-width: 0; max-width: none; width: 100%; margin: 0; padding: 0; background: transparent; font-family: var(--font-family-sans); font-weight: var(--font-weight-regular); line-height: var(--line-height-body); }

@@ -86,6 +86,12 @@ function initialPeriod() {
   return { startsAt: localDateTime(startsAt.toISOString()), endsAt: localDateTime(endsAt.toISOString()) };
 }
 
+function nextAvailableIndex(codes: string[], prefix: string) {
+  let index = 0;
+  while (codes.includes(`${prefix}_${index + 1}`)) index += 1;
+  return index;
+}
+
 function newLot(index: number): Lot {
   return {
     code: `lote_${index + 1}`,
@@ -218,6 +224,21 @@ export default function RegistrationCommercialBuilder({ eventId }: { eventId: st
 
   const registrationMode = payload.event.registrationMode;
   const eventEndLocal = payload.event.endDate ? localDateTime(payload.event.endDate) : undefined;
+  const canSave = dirty && !saving && categories.length > 0;
+  function addCategory() {
+    setCategories((current) => [
+      ...current,
+      newCategory(nextAvailableIndex(current.map((category) => category.code), 'categoria')),
+    ]);
+  }
+  const saveButton = (
+    <button className={styles.primary} type="button" disabled={!canSave} onClick={() => void save()}>
+      {saving ? 'Salvando…' : 'Salvar configuração'}
+    </button>
+  );
+  const addCategoryButton = (
+    <button className={styles.secondary} type="button" onClick={addCategory}>Adicionar categoria</button>
+  );
   return <main className={styles.page}>
     <header className={styles.topbar}>
       <Link className={styles.brand} href="/painel">EVOLVIA</Link>
@@ -250,7 +271,7 @@ export default function RegistrationCommercialBuilder({ eventId }: { eventId: st
       <section className={styles.builder} aria-labelledby="categories-title">
         <div className={styles.sectionHeading}>
           <div><p className={styles.eyebrow}>ESTRUTURA COMERCIAL</p><h2 id="categories-title">Categorias de inscrição</h2></div>
-          <button className={styles.primary} type="button" disabled={!dirty || saving || categories.length === 0} onClick={() => void save()}>{saving ? 'Salvando…' : 'Salvar configuração'}</button>
+          {categories.length > 0 ? <div className={styles.headingActions}>{addCategoryButton}{saveButton}</div> : null}
         </div>
 
         {categories.length === 0 && <div className={styles.empty}>
@@ -277,7 +298,7 @@ export default function RegistrationCommercialBuilder({ eventId }: { eventId: st
               <label>Comprovante<select value={registrationMode === 'PAID' || category.proofRequirement !== 'REQUIRED_BEFORE_PAYMENT' ? category.proofRequirement : 'NONE'} onChange={(event) => updateCategory(categoryIndex, { proofRequirement: event.target.value as ProofRequirement })}><option value="NONE">Não solicitar</option><option value="OPTIONAL">Solicitar, envio opcional</option><option value="REQUIRED_BEFORE_PAYMENT" disabled={registrationMode !== 'PAID'}>Exigir aprovação antes do pagamento</option></select><small>{category.proofRequirement === 'REQUIRED_BEFORE_PAYMENT' && registrationMode === 'PAID' ? 'O pagamento só abre depois que a organização aprovar o PDF.' : category.proofRequirement === 'OPTIONAL' ? 'O participante pode enviar um PDF. A inscrição segue sem ele.' : 'A categoria não pede comprovante.'}</small></label>
             </div>
 
-            <div className={styles.lotHeading}><h3>Lotes</h3><button className={styles.secondary} type="button" onClick={() => updateCategory(categoryIndex, { lots: [...category.lots, newLot(category.lots.length)] })}>Adicionar lote</button></div>
+            <div className={styles.lotHeading}><h3>Lotes</h3></div>
             <div className={styles.lots}>
               {category.lots.map((lot, lotIndex) => <fieldset className={styles.lot} key={lot.id ?? `lot-${lotIndex}`}>
                 <legend>Lote {lotIndex + 1}</legend>
@@ -295,10 +316,13 @@ export default function RegistrationCommercialBuilder({ eventId }: { eventId: st
                 </div>
               </fieldset>)}
             </div>
+            <div className={styles.lotActions}>
+              <button className={styles.secondary} type="button" onClick={() => updateCategory(categoryIndex, { lots: [...category.lots, newLot(nextAvailableIndex(category.lots.map((lot) => lot.code), 'lote'))] })}>Adicionar lote</button>
+            </div>
           </fieldset>)}
         </div>
 
-        {categories.length > 0 && <button className={styles.addCategory} type="button" onClick={() => setCategories((current) => [...current, newCategory(current.length)])}>+ Adicionar categoria</button>}
+        {categories.length > 0 ? <div className={styles.footerActions}>{addCategoryButton}{saveButton}</div> : null}
       </section>
     </div>
   </main>;
