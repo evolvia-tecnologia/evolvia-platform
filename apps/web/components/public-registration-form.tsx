@@ -1,9 +1,9 @@
 'use client';
 
-import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
+import { FormEvent, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import InternationalPhoneInput from './international-phone-input';
-import { phoneError, updateRegistrationAnswer } from '../lib/registration-input';
+import { phoneError, publishedChoiceError, updateRegistrationAnswer } from '../lib/registration-input';
 import { getToken } from '../lib/api';
 import { formatEventDate } from '../lib/event-time-zone';
 import {
@@ -15,6 +15,7 @@ import {
   publicRegistrationSummaryTitle,
 } from '../lib/public-registration-cta';
 import EvaScreenSupport from './eva-screen-support';
+import RegistrationRefundNotice from './registration-refund-notice';
 import styles from './public-registration-form.module.css';
 
 type Field = { code: string; label: string; type: string; required: boolean; help?: string; options?: Array<{ id: string; label: string }>; appliesToCategoryIds?: string[] };
@@ -116,6 +117,8 @@ export default function PublicRegistrationForm(props: {
   offerLotId?: string;
   initialProfileCode?: string | null;
   initialEventType?: string | null;
+  heading?: string;
+  preface?: ReactNode;
 }) {
   return <>
     <EvaScreenSupport guide="registration" additionalQuestions={registrationEva} />
@@ -129,12 +132,16 @@ function RegistrationForm({
   offerLotId,
   initialProfileCode,
   initialEventType,
+  heading,
+  preface,
 }: {
   slug: string;
   initialProtocol?: string;
   offerLotId?: string;
   initialProfileCode?: string | null;
   initialEventType?: string | null;
+  heading?: string;
+  preface?: ReactNode;
 }) {
   const preferredNameEdited = useRef(false);
   const submitting = useRef(false);
@@ -301,6 +308,8 @@ function RegistrationForm({
       if (problem) { setError(`${field.label}: ${problem}`); return; }
     }
     if (!categoryId || !lotId) { setError('Selecione uma categoria e um lote.'); return; }
+    const choiceError = publishedChoiceError(visibleFields, answers);
+    if (choiceError) { setError(choiceError); return; }
     const proofMode = category?.proofRequirement;
     const proofRequired = proofMode === 'REQUIRED_BEFORE_PAYMENT';
     if (proofRequired && !proofFile) {
@@ -407,8 +416,8 @@ function RegistrationForm({
   const eventType = options?.event.eventType ?? initialEventType;
   const registrationNoun = publicRegistrationNoun(profileCode, eventType);
 
-  if (loading) return <main className={styles.page}><p role="status">Carregando {registrationNoun}…</p></main>;
-  if (error && !options) return <main className={styles.page}><div className={styles.notice} role="alert"><h1>{offerLotId ? 'Vaga da fila indisponível' : registrationNoun === 'ingresso' ? 'Ingresso indisponível' : 'Inscrição indisponível'}</h1><p>{error}</p>{offerLotId && <Link href={waitlistHref}>Ver minha fila de espera</Link>}<Link href={`/${encodeURIComponent(slug)}`}>Voltar ao evento</Link></div></main>;
+  if (loading) return <main className={styles.page}>{heading ? <h1>{heading}</h1> : null}{preface}<p role="status">Carregando {registrationNoun}…</p></main>;
+  if (error && !options) return <main className={styles.page}><div className={styles.notice} role="alert"><h1>{offerLotId ? 'Vaga da fila indisponível' : registrationNoun === 'ingresso' ? 'Ingresso indisponível' : 'Inscrição indisponível'}</h1><p>{error}</p>{offerLotId && <Link href={waitlistHref}>Ver minha fila de espera</Link>}<Link href={`/${encodeURIComponent(slug)}`}>Voltar ao evento</Link></div>{preface}</main>;
 
   if (result) return <main className={styles.page}>
     <section className={styles.success} aria-labelledby="success-title">
@@ -439,7 +448,7 @@ function RegistrationForm({
       <Link href={`/evento/${encodeURIComponent(slug)}/participante`}>Acessar a Área do Participante</Link>
       <Link href={`/${encodeURIComponent(slug)}`}>Voltar ao evento</Link>
     </section>
-    
+    {preface}
   </main>;
 
   if (!options) return null;
@@ -459,6 +468,7 @@ function RegistrationForm({
       {waitlistNotice}
       <Link href={`/${encodeURIComponent(slug)}`}>Voltar ao evento</Link>
     </div>
+    {preface}
   </main>;
 
   return <main className={styles.page}>
@@ -469,8 +479,11 @@ function RegistrationForm({
       {offerLotId && options.offerExpiresAt
         ? <p className={styles.warning}>Esta vaga está reservada para você até {new Date(options.offerExpiresAt).toLocaleString('pt-BR')}. Preencha a ficha com o mesmo documento informado na fila e o e-mail da sua conta.</p>
         : <p>Escolha a categoria e o lote. O resumo acompanha o valor antes de reservar.</p>}
+      {!offerLotId && options.event.registrationMode === 'PAID' && options.categories.some((item) => item.lots.some((offer) => offer.priceCents > 0)) &&
+        <Link className={styles.waitlistLink} href={'/evento/' + encodeURIComponent(slug) + '/inscricao/grupo'}>Inscrever de 2 a 10 pessoas em um único pedido</Link>}
       {waitlistNotice}
     </header>
+    {preface}
 
     <form className={styles.form} onSubmit={submit}>
       <div className={styles.checkout}>
@@ -541,6 +554,7 @@ function RegistrationForm({
               <select required={field.required} value={String(value ?? '')} onChange={(event) => setAnswer(field.code, event.target.value)}>
                 <option value="">Selecione</option>{field.options.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}
               </select>
+              {field.help && <small>{field.help}</small>}
             </label>;
             if (field.type === 'CHECKBOX' && field.options) return <fieldset className={styles.options} key={field.code}><legend>{field.label}</legend>
               {field.options.map((option) => <label className={styles.check} key={option.id}><input type="checkbox" checked={Array.isArray(value) && value.includes(option.id)} onChange={(event) => {
@@ -604,6 +618,7 @@ function RegistrationForm({
         </dl>
         <p className={styles.summaryNote}>O valor final, com cupom ou cortesia, é calculado no servidor ao reservar.</p>
         {options.event.registrationMode === 'PAID' && lot && lot.priceCents > 0 && <p className={styles.summaryNote}>{options.platformCommission?.percent && options.platformCommission.bearer === 'PARTICIPANT' ? `O pagamento inclui ${options.platformCommission.percent}% de comissão da Evolvia sobre este valor.` : options.platformCommission?.percent ? `A comissão de ${options.platformCommission.percent}% da Evolvia fica com a plataforma e não aumenta este valor.` : 'A comissão da Evolvia sobre inscrição paga fica entre 10% e 15%.'} Certificado e trabalho científico não têm taxa. No Brasil, Pix e cartão; em outro país, cartão. O recebimento é em reais.</p>}
+        {options.event.registrationMode === 'PAID' && lot && lot.priceCents > 0 && <RegistrationRefundNotice slug={options.event.slug} paid />}
         {error && <p className={styles.error} role="alert">{error}</p>}
         <button type="submit" aria-describedby="registration-submit-guidance" disabled={sending || !options.terms}>{sending ? 'Reservando…' : publicRegistrationSubmitLabel(options.event.profileCode, options.event.eventType, Boolean(offerLotId))}</button>
         <p id="registration-submit-guidance" role="status">{!options.terms ? 'Inscrição indisponível: a organização precisa anexar os termos. Nenhum dado foi enviado.' : answers.terms_acceptance !== true ? 'Leia o documento e marque o aceite dos termos para concluir.' : 'Confira os campos obrigatórios e conclua sua inscrição.'}</p>

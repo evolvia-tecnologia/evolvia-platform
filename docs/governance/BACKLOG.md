@@ -1,5 +1,24 @@
 # Backlog e ordem de execução — Modo Lançamento
 
+## Fila vigente — 06/11/2026
+
+Contrato [#571/6685989083](https://github.com/evolvia-tecnologia/evolvia-platform/issues/571#issuecomment-6685989083) e decisão EVO-021 substituem a distribuição histórica de 05/11 abaixo. Base integrada: `49aeae51` (#637 e #647). Handoffs exigem ACK com SHA e arquivos; não reimplementar código integrado nem disputar caminhos ativos.
+
+| Frente | Dono | Próxima conclusão |
+| --- | --- | --- |
+| Inscrição #637 / integração | Work | Código integrado e publicado em homologação; gate público falhou depois por versão Nginx e alias `dev`. Jornada autenticada ainda pendente. Sem novo crédito de critério. |
+| G2.10 / #471 | Codex | Recusar entrada de valor zero em pedido PAID antes das escritas, preservando FREE; tratar threads novas e atualizar base com CI/revisão final. [Achado](https://github.com/evolvia-tecnologia/evolvia-platform/pull/471#issuecomment-6686774524). |
+| G2.11 / #491 | Codex + Work nos compartilhados | Operação financeira persistida, compensação e efeito nas credenciais; pedido administrativo não comprova estorno. |
+| G2.13 / #579 e #557 | Codex | Reaproveitar transporte integrado, sem reaplicar PR antigo; provar entrega por canal e destinatário autorizados. |
+| G2.14 / #613 | Codex | Completar API, persistência e adaptador; dependências fiscais municipais e do provedor explícitas. Rascunho não é NFS-e. |
+| G5.8 / #610 e G6.8/G7.4 / #518 | Gemini após ACK do worker | Concluir avisos, lote, cartas e consulta do autor; preservar outbox e não disparar e-mail real sem autorização. |
+| G10.10 / #642 e CAEX | Claude | Montar UI, provar HTTP/concorrência PostgreSQL/impressão. Três inversas do schema já presentes no SHA59801816; não repetir esse bloqueio histórico. |
+| Etiquetas #614 → #647 | Work/Cursor | Integrado em `develop@49aeae51`; HEAD `7dd48da9`, CI aplicável completo verde e revisão independente aprovada. Aguardar publicação e jornada física de impressão. [Achado corrigido](https://github.com/evolvia-tecnologia/evolvia-platform/pull/647#issuecomment-6686639676). |
+| Sports #621 → #648 | Cursor | Catálogo público não conclui jornada de atleta/estoque; fechar comportamento completo com persistência existente e testes. |
+
+Um resultado ativo por dono; até dois candidatos críticos de integração. Shared paths com patch mínimo serializado por Work e lease conferida. Sem mudança de produção, infra, secrets, cobrança, APIs pagas ou efeitos financeiros/comunicação reais. Datas e metas não substituem CI, revisão ou prova funcional. Percentuais não foram recalculados nesta atualização.
+
+
 ## Fila sincronizada — 05/11/2026
 
 Esta seção substitui a ordem executiva histórica abaixo, sem mudar a fórmula ou o denominador dos Gates. Coordenação e leases: [#571](https://github.com/evolvia-tecnologia/evolvia-platform/issues/571). Política de execução: EVO-020.

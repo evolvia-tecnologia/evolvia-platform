@@ -8,6 +8,18 @@ delivery_mode: "Modo Lançamento — EVO-015"
 active_phase: "Operação de inscrição e aceitação pública em homologação"
 ---
 
+## Estado verificado — 06/11/2026
+
+- Base integrada: `develop@49aeae51e4f2b35eab08558ca9997a0ff900fc09`, com [#637](https://github.com/evolvia-tecnologia/evolvia-platform/pull/637) e [#647](https://github.com/evolvia-tecnologia/evolvia-platform/pull/647). Sugestão do primeiro nome editável, telefone internacional sem área oculta e etiquetas consistentes no posto/totem.
+- HEAD validado `9cb2940f`, [CI42229498792](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/42229498792) completo aplicável verde: 948 testes da API, 729 da Web, PostgreSQL/migration, acessibilidade runtime e ARM64 Web. Árvores validada e integrada idênticas. Revisão independente Codex sem novos bloqueadores; não confundir com a revisão Gemini histórica.
+- Publicação pós-merge [42231851766/job127946099903](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/42231851766/job/127946099903) comprovou `develop@4cf655b5`, containers saudáveis, API/PostgreSQL prontos e HTTPS acessível em 06/11 às 11h28 São Paulo. O gate público falhou depois por `Server: nginx/1.24.0` e pelo alias `dev` com certificado/redirect divergentes. Isso comprova implantação, sem aprovar o gate público nem a jornada autenticada.
+- [#647](https://github.com/evolvia-tecnologia/evolvia-platform/pull/647) integrado por squash `49aeae51`, HEAD final `7dd48da9`, CI aplicável completo verde, zero threads e revisão independente final sem bloqueadores. A prévia ilegível permanece visível em tela e excluída da impressão; publicação e jornada física continuam pendentes.
+- Direção atual: Work integra; Codex responde por G2/financeiro/fiscal; Claude por operadores/operação/CAEX; Gemini por ciência/comunicações; Cursor retomado para etiquetas e Sports. Contrato [#571/6685989083](https://github.com/evolvia-tecnologia/evolvia-platform/issues/571#issuecomment-6685989083), decisão EVO-021. Esta distribuição substitui atribuições históricas incompatíveis abaixo.
+- A correção refina um critério já integrado. A última medição continua histórica: **92,9% implementado / 70,0% comprovado, 85/93, 0/11 Gates encerrados**. Sem novo crédito por branch, agenda ou refinamento.
+
+Detalhes da entrega e limitações no [Master Codex](EVOLVIA_MASTER_CODEX.md); próximas ações no [Backlog](BACKLOG.md). Histórico preservado abaixo.
+
+
 ## Checkpoint de execução — 05/11/2026
 
 Base integrada verificada: `develop@9fd3bed60347a8f6eefb2a0bcda46f4ff18cca21`.

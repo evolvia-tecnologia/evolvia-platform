@@ -367,7 +367,7 @@ export default function EventAdminDashboard({ eventId, section }: { eventId: str
         </> : section === 'publication'
           ? <>
             <EventSubjectAreas eventId={eventId} initial={payload.answers.subjectAreas ?? []} />
-            <PublicationEditor eventId={eventId} embedded supportsScientificSources={isScientific} />
+            <PublicationEditor eventId={eventId} embedded supportsScientificSources={isScientific} running={payload.answers.eventType === 'Corrida'} />
           </>
           : <IntegrationsHub eventId={eventId} />}
   </EventWorkspace>;

@@ -35,6 +35,8 @@ import {
   registrationCountry,
   type CommissionQuote,
 } from './paid-event-commission.policy';
+import { checkoutRefundBlock } from './registration-refund-policy';
+import { RegistrationRefundService } from './registration-refund.service';
 import { RegistrationReservationPolicyError, isPublicTicketOffer, normalizeIdempotencyKey } from './registration-reservations-policy';
 
 const PROVIDER = 'ASAAS';
@@ -50,6 +52,7 @@ export class AsaasCheckoutService {
     private readonly prisma: PrismaService,
     private readonly gateway: AsaasCheckoutGateway,
     private readonly foundation: IntegrationFoundationService,
+    private readonly refunds: RegistrationRefundService,
   ) {}
 
   isConfigured(): boolean {
@@ -98,9 +101,15 @@ export class AsaasCheckoutService {
         expiresAt: true,
         category: { select: { proofRequirement: true } },
         categoryProof: { select: { state: true } },
+        orderEntry: { select: { orderId: true } },
       },
     });
     if (!reservation) throw new NotFoundException('Reserva não encontrada.');
+    // An order entry must never be charged as an independent reservation:
+    // one order owns exactly one grouped checkout and one payment webhook.
+    if (reservation.orderEntry) {
+      throw new ConflictException('Esta inscrição pertence a uma compra múltipla. Utilize o checkout do pedido.');
+    }
     const proofBlock = categoryProofPaymentBlock(reservation.category.proofRequirement, reservation.categoryProof?.state ?? null);
     if (proofBlock) throw new ConflictException(proofBlock);
     const now = new Date();
@@ -159,6 +168,8 @@ export class AsaasCheckoutService {
         return this.toPublicCheckout(protocol, reservation.status, checkout, 'NONE', null, isPublicTicketOffer(event.profileCode, event.eventType));
       }
     }
+    const published = await this.refunds.hasPublishedPolicy(event.id, organizationId);
+    if (!published) throw new ConflictException(checkoutRefundBlock(false));
     let split: { walletId: string; fixedValue: number };
     try {
       split = asaasOrganizerSplit(
@@ -236,6 +247,11 @@ export class AsaasCheckoutService {
             failureCode: null,
           },
         });
+        await this.refunds.recordAcceptance(tx, {
+          eventId: event.id,
+          organizationId,
+          reservationId: reservation.id,
+        }, now);
         await tx.auditLog.create({
           data: {
             organizationId,
@@ -314,6 +330,12 @@ export class AsaasCheckoutService {
     let event: NormalizedAsaasCheckoutWebhook;
     try { event = normalizeAsaasCheckoutWebhook(rawBody); }
     catch (error) { throw new BadRequestException(error instanceof Error ? error.message : 'Webhook inválido.'); }
+    return this.receiveNormalizedWebhook(event);
+  }
+
+  // Authenticated controller dispatches the already-normalized event here;
+  // direct webhook callers retain token authentication in receiveWebhook.
+  async receiveNormalizedWebhook(event: NormalizedAsaasCheckoutWebhook) {
     const fingerprint = webhookFingerprint(event);
 
     try {
