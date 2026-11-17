@@ -12,7 +12,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { spawnSync } from 'node:child_process';
-import { chmodSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, readlinkSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, readlinkSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -45,14 +45,26 @@ echo "nginx $*" >> "$STUB_STATE/calls.log"
 case " $NGINX_FAIL_AT " in *" $n "*) echo "nginx: [emerg] configuracao recusada" >&2; exit 1;; esac
 exit 0`,
   // Fotografa o que o reload CARREGOU, nao so o que sobrou em disco no fim.
-  // A divergencia entre os dois e justamente a mina: disco com configuracao que
-  // nao valida e processo servindo outra coisa.
+  // A divergencia entre os dois e a mina: disco com configuracao que nao valida
+  // e processo servindo outra coisa.
+  //
+  // Duas sutilezas que decidem se esta prova vale:
+  //  - so registra quando o reload TEM SUCESSO. Um reload que falha nao carrega
+  //    nada; registrar antes da falha inventaria um estado que nunca foi servido.
+  //  - le o ALVO DO LINK habilitado, nao o arquivo do site. O Nginx serve o que
+  //    esta em sites-enabled; depois de um rollback que repontou o link, o site
+  //    e o servido sao arquivos diferentes.
   systemctl: `echo "systemctl $*" >> "$STUB_STATE/calls.log"
 case "$1 $2" in "reload nginx")
   n=$(( $(cat "$STUB_STATE/reload.count" 2>/dev/null || echo 0) + 1 ))
   echo "$n" > "$STUB_STATE/reload.count"
-  [ -f "$EVOLVIA_NGINX_SITE" ] && cp "$EVOLVIA_NGINX_SITE" "$STUB_STATE/carregado-$n"
   case " $RELOAD_FAIL_AT " in *" $n "*) echo "Job for nginx.service failed" >&2; exit 1;; esac
+  servido="$(readlink -f "$EVOLVIA_NGINX_LINK" 2>/dev/null || true)"
+  if [ -n "$servido" ] && [ -f "$servido" ]; then
+    cp "$servido" "$STUB_STATE/carregado-$n"
+  else
+    : > "$STUB_STATE/carregado-$n"
+  fi
   ;;
 esac
 exit 0`,
@@ -162,7 +174,7 @@ const confirmarIsolamento = (contexto) => {
   );
 };
 
-/** O conteudo que cada reload efetivamente carregou, na ordem. */
+/** O conteudo que cada reload BEM-SUCEDIDO carregou, na ordem. */
 const carregados = (contexto) => {
   const estado = contexto.caminhos.state;
   return readdirSync(estado)
@@ -316,8 +328,11 @@ for (const [rotulo, script] of [['homologacao', HOMOLOGACAO], ['staging-tls', ST
     const contexto = ambiente({ nginxFailAt: '2' }, t);
     executar(script, contexto);
     const estados = carregados(contexto);
-    assert.equal(estados.length > 0, true, 'nenhum reload foi executado');
-    assert.equal(estados.at(-1), readFileSync(contexto.caminhos.site, 'utf8'),
-      'o disco ficou com uma configuracao que o processo em execucao nunca carregou: o proximo reload falha');
+    assert.equal(estados.length > 0, true, 'nenhum reload bem-sucedido foi executado');
+    // Compara com o que o link habilitado serve agora, nao com o arquivo do site:
+    // e isso que o Nginx entregaria no proximo reload.
+    const servido = readFileSync(realpathSync(contexto.caminhos.link), 'utf8');
+    assert.equal(estados.at(-1), servido,
+      'o que esta habilitado agora nunca foi carregado por um reload bem-sucedido: o proximo reload falha');
   });
 }
