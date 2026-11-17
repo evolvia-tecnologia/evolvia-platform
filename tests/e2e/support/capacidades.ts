@@ -26,6 +26,9 @@ import type { Locator, Page } from '@playwright/test';
  *
  * Regra 3, da revisao independente na #571 (microcorte do #629): o detector tem
  * de ESPERAR de forma deterministica. Ver o comentario de `presente` abaixo.
+ *
+ * Regra 4, da auditoria do Work em 16/11/2026: o detector nao pode ter EFEITO
+ * COLATERAL. Ver temRotaDeCompraMultipla.
  */
 
 export type Capacidade = {
@@ -128,17 +131,37 @@ export function motivoDeSkip(capacidade: Capacidade): string {
  * por uma tela que ainda nao foi integrada. G2.10 e um dos oito criterios NAO
  * integrados do GATES_STATUS.json.
  *
- * Checa pelo status HTTP, nao por elemento: um 404 do Next ainda renderiza
- * pagina, e procurar elemento daria o mesmo resultado por motivo errado.
+ * Checa pelo STATUS HTTP, nao por elemento: um 404 do Next ainda renderiza
+ * pagina, entao procurar elemento daria o resultado certo pelo motivo errado.
  *
- * Nao precisou da espera deterministica da regra 3: o status da resposta ja e
- * um fato do momento da navegacao, nao algo que aparece depois.
+ * Por que `page.request.get` e nao `page.goto` -- regra 4
+ * ------------------------------------------------------
+ * A versao anterior usava `page.goto(rota, { waitUntil: 'commit' })`. Isso
+ * respondia a pergunta certa e cobrava um preco escondido: **navegava a pagina
+ * sob teste**. Este detector e chamado antes das jornadas, entao ele destruia o
+ * estado que o teste seguinte usava -- sessao na tela errada, DOM anterior
+ * perdido. Achado do Work na auditoria da #634.
+ *
+ * `page.request` compartilha cookies e storage do contexto, logo a sessao
+ * autenticada continua valendo, mas nenhuma navegacao acontece.
+ *
+ * Medido em Chromium, servidor local, pagina inicial em /a:
+ *
+ *   rota      | metodo  | status | url antes -> depois | DOM anterior
+ *   /existe   | goto    | 200    | /a -> /existe       | perdido
+ *   /existe   | request | 200    | /a -> /a            | preservado
+ *   /ausente  | goto    | 404    | /a -> /ausente      | perdido
+ *   /ausente  | request | 404    | /a -> /a            | preservado
+ *
+ * Status identico nos dois metodos, nas duas direcoes: a troca nao perde o
+ * sinal, so deixa de causar o efeito colateral. Redirecionamento continua
+ * sendo seguido, como no `goto`, para que o status final decida.
  */
 export async function temRotaDeCompraMultipla(page: Page, rota: string): Promise<Capacidade> {
   let existe = false;
   try {
-    const resposta = await page.goto(rota, { waitUntil: 'commit' });
-    existe = (resposta?.status() ?? 404) < 400;
+    const resposta = await page.request.get(rota);
+    existe = resposta.status() < 400;
   } catch { existe = false; }
   return {
     nome: 'rota publica de compra multipla (/inscricao/grupo)',
