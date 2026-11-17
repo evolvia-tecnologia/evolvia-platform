@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 
@@ -87,37 +87,22 @@ assert.ok(
   'As configurações Nginx canônicas não podem voltar a servir o domínio legado.',
 );
 
-// Varredura do repositório inteiro. Existe porque corrigir uma referência por
-// execução de CI prova apenas a última falha: aqui todas as pendências aparecem
-// de uma vez, com caminho e linha.
-const PASTAS_IGNORADAS = new Set([
-  '.git',
-  '.next',
-  '.turbo',
-  'build',
-  'coverage',
-  'dist',
-  'node_modules',
-  'out',
-  'visual-evidence',
-]);
+// Varredura do inventário rastreado pelo git: o mesmo conjunto que `git grep`
+// percorre. Existe porque corrigir uma referência por execução de CI prova
+// apenas a última falha — aqui todas as pendências aparecem de uma vez, com
+// caminho e linha. Binários são descartados por byte nulo, não por extensão.
+const TOKENS_LEGADOS = [
+  'bootstrap-dev-redirect',
+  'diagnose-dev-tls',
+  'evolvia-dev-redirect',
+  'DEV_REDIRECT_BOOTSTRAP',
+  'EVOLVIA_DEV_',
+];
 
-const EXTENSOES_TEXTO = new Set([
-  '.cjs',
-  '.conf',
-  '.js',
-  '.json',
-  '.jsx',
-  '.md',
-  '.mjs',
-  '.sh',
-  '.ts',
-  '.tsx',
-  '.txt',
-  '.yaml',
-  '.yml',
-]);
-
+// Única decisão de política, não de descoberta: o domínio nu é procurado apenas
+// em arquivos executáveis, para que registro histórico em Markdown siga
+// permitido. Os tokens acima nomeiam arquivos apagados e a chave administrativa
+// do alias: não têm uso legítimo em nenhum arquivo rastreado.
 const EXTENSOES_EXECUTAVEIS = new Set([
   '.cjs',
   '.conf',
@@ -132,17 +117,6 @@ const EXTENSOES_EXECUTAVEIS = new Set([
   '.yml',
 ]);
 
-// Tokens sem uso legítimo no repositório: nomeiam arquivos apagados e a chave
-// administrativa do alias. O domínio em si é procurado somente em arquivos
-// executáveis, para que registro histórico em Markdown continue permitido.
-const TOKENS_LEGADOS = [
-  'bootstrap-dev-redirect',
-  'diagnose-dev-tls',
-  'evolvia-dev-redirect',
-  'DEV_REDIRECT_BOOTSTRAP',
-  'EVOLVIA_DEV_',
-];
-
 // Exceções deliberadas. As três primeiras contêm os tokens dentro das próprias
 // invariantes negativas ou no registro de desativação.
 //
@@ -154,6 +128,10 @@ const TOKENS_LEGADOS = [
 //
 //   assert.ok(!workflow.includes('bash infra/certbot/diagnose-dev-tls.sh'), '...');
 //   assert.ok(!workflow.includes('Comprovar certificado e redirecionamento do alias dev'), '...');
+//
+// Nenhum arquivo de segurança está isento para contornar ocorrência: a única
+// residual do repositório foi corrigida na origem, em
+// scripts/validate-gate1-human-accessibility-evidence.test.mjs.
 const ISENTOS = new Set([
   'scripts/validate-readiness-contract.mjs',
   'apps/web/tests/security-headers.test.mjs',
@@ -161,42 +139,47 @@ const ISENTOS = new Set([
   '.github/workflows/validacao-v02.yml',
 ]);
 
-const LIMITE_BYTES = 2 * 1024 * 1024;
+const rastreados = execFileSync('git', ['ls-files', '-z'], {
+  cwd: raiz,
+  maxBuffer: 64 * 1024 * 1024,
+})
+  .toString('utf8')
+  .split('\0')
+  .filter(Boolean);
+
+assert.ok(
+  rastreados.length > 0,
+  'A varredura não obteve o inventário rastreado pelo git; sem ele não há prova de ausência.',
+);
+
 const residuos = [];
 
-const varrer = (diretorio) => {
-  for (const entrada of readdirSync(diretorio, { withFileTypes: true })) {
-    if (entrada.isDirectory()) {
-      if (!PASTAS_IGNORADAS.has(entrada.name)) {
-        varrer(`${diretorio}/${entrada.name}`);
-      }
-      continue;
-    }
-    if (!entrada.isFile()) {
-      continue;
-    }
+for (const relativo of rastreados) {
+  if (ISENTOS.has(relativo)) {
+    continue;
+  }
 
-    const absoluto = `${diretorio}/${entrada.name}`;
-    const relativo = absoluto.slice(raiz.length);
-    if (ISENTOS.has(relativo)) {
-      continue;
-    }
+  const absoluto = `${raiz}${relativo}`;
+  if (!existsSync(absoluto)) {
+    continue;
+  }
 
-    const ponto = entrada.name.lastIndexOf('.');
-    const extensao = ponto === -1 ? '' : entrada.name.slice(ponto);
-    if (!EXTENSOES_TEXTO.has(extensao)) {
-      continue;
-    }
-    if (statSync(absoluto).size > LIMITE_BYTES) {
-      continue;
-    }
+  const bruto = readFileSync(absoluto);
+  if (bruto.includes(0)) {
+    continue;
+  }
 
-    const procurados = EXTENSOES_EXECUTAVEIS.has(extensao)
-      ? [...TOKENS_LEGADOS, LEGACY_DOMAIN]
-      : TOKENS_LEGADOS;
+  const ponto = relativo.lastIndexOf('.');
+  const barra = relativo.lastIndexOf('/');
+  const extensao = ponto > barra ? relativo.slice(ponto) : '';
+  const procurados = EXTENSOES_EXECUTAVEIS.has(extensao)
+    ? [...TOKENS_LEGADOS, LEGACY_DOMAIN]
+    : TOKENS_LEGADOS;
 
-    const linhas = readFileSync(absoluto, 'utf8').split('\n');
-    linhas.forEach((linha, indice) => {
+  bruto
+    .toString('utf8')
+    .split('\n')
+    .forEach((linha, indice) => {
       for (const token of procurados) {
         if (linha.includes(token)) {
           residuos.push(`${relativo}:${indice + 1}: ${token}`);
@@ -204,10 +187,7 @@ const varrer = (diretorio) => {
         }
       }
     });
-  }
-};
-
-varrer(raiz.replace(/\/$/u, ''));
+}
 
 assert.deepEqual(
   residuos,
@@ -228,4 +208,6 @@ for (const relativo of SCRIPTS_CANONICOS) {
   execFileSync('bash', ['-n', caminho(relativo)], { stdio: 'pipe' });
 }
 
-console.log('Contratos operacionais de readiness e provas públicas canônicas validados; domínio legado ausente do repositório.');
+console.log(
+  `Contratos operacionais e provas públicas canônicas validados; ${rastreados.length} arquivos rastreados sem dependência do domínio legado.`,
+);
