@@ -12,7 +12,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { spawnSync } from 'node:child_process';
-import { chmodSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, readlinkSync, symlinkSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, readlinkSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -43,9 +43,17 @@ echo "$n" > "$STUB_STATE/nginx.count"
 echo "nginx $*" >> "$STUB_STATE/calls.log"
 case " $NGINX_FAIL_AT " in *" $n "*) echo "nginx: [emerg] configuracao recusada" >&2; exit 1;; esac
 exit 0`,
+  // Fotografa o que o reload CARREGOU, nao so o que sobrou em disco no fim.
+  // A divergencia entre os dois e justamente a mina: disco com configuracao que
+  // nao valida e processo servindo outra coisa.
   systemctl: `echo "systemctl $*" >> "$STUB_STATE/calls.log"
-case "$1 $2" in "reload nginx") case " $RELOAD_FAIL_AT " in *" $(( $(cat "$STUB_STATE/reload.count" 2>/dev/null || echo 0) + 1 )) "*) echo "$(( $(cat "$STUB_STATE/reload.count" 2>/dev/null || echo 0) + 1 ))" > "$STUB_STATE/reload.count"; echo "Job for nginx.service failed" >&2; exit 1;; esac
-  echo "$(( $(cat "$STUB_STATE/reload.count" 2>/dev/null || echo 0) + 1 ))" > "$STUB_STATE/reload.count";; esac
+case "$1 $2" in "reload nginx")
+  n=$(( $(cat "$STUB_STATE/reload.count" 2>/dev/null || echo 0) + 1 ))
+  echo "$n" > "$STUB_STATE/reload.count"
+  [ -f "$EVOLVIA_NGINX_SITE" ] && cp "$EVOLVIA_NGINX_SITE" "$STUB_STATE/carregado-$n"
+  case " $RELOAD_FAIL_AT " in *" $n "*) echo "Job for nginx.service failed" >&2; exit 1;; esac
+  ;;
+esac
 exit 0`,
   getent: `[ "$1" = "ahostsv4" ] && echo "${IPV4} STREAM $2"
 exit 0`,
@@ -55,8 +63,16 @@ exit 0`,
   // passaria mesmo com o defeito de caminho, que e justamente o que ele procura.
   curl: `echo "curl $*" >> "$STUB_STATE/calls.log"
 for a in "$@"; do case "$a" in *acme-challenge/*)
+  token="\${a##*/}"
+  alvo="$EVOLVIA_ACME_WEBROOT/.well-known/acme-challenge/$token"
+  plano="$EVOLVIA_ACME_WEBROOT/$token"
+  # Evidencia registrada ANTES da falha injetada: so assim o caso fail distingue
+  # "gravou no lugar errado" de "nunca gravou".
+  printf '%s aninhado=%s plano=%s conteudo=%s\\n' "$token" \\
+    "$([ -f "$alvo" ] && echo sim || echo nao)" \\
+    "$([ -f "$plano" ] && echo sim || echo nao)" \\
+    "$([ -f "$alvo" ] && cat "$alvo" || echo ausente)" >> "$STUB_STATE/probe.log"
   [ "$CURL_ACME" = "ok" ] || exit 22
-  alvo="$EVOLVIA_ACME_WEBROOT/.well-known/acme-challenge/\${a##*/}"
   [ -f "$alvo" ] || exit 22
   cat "$alvo"; exit 0;; esac; done
 exit 0`,
@@ -66,8 +82,9 @@ exit 0`,
   ss: 'exit 0',
 };
 
-function ambiente({ nginxFailAt = '', reloadFailAt = '', curlAcme = 'ok', comCertificado = true } = {}) {
+function ambiente({ nginxFailAt = '', reloadFailAt = '', curlAcme = 'ok', comCertificado = true } = {}, t) {
   const base = mkdtempSync(join(tmpdir(), 'evolvia-acme-'));
+  t?.after(() => rmSync(base, { recursive: true, force: true }));
   const caminhos = {
     site: join(base, 'etc/nginx/sites-available/evolvia-homologacao'),
     link: join(base, 'etc/nginx/sites-enabled/evolvia-homologacao'),
@@ -75,6 +92,7 @@ function ambiente({ nginxFailAt = '', reloadFailAt = '', curlAcme = 'ok', comCer
     certDir: join(base, 'etc/letsencrypt/live', DOMINIO),
     backups: join(base, 'opt/evolvia/backups'),
     envFile: join(base, 'opt/evolvia/environments/staging/.env'),
+    siteAnterior: join(base, 'etc/nginx/sites-available/evolvia-anterior'),
     stub: join(base, 'stub'),
     state: join(base, 'state'),
   };
@@ -89,7 +107,11 @@ function ambiente({ nginxFailAt = '', reloadFailAt = '', curlAcme = 'ok', comCer
   }
   // Pré-estado: o site ativo já serve a configuração anterior, e o link aponta para ele.
   writeFileSync(caminhos.site, `${MARCADOR}\n`);
-  symlinkSync(caminhos.site, caminhos.link);
+  // O link aponta para um alvo DISTINTO do site: se o script o repontar e nao
+  // restaurar, a diferenca aparece. Apontando para o mesmo arquivo, o caso
+  // passaria sem que houvesse restauracao alguma.
+  writeFileSync(caminhos.siteAnterior, `${MARCADOR}\n`);
+  symlinkSync(caminhos.siteAnterior, caminhos.link);
 
   for (const [nome, corpo] of Object.entries(STUBS)) {
     const alvo = join(caminhos.stub, nome);
@@ -134,6 +156,20 @@ const confirmarIsolamento = (contexto) => {
   );
 };
 
+/** O conteudo que cada reload efetivamente carregou, na ordem. */
+const carregados = (contexto) => {
+  const estado = contexto.caminhos.state;
+  return readdirSync(estado)
+    .filter((nome) => nome.startsWith('carregado-'))
+    .sort((esquerda, direita) => Number(esquerda.slice(10)) - Number(direita.slice(10)))
+    .map((nome) => readFileSync(join(estado, nome), 'utf8'));
+};
+
+const probes = (contexto) => {
+  const log = join(contexto.caminhos.state, 'probe.log');
+  return existsSync(log) ? readFileSync(log, 'utf8').trim().split('\n').filter(Boolean) : [];
+};
+
 const chamadas = (contexto) => {
   const log = join(contexto.caminhos.state, 'calls.log');
   return existsSync(log) ? readFileSync(log, 'utf8') : '';
@@ -156,7 +192,7 @@ const exigirOverrides = (script) => {
 
 const executar = (script, contexto) => {
   exigirOverrides(script);
-  const resultado = spawnSync('bash', [script], { env: contexto.env, encoding: 'utf8' });
+  const resultado = spawnSync('bash', [script], { env: contexto.env, encoding: 'utf8', timeout: 30_000 });
   confirmarIsolamento(contexto);
   return resultado;
 };
@@ -173,8 +209,8 @@ test('os scripts aceitam override de caminho, sem o qual nenhum teste pode isola
 });
 
 for (const [rotulo, script] of [['homologacao', HOMOLOGACAO], ['staging-tls', STAGING]]) {
-  test(`${rotulo}: probe ACME recusado preserva o site ativo byte a byte`, () => {
-    const contexto = ambiente({ curlAcme: 'fail' });
+  test(`${rotulo}: probe ACME recusado preserva o site ativo byte a byte`, (t) => {
+    const contexto = ambiente({ curlAcme: 'fail' }, t);
     const antes = readFileSync(contexto.caminhos.site, 'utf8');
     const resultado = executar(script, contexto);
     assert.notEqual(resultado.status, 0, 'o script tem de falhar quando o desafio nao responde');
@@ -182,46 +218,46 @@ for (const [rotulo, script] of [['homologacao', HOMOLOGACAO], ['staging-tls', ST
       'o site ativo foi deixado diferente do original apos a falha');
   });
 
-  test(`${rotulo}: recusa do nginx -t final preserva o site ativo byte a byte`, () => {
-    const contexto = ambiente({ nginxFailAt: '2' });
+  test(`${rotulo}: recusa do nginx -t final preserva o site ativo byte a byte`, (t) => {
+    const contexto = ambiente({ nginxFailAt: '2' }, t);
     const antes = readFileSync(contexto.caminhos.site, 'utf8');
     const resultado = executar(script, contexto);
     assert.notEqual(resultado.status, 0);
     assert.equal(readFileSync(contexto.caminhos.site, 'utf8'), antes);
   });
 
-  test(`${rotulo}: falha no reload do Nginx preserva o site ativo byte a byte`, () => {
-    const contexto = ambiente({ reloadFailAt: '1' });
+  test(`${rotulo}: falha no reload do Nginx preserva o site ativo byte a byte`, (t) => {
+    const contexto = ambiente({ reloadFailAt: '1' }, t);
     const antes = readFileSync(contexto.caminhos.site, 'utf8');
     const resultado = executar(script, contexto);
     assert.notEqual(resultado.status, 0);
     assert.equal(readFileSync(contexto.caminhos.site, 'utf8'), antes);
   });
 
-  test(`${rotulo}: falha restaura o link simbolico para o alvo anterior`, () => {
-    const contexto = ambiente({ curlAcme: 'fail' });
+  test(`${rotulo}: falha restaura o link simbolico para o alvo anterior`, (t) => {
+    const contexto = ambiente({ curlAcme: 'fail' }, t);
     const alvoAntes = readlinkSync(contexto.caminhos.link);
     executar(script, contexto);
     assert.equal(lstatSync(contexto.caminhos.link).isSymbolicLink(), true, 'o link deixou de ser link');
     assert.equal(readlinkSync(contexto.caminhos.link), alvoAntes, 'o link passou a apontar para outro alvo');
   });
 
-  test(`${rotulo}: falha nao remove certificado existente`, () => {
-    const contexto = ambiente({ curlAcme: 'fail' });
+  test(`${rotulo}: falha nao remove certificado existente`, (t) => {
+    const contexto = ambiente({ curlAcme: 'fail' }, t);
     executar(script, contexto);
     assert.equal(readFileSync(join(contexto.caminhos.certDir, 'fullchain.pem'), 'utf8'), 'certificado-existente\n');
     assert.equal(readFileSync(join(contexto.caminhos.certDir, 'privkey.pem'), 'utf8'), 'chave-existente\n');
   });
 
-  test(`${rotulo}: certificado existente nao dispara nova emissao`, () => {
-    const contexto = ambiente();
+  test(`${rotulo}: certificado existente nao dispara nova emissao`, (t) => {
+    const contexto = ambiente({}, t);
     executar(script, contexto);
     assert.doesNotMatch(chamadas(contexto), /certbot certonly/u,
       'houve emissao de certificado mesmo havendo um valido no lugar');
   });
 
-  test(`${rotulo}: caminho feliz instala a configuracao nova e recarrega`, () => {
-    const contexto = ambiente();
+  test(`${rotulo}: caminho feliz instala a configuracao nova e recarrega`, (t) => {
+    const contexto = ambiente({}, t);
     const resultado = executar(script, contexto);
     assert.equal(resultado.status, 0, resultado.stderr);
     const depois = readFileSync(contexto.caminhos.site, 'utf8');
@@ -229,8 +265,8 @@ for (const [rotulo, script] of [['homologacao', HOMOLOGACAO], ['staging-tls', ST
     assert.match(chamadas(contexto), /systemctl reload nginx/u);
   });
 
-  test(`${rotulo}: duas execucoes seguidas deixam o mesmo estado`, () => {
-    const contexto = ambiente();
+  test(`${rotulo}: duas execucoes seguidas deixam o mesmo estado`, (t) => {
+    const contexto = ambiente({}, t);
     assert.equal(executar(script, contexto).status, 0);
     const primeira = readFileSync(contexto.caminhos.site, 'utf8');
     assert.equal(executar(script, contexto).status, 0);
@@ -238,16 +274,34 @@ for (const [rotulo, script] of [['homologacao', HOMOLOGACAO], ['staging-tls', ST
       'a segunda execucao produziu estado diferente da primeira');
   });
 
-  test(`${rotulo}: o desafio ACME fica sob .well-known e nao sobra em sucesso nem em falha`, () => {
+  test(`${rotulo}: o desafio existe sob .well-known no momento do probe e nao sobra depois`, (t) => {
     for (const curlAcme of ['ok', 'fail']) {
-      const contexto = ambiente({ curlAcme });
+      const contexto = ambiente({ curlAcme }, t);
       executar(script, contexto);
-      const pedido = chamadas(contexto).match(/acme-challenge\/([^\s]+)/u);
-      assert.ok(pedido, `${curlAcme}: o script nao consultou o desafio`);
-      const esperado = join(contexto.caminhos.webroot, '.well-known/acme-challenge', pedido[1]);
-      assert.equal(existsSync(esperado), false, `${curlAcme}: o desafio sobrou em ${esperado}`);
-      assert.equal(existsSync(join(contexto.caminhos.webroot, pedido[1])), false,
-        `${curlAcme}: o desafio foi gravado fora de .well-known/acme-challenge, onde o Nginx nao o encontra`);
+      const registros = probes(contexto);
+      assert.equal(registros.length > 0, true, `${curlAcme}: o script nao consultou o desafio`);
+      for (const registro of registros) {
+        const token = registro.split(' ')[0];
+        // Medido DENTRO do stub, antes de qualquer falha injetada: distingue
+        // "gravou no lugar errado" de "nunca gravou".
+        assert.match(registro, /aninhado=sim/u,
+          `${curlAcme}: no momento do probe o desafio nao estava em .well-known/acme-challenge/`);
+        assert.match(registro, /plano=nao/u,
+          `${curlAcme}: o desafio foi gravado em ${'${WEBROOT}'}/${'${CHALLENGE}'}, onde o Nginx com root nao o encontra`);
+        assert.match(registro, new RegExp(`conteudo=${token}$`, 'u'),
+          `${curlAcme}: o conteudo servido nao corresponde ao token pedido`);
+        assert.equal(existsSync(join(contexto.caminhos.webroot, '.well-known/acme-challenge', token)), false,
+          `${curlAcme}: o desafio sobrou apos a execucao`);
+      }
     }
+  });
+
+  test(`${rotulo}: o estado carregado pelo Nginx nao diverge do que ficou em disco`, (t) => {
+    const contexto = ambiente({ nginxFailAt: '2' }, t);
+    executar(script, contexto);
+    const estados = carregados(contexto);
+    assert.equal(estados.length > 0, true, 'nenhum reload foi executado');
+    assert.equal(estados.at(-1), readFileSync(contexto.caminhos.site, 'utf8'),
+      'o disco ficou com uma configuracao que o processo em execucao nunca carregou: o proximo reload falha');
   });
 }
