@@ -13,6 +13,13 @@ Nginx e Certbot presentes no repositório não são aplicadas pelo deploy comum.
 Essa restrição deve ser preservada: ela impede que a chave do GitHub obtenha shell ou
 execute comandos arbitrários no servidor.
 
+> **Consequência que se repete em diagnósticos.** Como o wrapper não executa o
+> `deploy.sh` versionado, um cabeçalho público divergente — por exemplo `Server:
+> nginx/1.24.0` reprovando a prova "Versão do proxy exposta" — **não** se corrige
+> publicando commits. O `server_tokens off` já está nas configurações versionadas; o
+> que falta é a sincronização administrativa descrita em "Sincronização segura do
+> Nginx ativo". Atribuir essa classe de falha ao `deploy.sh` leva a conclusões erradas.
+
 ## Recuperação segura
 
 O script `infra/certbot/bootstrap-staging-tls.sh` deve ser executado uma única vez por
@@ -77,32 +84,26 @@ Se o Nginx local estiver correto e o HTTPS externo continuar indisponível, a po
 443 deve ser liberada na regra de entrada da rede Oracle para o endereço público do
 servidor. Essa alteração de rede não é feita automaticamente pelo script.
 
-## Endereço legado de desenvolvimento
+## Endereço legado de desenvolvimento (desativado)
 
-`dev.evolviatecnologia.com` não é um segundo ambiente e não pode servir uma cópia
-divergente da aplicação. Depois que o domínio resolver para o mesmo IPv4 da
-homologação, o deploy canônico ativa e valida automaticamente o redirecionamento TLS
-permanente para o domínio canônico. O comando abaixo permanece disponível para
-recuperação administrativa:
+`dev.evolviatecnologia.com` foi **desativado por decisão do PO**. O registro DNS foi
+removido pelo PO e as dependências versionadas saíram do repositório:
 
-```bash
-sudo env CERTBOT_EMAIL="SEU_EMAIL_DE_OPERACAO" \
-  bash /opt/evolvia/staging/current/infra/certbot/bootstrap-dev-redirect.sh
-```
+| Removido | O que era |
+| --- | --- |
+| `infra/certbot/bootstrap-dev-redirect.sh` | bootstrap de certificado e redirecionamento do alias |
+| `infra/certbot/diagnose-dev-tls.sh` | diagnóstico somente leitura do alias |
+| `infra/nginx/evolvia-dev-redirect.conf` | site Nginx do alias |
+| bloco `DEV_REDIRECT_BOOTSTRAP` em `deploy.sh` | invocação do bootstrap durante o deploy |
 
-O script cria configuração e certificado separados para o alias legado, preserva o
-site canônico, faz backup do alvo e do estado do link habilitado, valida `nginx -t`,
-recarrega o serviço e restaura exatamente a configuração anterior em caso de falha.
-HTTP e HTTPS respondem `308` para
-`https://homologacao.evolviatecnologia.com`, preservando caminho e consulta.
+**Não há procedimento de recuperação, e nenhum comando deve ser executado para esse
+alias.** `scripts/validate-readiness-contract.mjs` passou a exigir a ausência desses
+arquivos e de qualquer menção ao domínio legado em `deploy.sh` e nas configurações
+Nginx canônicas: reintroduzi-los reprova o CI.
 
-O e-mail é fornecido somente no ambiente administrativo e não deve ser salvo no Git.
-Quando ele não estiver disponível, o Certbot usa o modo não interativo sem contato;
-o Gate externo continua responsável por recusar certificado ausente, inválido ou
-perto da expiração. Depois da primeira emissão, execuções posteriores reutilizam o
-certificado existente e não consomem nova emissão.
+Se o alias voltar a resolver para o IPv4 da homologação por engano, o bloco
+`default_server` de `infra/nginx/evolvia.conf` responde `444` e encerra a conexão sem
+servir conteúdo.
 
-O deploy somente conclui depois que o diagnóstico comprova DNS, cadeia, SNI,
-hostname, validade, cabeçalhos defensivos e redirecionamentos HTTP/HTTPS `308`. A
-variável administrativa `EVOLVIA_DEV_REDIRECT_BOOTSTRAP=0` existe apenas como opt-out
-explícito para recuperação; o padrão permanece fail-closed e habilitado.
+O histórico das execuções anteriores permanece no Git e nos registros de CI; nada foi
+reescrito.
