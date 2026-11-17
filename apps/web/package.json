@@ -9,6 +9,7 @@
     "start": "next start -H 0.0.0.0 -p 3000"
   },
   "dependencies": {
+    "ckeditor5": "49.1.0",
     "next": "15.5.28",
     "react": "19.2.8",
     "react-dom": "19.2.8"

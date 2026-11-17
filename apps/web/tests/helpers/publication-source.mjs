@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { stripTypeScriptTypes } from 'node:module';
 
-const sources = new Set(['publication-text-style', 'public-rich-text', 'publication-rich-text-format']);
+const sources = new Set(['publication-text-style', 'public-rich-text', 'publication-rich-text-format', 'ckeditor-rich-text']);
 const urls = new Map();
 
 async function sourceUrl(name) {
@@ -10,6 +10,9 @@ async function sourceUrl(name) {
   let source = await readFile(new URL(`../../lib/${name}.ts`, import.meta.url), 'utf8');
   if (name !== 'publication-text-style') {
     source = source.replace(/['"]\.\/publication-text-style['"]/gu, JSON.stringify(await sourceUrl('publication-text-style')));
+  }
+  if (name === 'ckeditor-rich-text') {
+    source = source.replace(/['"]\.\/public-rich-text['"]/gu, JSON.stringify(await sourceUrl('public-rich-text')));
   }
   const url = `data:text/javascript;base64,${Buffer.from(stripTypeScriptTypes(source)).toString('base64')}`;
   urls.set(name, url);
