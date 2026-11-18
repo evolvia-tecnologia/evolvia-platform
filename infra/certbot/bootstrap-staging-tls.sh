@@ -309,7 +309,7 @@ ensure_certbot() {
   [[ -x "$CERTBOT_BIN" ]] || fail "Executável do Certbot ausente."
 }
 
-if [[ "$CERTIFICATE_PRESENT" == 0 ]]; then
+if [[ "$CERTIFICATE_PRESENT" == "0" ]]; then
   ensure_certbot
   "$CERTBOT_BIN" certonly --webroot --webroot-path "$WEBROOT" --cert-name "$DOMAIN" \
     --domain "$DOMAIN" --email "${CERTBOT_EMAIL:?Informe CERTBOT_EMAIL para emitir o certificado.}" --agree-tos --non-interactive --keep-until-expiring
