@@ -169,6 +169,27 @@ test('erro inesperado registra nome e frames sem mensagem, stack bruta nem URL c
   });
 });
 
+test('mensagem com várias linhas não entra nos frames', () => {
+  const continuations = [
+    'Linha invalida: pessoa@exemplo.test (clientes.csv:12:5)',
+    'at segredoDoBanco:12:34',
+    'detalhe (IDENTIFICADORDETESTE:1:1)',
+    'contexto (senha=valor-de-teste do usuario pessoa@exemplo.test)',
+    'chamada (https://api.exemplo.test/v1?token=abc:1:1)',
+    '    email: "pessoa@exemplo.test"',
+  ];
+  for (const continuation of continuations) {
+    const error = new Error(`cabeca\n${continuation}`);
+    error.stack = ['Error: cabeca', continuation, '    at real (/app/dist/x.js:3:1)'].join('\n');
+    const result = execute(error);
+    const entry = JSON.parse(result.logs[0][0]);
+    assert.deepEqual(entry.frames, ['/app/dist/x.js:3:1'], continuation);
+    assert.equal(result.logs[0][0].includes(continuation), false, continuation);
+    assert.equal(JSON.stringify(result.payload).includes('pessoa@exemplo.test'), false);
+    assert.equal(JSON.stringify(result.payload).includes('segredoDoBanco'), false);
+  }
+});
+
 test('corpo string de HttpException 500 não vaza na resposta nem no log', () => {
   const error = new HttpException('MARK_MESSAGE SELECT secret FROM documents', 500);
   error.stack = 'HttpException: MARK_MESSAGE\n    at boom (/app/dist/boom.js:4:1)';

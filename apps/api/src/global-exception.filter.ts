@@ -34,13 +34,17 @@ function safeExceptionName(exception: unknown): string | undefined {
 }
 
 /**
- * Frames de diagnóstico sem a linha da mensagem.
- * Mantém só localização (arquivo:linha:coluna); descarta nomes de função e a mensagem.
+ * Frames de diagnóstico a partir da primeira linha de stack.
+ * Uma mensagem com várias linhas fica antes disso e não vira localização.
+ * Mantém só arquivo:linha:coluna; descarta nomes de função e a mensagem.
  */
 function diagnosticFrames(exception: unknown): string[] {
   if (!(exception instanceof Error) || typeof exception.stack !== 'string') return [];
+  const lines = exception.stack.split('\n');
+  const start = lines.findIndex((line) => /^\s+at\s/u.test(line));
+  if (start < 0) return [];
   const frames: string[] = [];
-  for (const rawLine of exception.stack.split('\n').slice(1)) {
+  for (const rawLine of lines.slice(start)) {
     const line = rawLine.trim();
     const match = line.match(FRAME_WITH_PARENS) ?? (line.startsWith('at ') ? line.match(FRAME_BARE) : null);
     if (!match) continue;
