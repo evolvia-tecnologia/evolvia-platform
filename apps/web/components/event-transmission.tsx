@@ -121,7 +121,7 @@ function EventTransmissionForm({ eventId }: { eventId: string }) {
       {error && <p className={styles.error} id="transmission-error" role="alert">{error}</p>}
       {notice && <p role="status">{notice}</p>}
       {phase === 'loading' && <p role="status">Carregando a transmissão…</p>}
-      {unavailable && <Link className={local.foundation} href={`/eventos/${encodeURIComponent(eventId)}/configuracao`}>Abrir a fundação do evento</Link>}
+      {unavailable && <Link className={local.foundation} href={`/eventos/${encodeURIComponent(eventId)}/configuracao?review=foundation`}>Abrir a fundação do evento</Link>}
       {(phase === 'load-error' || phase === 'write-error' || unavailable) && <button type="button" onClick={() => setReload((value) => value + 1)}>Recarregar transmissão</button>}
       {!unavailable && <form className={styles.register} onSubmit={(event) => void save(event)}>
         <label>Forma

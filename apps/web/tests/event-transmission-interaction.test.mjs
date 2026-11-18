@@ -136,7 +136,8 @@ test('evento presencial explica a indisponibilidade e não oferece salvar', asyn
   }, async (tree) => {
     const view = JSON.stringify(tree.toJSON());
     assert.match(view, /somente para eventos online ou híbridos/u);
-    assert.match(view, /\/eventos\/evt-qa\/configuracao/u);
+    const foundation = tree.root.findAllByType('a').find((item) => /Abrir a fundação/.test(item.children.join('')));
+    assert.equal(foundation.props.href, '/eventos/evt-qa/configuracao?review=foundation');
     assert.equal(tree.root.findAllByType('form').length, 0);
     assert.equal(button(tree, 'Salvar transmissão'), undefined);
     assert.equal(button(tree, 'Remover link'), undefined);
@@ -153,6 +154,23 @@ test('validação recusada mantém mensagem útil e permite corrigir sem recarre
     assert.equal(title(tree).props.disabled, false);
     assert.equal(title(tree).props.value, '');
     assert.equal(tree.root.findByProps({ type: 'url' }).props['aria-invalid'], true);
+  });
+});
+
+test('título digitado sobrevive à recusa de validação do título', async () => {
+  await mount(async (_path, options) => {
+    if (!options?.method) return { transmission: null };
+    throw new ApiError('O título da transmissão não pode conter marcação.', 400);
+  }, async (tree) => {
+    await act(async () => {
+      title(tree).props.onChange({ target: { value: 'Sala <b>principal</b>' } });
+    });
+    assert.equal(title(tree).props.value, 'Sala <b>principal</b>');
+    await act(async () => { submit(tree); });
+    assert.match(JSON.stringify(tree.toJSON()), /título da transmissão/iu);
+    assert.equal(title(tree).props.value, 'Sala <b>principal</b>');
+    assert.equal(title(tree).props.disabled, false);
+    assert.equal(title(tree).props['aria-invalid'], true);
   });
 });
 

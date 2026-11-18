@@ -1,9 +1,12 @@
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 import { transmissionFieldFromApiMessage, transmissionUnavailable } from '../lib/transmission-availability.ts';
 
+const UNAVAILABLE = 'Transmissão disponível somente para eventos online ou híbridos';
+
 test('a frase da API identifica presencial e o campo recusado', () => {
-  const format = 'Transmissão disponível somente para eventos online ou híbridos. Altere o formato na Fundação do evento.';
+  const format = `${UNAVAILABLE}. Altere o formato na Fundação do evento.`;
   assert.equal(transmissionUnavailable(format), true);
   assert.equal(transmissionFieldFromApiMessage(format), null);
   assert.equal(transmissionUnavailable('Falha de carga'), false);
@@ -16,4 +19,16 @@ test('a frase da API identifica presencial e o campo recusado', () => {
   assert.equal(transmissionUnavailable(undefined), false);
   assert.equal(transmissionFieldFromApiMessage(null), null);
   assert.equal(transmissionFieldFromApiMessage(undefined), null);
+});
+
+test('a frase UNAVAILABLE permanece acoplada à API', async () => {
+  const [lib, service] = await Promise.all([
+    readFile(new URL('../lib/transmission-availability.ts', import.meta.url), 'utf8'),
+    readFile(new URL('../../api/src/transmission.service.ts', import.meta.url), 'utf8'),
+  ]);
+  assert.match(lib, new RegExp(UNAVAILABLE.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&')));
+  assert.ok(
+    service.includes(UNAVAILABLE),
+    'A frase da API mudou: atualize lib/transmission-availability.ts no mesmo PR.',
+  );
 });
