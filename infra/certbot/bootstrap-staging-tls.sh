@@ -29,9 +29,18 @@ fail() { printf '[EVOLVIA TLS] ERRO: %s\n' "$*" >&2; exit 1; }
 # cp -a preserva inclusive o alvo literal de links relativos ou pendentes.
 restore() {
   local dest="$1" saved="$2"
-  rm -f -- "$dest" || return 1
-  if [[ -e "$saved" || -L "$saved" ]]; then
-    cp -a -- "$saved" "$dest"
+  if [[ -f "$saved.absent" ]]; then
+    rm -f -- "$dest"
+  else
+    local tmpdir
+    tmpdir="$(mktemp -d -- "$(dirname "$dest")/.evolvia-rollback-XXXXXXXX")" || return 1
+    if cp -a -- "$saved" "$tmpdir/original" && mv -fT -- "$tmpdir/original" "$dest"; then
+      rmdir -- "$tmpdir"
+    else
+      rm -f -- "$tmpdir/original"
+      rmdir -- "$tmpdir"
+      return 1
+    fi
   fi
 }
 
@@ -41,11 +50,23 @@ finish() {
   set +e
   if [[ -n "$CHALLENGE_FILE" ]]; then rm -f -- "$CHALLENGE_FILE" || failed=1; fi
   if [[ "$code" != 0 && "$CONFIG_CHANGED" == 1 ]]; then
+    if [[ -z "$BACKUP_DIR" || ! -d "$BACKUP_DIR" || -L "$BACKUP_DIR" ]]; then
+      printf 'Rollback interrompido: diretório de backup indisponível. Preserve o site ativo.\n' >&2
+      exit 2
+    fi
+    local item
+    for item in site link hook old-link; do
+      if [[ "$item" == old-link && "$RETIRE_OLD" == 0 ]]; then continue; fi
+      if [[ ! -e "$BACKUP_DIR/$item" && ! -L "$BACKUP_DIR/$item" && ! -f "$BACKUP_DIR/$item.absent" ]]; then
+        printf 'Rollback interrompido: cópia de %s ausente em %s. Preserve o site ativo.\n' "$item" "$BACKUP_DIR" >&2
+        exit 2
+      fi
+    done
     restore "$NGINX_SITE" "$BACKUP_DIR/site" || failed=1
     restore "$NGINX_LINK" "$BACKUP_DIR/link" || failed=1
     if [[ "$RETIRE_OLD" == 1 ]]; then restore "$OLD_LINK" "$BACKUP_DIR/old-link" || failed=1; fi
     restore "$HOOK" "$BACKUP_DIR/hook" || failed=1
-    nginx -t && systemctl reload nginx || failed=1
+    if [[ "$failed" == 0 ]]; then nginx -t && systemctl reload nginx || failed=1; fi
     if [[ "$failed" == 0 ]]; then log "Configuração anterior restaurada e recarregada."; fi
   fi
   if [[ "$failed" != 0 ]]; then
@@ -66,7 +87,7 @@ for dir in "$WEBROOT" "$CERT_DIR"; do
 done
 [[ "$(id -u)" -eq 0 ]] || fail "Execute como root com sudo."
 
-for command in awk curl getent grep install nginx flock mktemp systemctl realpath cmp; do
+for command in awk curl getent grep install nginx flock mktemp systemctl realpath cmp mv rmdir; do
   command -v "$command" >/dev/null 2>&1 || fail "Comando necessário ausente: ${command}"
 done
 
@@ -121,6 +142,8 @@ snapshot() {
   if [[ -e "$path" || -L "$path" ]]; then
     [[ -L "$path" || -f "$path" ]] || fail "Arquivo inesperado em $path."
     cp -a -- "$path" "$BACKUP_DIR/$name"
+  else
+    : > "$BACKUP_DIR/$name.absent"
   fi
 }
 [[ ! -L "$NGINX_SITE" ]] || fail "Inspecione o link no lugar do arquivo de configuração."
@@ -289,8 +312,9 @@ CHALLENGE_FILE="$(mktemp "$WEBROOT/.well-known/acme-challenge/evolvia-acme-XXXXX
 token="${CHALLENGE_FILE##*/}"
 printf %s "$token" >"$CHALLENGE_FILE"
 chmod 0644 -- "$CHALLENGE_FILE"
-PUBLIC_CHALLENGE="$(curl -fsS --max-time 15 "http://${DOMAIN}/.well-known/acme-challenge/${token}")" \
-  || fail "A consulta HTTP ao desafio ACME de ${DOMAIN} falhou."
+if ! PUBLIC_CHALLENGE="$(curl -fsS --max-time 15 "http://${DOMAIN}/.well-known/acme-challenge/${token}")"; then
+  fail "A consulta HTTP ao desafio ACME de ${DOMAIN} falhou."
+fi
 [[ "$PUBLIC_CHALLENGE" == "$token" ]] || fail "O desafio ACME público retornou conteúdo inesperado."
 rm -- "$CHALLENGE_FILE"
 CHALLENGE_FILE=''
