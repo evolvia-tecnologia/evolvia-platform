@@ -1,0 +1,87 @@
+// Moderação de eventos pela plataforma (#665).
+//
+// Tabela ADITIVA e separada, por decisão registrada em 14/11: suspensão pela
+// plataforma não é cancelamento pelo organizador, e misturar as duas num mesmo
+// campo de `Event` perderia quem fez o quê. Aqui o estado de moderação vive ao
+// lado, com a fotografia do status original e a razão append-only.
+//
+// Sem relação declarada com `Event` ou `User` de propósito: `schema.prisma` é
+// compartilhado e o Work coordena. Os ids são guardados como texto, mesmo
+// padrão de `PlatformGrant` em `platform-master.prisma`.
+
+enum PlatformModerationState {
+  ATIVO
+  SUSPENSO
+  REMOVIDO
+}
+
+enum PlatformModerationAction {
+  SUSPENDER
+  LIBERAR
+  REMOVER
+  RESTAURAR
+}
+
+enum PlatformModerationClass {
+  FRAUDE_SUSPEITA
+  VIOLACAO_DE_REGRA
+  CONDUTA
+  ORDEM_JUDICIAL
+  PEDIDO_DO_ORGANIZADOR
+  OUTRO
+}
+
+/// Estado corrente. Uma linha por evento, criada só quandoहá primeira
+/// moderação — evento sem linha é ATIVO, e é isso que mantém a migration
+/// inofensiva para o que já existe.
+model PlatformEventModeration {
+  id                 String                    @id @default(cuid())
+  eventId            String                    @unique
+  organizationId     String                    @db.VarChar(64)
+  state              PlatformModerationState   @default(ATIVO)
+  /// Estado de moderação anterior à remoção, para a restauração devolver o que era.
+  previousState      PlatformModerationState?
+  /// Fotografia do `Event.status` de antes da primeira saída de ATIVO.
+  /// Nunca sobrescrita enquanto o estado não voltar a ATIVO: é ela que impede
+  /// um rascunho suspenso de voltar publicado.
+  originalEventStatus String?                  @db.VarChar(32)
+  lastAction         PlatformModerationAction?
+  lastClassification PlatformModerationClass?
+  lastReason         String                    @default("") @db.VarChar(200)
+  lastCaseRef        String                    @default("") @db.VarChar(64)
+  lastActorUserId    String                    @default("") @db.VarChar(64)
+  lastApproverUserId String                    @default("") @db.VarChar(64)
+  createdAt          DateTime                  @default(now())
+  updatedAt          DateTime                  @updatedAt
+
+  @@index([state, updatedAt])
+  @@index([organizationId, state])
+}
+
+/// Razão append-only. Nunca alterada nem apagada: reverter uma moderação é um
+/// registro NOVO, não um UPDATE no anterior. Guarda o antes e o depois dos dois
+/// estados — moderação e status do evento — para que a leitura responda o que
+/// mudou sem precisar inferir.
+model PlatformEventModerationEvent {
+  id                  String                   @id @default(cuid())
+  eventId             String
+  organizationId      String                   @db.VarChar(64)
+  action              PlatformModerationAction
+  fromState           PlatformModerationState
+  toState             PlatformModerationState
+  eventStatusBefore   String                   @db.VarChar(32)
+  eventStatusAfter    String                   @db.VarChar(32)
+  originalEventStatus String?                  @db.VarChar(32)
+  classification      PlatformModerationClass
+  reason              String                   @db.VarChar(200)
+  caseRef             String                   @db.VarChar(64)
+  actorUserId         String
+  /// Segunda aprovação, exigida para remover. Vazio nas ações que não a pedem.
+  approverUserId      String                   @default("") @db.VarChar(64)
+  correlationId       String                   @db.VarChar(64)
+  occurredAt          DateTime                 @default(now())
+
+  @@index([eventId, occurredAt])
+  @@index([occurredAt])
+  @@index([action, occurredAt])
+}
