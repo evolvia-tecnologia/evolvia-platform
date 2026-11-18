@@ -782,6 +782,7 @@ model EventIntegrationPreparation {
   accountLabel    String
   createdByUserId String
   createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
   withdrawnAt     DateTime?
 
   @@unique([eventId, code])

@@ -138,8 +138,8 @@ export class IntegrationFoundationService {
     const event = await this.requireEvent(userId, eventId);
     const items = await this.prisma.eventIntegrationPreparation.findMany({
       where: { eventId: event.id, organizationId: event.organizationId, withdrawnAt: null },
-      orderBy: { createdAt: 'desc' },
-      select: { code: true, accountLabel: true, createdAt: true },
+      orderBy: { updatedAt: 'desc' },
+      select: { code: true, accountLabel: true, createdAt: true, updatedAt: true },
     });
     return { items, outbound: false as const };
   }
@@ -150,6 +150,12 @@ export class IntegrationFoundationService {
     let accountLabel: string;
     try { accountLabel = normalizePreparationAccountLabel(input.accountLabel); }
     catch (error) { this.policy(error); }
+    const existing = await this.prisma.eventIntegrationPreparation.findFirst({
+      where: { eventId: event.id, organizationId: event.organizationId, code },
+      select: { id: true, accountLabel: true, withdrawnAt: true },
+    });
+    const reopened = Boolean(existing);
+    const previousLabelKept = existing ? existing.accountLabel === accountLabel : false;
     await this.prisma.eventIntegrationPreparation.upsert({
       where: { eventId_code: { eventId: event.id, code } },
       create: {
@@ -161,7 +167,12 @@ export class IntegrationFoundationService {
       },
       update: { accountLabel, withdrawnAt: null, createdByUserId: userId },
     });
-    await this.audit(event, userId, 'integration.preparation_opened', event.id, { code });
+    await this.audit(event, userId, 'integration.preparation_opened', event.id, {
+      code,
+      reopened,
+      labelChanged: reopened ? !previousLabelKept : false,
+      wasWithdrawn: Boolean(existing?.withdrawnAt),
+    });
     return { code, accountLabel, ...refuseProviderDelivery(), message: 'Preparação registrada. Nenhum dado é enviado ao provedor.' };
   }
 
