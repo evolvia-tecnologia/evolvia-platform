@@ -16,9 +16,10 @@ test('atributos de acessibilidade vão para o editable, não para o host vazio',
   assert.match(field, /describedBy=\{describedBy\}/u);
   assert.match(field, /invalid=\{Boolean\(shownError\)\}/u);
   assert.match(field, /required=\{required\}/u);
-  const host = field.slice(field.indexOf('className={styles.editor}'), field.indexOf('<PublicationCkEditor'));
-  assert.equal(/aria-labelledby/u.test(host), false);
-  assert.equal(/aria-invalid/u.test(host), false);
+  // Só a tag de abertura do host — o textarea de fallback pode ter ARIA.
+  const editorClassAt = field.indexOf('className={styles.editor}');
+  const hostOpen = field.slice(editorClassAt, field.indexOf('>', editorClassAt) + 1);
+  assert.equal(/aria-/u.test(hostOpen), false);
 });
 
 test('falha do ClassicEditor.create avisa e preserva o texto num textarea', () => {
