@@ -21,6 +21,7 @@ MODE="${1:-staging}"
 BACKUP_DIR=''
 CHALLENGE_FILE=''
 CONFIG_CHANGED=0
+RETIRE_OLD=0
 
 log() { printf '[EVOLVIA TLS] %s\n' "$*"; }
 fail() { printf '[EVOLVIA TLS] ERRO: %s\n' "$*" >&2; exit 1; }
@@ -65,7 +66,7 @@ for dir in "$WEBROOT" "$CERT_DIR"; do
 done
 [[ "$(id -u)" -eq 0 ]] || fail "Execute como root com sudo."
 
-for command in awk curl getent grep install nginx flock mktemp systemctl; do
+for command in awk curl getent grep install nginx flock mktemp systemctl realpath cmp; do
   command -v "$command" >/dev/null 2>&1 || fail "Comando necessário ausente: ${command}"
 done
 
@@ -127,10 +128,9 @@ snapshot() {
 snapshot "$NGINX_SITE" site
 snapshot "$NGINX_LINK" link
 snapshot "$HOOK" hook
-RETIRE_OLD=0
 if [[ "$OLD_LINK" != "$NGINX_LINK" && ( -L "$OLD_LINK" || -e "$OLD_LINK" ) ]]; then
   templates="$(dirname "${BASH_SOURCE[0]}")/../nginx"
-  [[ -L "$OLD_LINK" && "$(realpath -e "$OLD_LINK")" == "$OLD_SITE" ]] &&
+  [[ -L "$OLD_LINK" && -f "$OLD_LINK" && "$(realpath -e "$OLD_LINK")" == "$OLD_SITE" ]] &&
     { cmp -s "$OLD_SITE" "$templates/evolvia.conf" || cmp -s "$OLD_SITE" "$templates/evolvia-https.conf"; } ||
     fail "Site antigo de origem incerta em $OLD_LINK. Revise antes da migração."
   snapshot "$OLD_LINK" old-link
