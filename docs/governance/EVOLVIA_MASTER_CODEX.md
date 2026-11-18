@@ -1,5 +1,9 @@
 # Evolvia Master Codex
 
+## Registro operacional de 17/11/2026
+
+O gateway anunciou `c4512c2d` às 15h34 de São Paulo. O domínio canônico apresentou readiness da API e do PostgreSQL, HTTPS 200 e redirecionamento 308. O cabeçalho Server expôs a versão do Nginx. Work mantém o aceite operacional condicionado à recuperação [#108](https://github.com/evolvia-tecnologia/evolvia-platform/issues/108) e à prova independente do SHA servido. [job de publicação](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/44146606412/job/134271238197).
+
 ## Checkpoint de execução — 06/11/2026
 
 Direção do fundador e contratos em [#571/6685989083](https://github.com/evolvia-tecnologia/evolvia-platform/issues/571#issuecomment-6685989083). Work integra e mantém #637; Codex mantém compra múltipla/reembolso/confirmação/fiscal; Claude mantém #642 e operação/CAEX; Gemini recebe cartas/comunicações e #610 mediante ACK; Cursor retomado explicitamente para etiquetas #614→#647 e Sports #621→#648, em sessão contratada sem Cloud/cobrança nova. Um dono por conjunto de paths, transferências com SHA/ACK, compartilhados serializados. Esta direção substitui as atribuições históricas incompatíveis abaixo.

@@ -1,5 +1,9 @@
 # Estado dos Gates — 27/10/2026
 
+## Evidência de publicação em 17/11/2026
+
+O [job de publicação](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/44146606412/job/134271238197) registrou implantação de `c4512c2d`, prontidão e HTTPS 200. O gate público reprovou por exposição da versão do proxy. O redirecionamento HTTP 308 para o domínio canônico passou. A matriz conserva o histórico do cálculo abaixo. O campo `lastConfirmedDeployment` registra a implantação anunciada pelo gateway. A identificação independente do SHA servido e o aceite funcional seguem pendentes.
+
 ## Reconciliação vigente — 27/10/2026, 10h11 (São Paulo)
 
 Implementação **92,9%**; conclusão comprovada **70,0%**; **85/93** unidades integradas; **0/11 Gates encerrados**. Recálculo pelos mesmos 93 critérios e pesos iguais dos 11 Gates: 92,9154% de integração e 69,9707% de I/T/D/F. Nenhum marco foi alterado por refinamento, branch, comentário ou espera.

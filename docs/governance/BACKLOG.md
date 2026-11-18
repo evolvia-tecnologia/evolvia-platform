@@ -1,5 +1,9 @@
 # Backlog e ordem de execução — Modo Lançamento
 
+## Prioridade operacional em 17/11/2026
+
+Work coordena a recuperação [#108](https://github.com/evolvia-tecnologia/evolvia-platform/issues/108) e o corte conjunto com a suíte [#686](https://github.com/evolvia-tecnologia/evolvia-platform/pull/686). O operador autorizado deve inspecionar a configuração carregada, aplicar o corte validado com backup e rollback e repetir a prova externa de versão do proxy. Para habilitar o aceite das jornadas, correlacionar o SHA solicitado, o informado pelo gateway e o identificado no serviço ativo. A execução anterior está no [job de publicação](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/44146606412/job/134271238197).
+
 ## Fila vigente — 06/11/2026
 
 Contrato [#571/6685989083](https://github.com/evolvia-tecnologia/evolvia-platform/issues/571#issuecomment-6685989083) e decisão EVO-021 substituem a distribuição histórica de 05/11 abaixo. Base integrada: `49aeae51` (#637 e #647). Handoffs exigem ACK com SHA e arquivos; não reimplementar código integrado nem disputar caminhos ativos.

@@ -8,6 +8,10 @@ delivery_mode: "Modo Lançamento — EVO-015"
 active_phase: "Operação de inscrição e aceitação pública em homologação"
 ---
 
+## Homologação em 17/11/2026, 15h34 de São Paulo
+
+O gateway anunciou a implantação de `c4512c2deb2e406f888b6572c2ad3c4b9813c2ad` às 18h34min32s UTC. O runner observou readiness da API e do PostgreSQL, HTTPS 200, HTTP 308 com destino canônico, HSTS, nosniff, Referrer-Policy, SAMEORIGIN e ausência de X-Powered-By. A versão exposta em `Server: nginx/1.24.0 (Ubuntu)` reprovou o gate. O diagnóstico posterior do alias removido retornou 127 em etapa tolerante a falha. A resposta pública medida não identifica o SHA servido. A implantação de 06/11 e o registro de 27/10 são históricos. [job de publicação](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/44146606412/job/134271238197).
+
 ## Estado verificado — 06/11/2026
 
 - Base integrada: `develop@49aeae51e4f2b35eab08558ca9997a0ff900fc09`, com [#637](https://github.com/evolvia-tecnologia/evolvia-platform/pull/637) e [#647](https://github.com/evolvia-tecnologia/evolvia-platform/pull/647). Sugestão do primeiro nome editável, telefone internacional sem área oculta e etiquetas consistentes no posto/totem.

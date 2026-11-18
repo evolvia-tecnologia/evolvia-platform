@@ -2001,13 +2001,13 @@
     }
   ],
   "lastConfirmedDeployment": {
-    "sourceSha": "d0493a743690fad325c4c64646dd12a7ad345ae7",
-    "run": 40479956349,
-    "job": 122112460724,
-    "commitAtUtc": "2026-10-27T09:34:54Z",
-    "readinessAtUtc": "2026-10-27T09:34:56Z",
+    "sourceSha": "c4512c2deb2e406f888b6572c2ad3c4b9813c2ad",
+    "run": 44146606412,
+    "job": 134271238197,
+    "commitAtUtc": "2026-11-17T18:34:32Z",
+    "readinessAtUtc": "2026-11-17T18:34:34Z",
     "httpsStatus": 200,
     "publicGatePassed": false,
-    "note": "Implantação/prontidão comprovadas antes da falha Nginx/alias TLS. Sem Go de produção."
+    "note": "SHA anunciado pelo gateway. API/PostgreSQL prontos, HTTPS 200 e HTTP 308 canônico. Gate reprovado pela versão do Nginx em Server. Identificação independente do SHA servido pendente."
   }
 }
