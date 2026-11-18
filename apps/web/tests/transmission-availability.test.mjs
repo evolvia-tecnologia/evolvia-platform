@@ -9,6 +9,8 @@ test('a frase da API identifica presencial e o campo recusado', () => {
   const format = `${UNAVAILABLE}. Altere o formato na Fundação do evento.`;
   assert.equal(transmissionUnavailable(format), true);
   assert.equal(transmissionFieldFromApiMessage(format), null);
+  // Frase de formato + texto de campo: o curto-circuito de indisponível prevalece.
+  assert.equal(transmissionFieldFromApiMessage(`${UNAVAILABLE}. Informe um link https.`), null);
   assert.equal(transmissionUnavailable('Falha de carga'), false);
   assert.equal(transmissionFieldFromApiMessage('Informe um link https.'), 'url');
   assert.equal(transmissionFieldFromApiMessage('O link da transmissão precisa ser https, sem usuário e senha.'), 'url');
