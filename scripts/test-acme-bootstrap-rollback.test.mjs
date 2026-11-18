@@ -506,3 +506,42 @@ for (const [rotulo, script] of [['homologacao', HOMOLOGACAO], ['staging-tls', ST
     assert.equal(lstatSync(contexto.caminhos.linkLegado).isSymbolicLink(), true);
   });
 }
+
+// A conta ACME precisa de endereco de contato quando ha emissao (#108). Os casos
+// abaixo nao usam `executar`: a porta do e-mail deve recusar ANTES de criar o
+// backup, e `confirmarIsolamento` exige backup escrito. As duas guardas de
+// pre-spawn continuam valendo, e a prova de que a etapa alcancada foi a porta do
+// e-mail e a propria mensagem, nao um codigo de saida generico.
+const executarSemEmail = (script, contexto) => {
+  exigirOverrides(script);
+  exigirAusenciaDeCaminhosDeSistema(script);
+  delete contexto.env.CERTBOT_EMAIL;
+  return spawnSync('bash', [script], { env: contexto.env, encoding: 'utf8', timeout: 30_000 });
+};
+
+for (const [rotulo, script] of [['homologacao', HOMOLOGACAO], ['staging-tls', STAGING]]) {
+  test(`${rotulo}: emissao sem CERTBOT_EMAIL e recusada antes de chamar o certbot`, (t) => {
+    const contexto = ambiente({ comCertificado: false }, t);
+    const antes = readFileSync(contexto.caminhos.site, 'utf8');
+    const resultado = executarSemEmail(script, contexto);
+    assert.equal(resultado.signal, null, `morto por sinal (${resultado.signal}): a porta do e-mail nao foi exercitada`);
+    assert.equal(typeof resultado.status, 'number', 'o processo nao terminou com codigo de saida');
+    assert.notEqual(resultado.status, 0, 'o script emitiu certificado sem e-mail de contato');
+    assert.match(resultado.stderr, /CERTBOT_EMAIL/u,
+      `falhou por outro motivo que nao a ausencia de e-mail: ${resultado.stderr.trim()}`);
+    assert.doesNotMatch(chamadas(contexto), /certbot certonly/u,
+      'o certbot foi invocado mesmo sem e-mail de contato');
+    assert.doesNotMatch(chamadas(contexto), /register-unsafely-without-email/u,
+      'a conta ACME seria registrada sem endereco de contato, o que a #108 proibe');
+    assert.equal(readFileSync(contexto.caminhos.site, 'utf8'), antes,
+      'a recusa por falta de e-mail deixou o site ativo diferente do original');
+  });
+
+  test(`${rotulo}: certificado existente dispensa CERTBOT_EMAIL`, (t) => {
+    const contexto = ambiente({ comCertificado: true }, t);
+    const resultado = executarSemEmail(script, contexto);
+    exigirSucesso(resultado);
+    assert.doesNotMatch(chamadas(contexto), /certbot certonly/u,
+      'houve emissao havendo certificado valido no lugar');
+  });
+}
