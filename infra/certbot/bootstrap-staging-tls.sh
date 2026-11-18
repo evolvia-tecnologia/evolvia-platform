@@ -289,7 +289,8 @@ CHALLENGE_FILE="$(mktemp "$WEBROOT/.well-known/acme-challenge/evolvia-acme-XXXXX
 token="${CHALLENGE_FILE##*/}"
 printf %s "$token" >"$CHALLENGE_FILE"
 chmod 0644 -- "$CHALLENGE_FILE"
-PUBLIC_CHALLENGE="$(curl -fsS --max-time 15 "http://${DOMAIN}/.well-known/acme-challenge/${token}")"
+PUBLIC_CHALLENGE="$(curl -fsS --max-time 15 "http://${DOMAIN}/.well-known/acme-challenge/${token}")" \
+  || fail "A consulta HTTP ao desafio ACME de ${DOMAIN} falhou."
 [[ "$PUBLIC_CHALLENGE" == "$token" ]] || fail "O desafio ACME público retornou conteúdo inesperado."
 rm -- "$CHALLENGE_FILE"
 CHALLENGE_FILE=''
@@ -328,9 +329,11 @@ rm -f -- "$HOOK"
 install -m 0755 "$BACKUP_DIR/reload-hook" "$HOOK"
 curl -fsSI --max-time 15 "https://${DOMAIN}/" >/dev/null \
   || fail "A verificação HTTPS pública de ${DOMAIN} falhou após a recarga do Nginx."
+# O HTTPS já foi validado. Uma falha de renovação requer atenção sem desfazer o site ativo.
+CONFIG_CHANGED=0
 if [[ "${CERTBOT_SKIP_DRY_RUN:-0}" != 1 ]]; then
   ensure_certbot
-  "$CERTBOT_BIN" renew --cert-name "$DOMAIN" --dry-run
+  "$CERTBOT_BIN" renew --cert-name "$DOMAIN" --dry-run \
+    || fail "HTTPS ativo em ${DOMAIN}. O teste de renovação falhou. Confira os logs do Certbot."
 fi
-CONFIG_CHANGED=0
 log "HTTPS ativo em https://${DOMAIN}. Backup: ${BACKUP_DIR}"
