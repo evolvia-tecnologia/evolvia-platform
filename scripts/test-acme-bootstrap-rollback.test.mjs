@@ -12,7 +12,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { spawnSync } from 'node:child_process';
-import { chmodSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, readlinkSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, readlinkSync, realpathSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -159,6 +159,10 @@ function ambiente({ nginxFailAt = '', reloadFailAt = '', curlAcme = 'ok', comCer
   // passaria sem que houvesse restauracao alguma.
   writeFileSync(caminhos.siteAnterior, `${MARCADOR}\n`);
   symlinkSync(caminhos.siteAnterior, caminhos.link);
+  // Modo DISTINTO do 0644 que os scripts instalam: um rollback que faca
+  // `install -m 0644` restaura o conteudo e perde a permissao, e a diferenca
+  // precisa aparecer. Com 0644 no pre-estado, o caso passaria por coincidencia.
+  chmodSync(caminhos.site, 0o640);
 
   for (const [nome, corpo] of Object.entries(STUBS)) {
     const alvo = join(caminhos.stub, nome);
@@ -440,6 +444,16 @@ for (const [rotulo, script] of [['homologacao', HOMOLOGACAO], ['staging-tls', ST
     exigirFalhaNaEtapa(resultado, /certbot certonly/u.test(chamadas(contexto)), 'emissao do certificado');
     assert.equal(readFileSync(contexto.caminhos.site, 'utf8'), antes,
       'o site ativo foi deixado diferente do original apos falha de emissao');
+  });
+
+  test(`${rotulo}: falha restaura tambem a permissao do site ativo`, (t) => {
+    const contexto = ambiente({ curlAcme: 'fail' }, t);
+    const modoAntes = statSync(contexto.caminhos.site).mode & 0o777;
+    const resultado = executar(script, contexto);
+    exigirFalhaNaEtapa(resultado, probes(contexto).length > 0, 'consulta publica do desafio ACME');
+    const modoDepois = statSync(contexto.caminhos.site).mode & 0o777;
+    assert.equal(modoDepois.toString(8), modoAntes.toString(8),
+      'o rollback devolveu o conteudo mas nao a permissao: restaurar com `install -m 0644` fixo perde o modo anterior');
   });
 
   test(`${rotulo}: o estado carregado pelo Nginx nao diverge do que ficou em disco`, (t) => {
