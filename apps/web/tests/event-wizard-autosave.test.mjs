@@ -311,15 +311,16 @@ test('salvar e sair interrompe após três tentativas se o rascunho não estabil
   );
   await assert.rejects(
     saveCurrentDraftBeforeExit({
-      currentDraft: () => {
+      currentDraft: () => state.draftRef.current,
+      save: async (snapshot) => {
+        await save('identity', snapshot, { resumeOnStale: false });
         tick += 1;
         state.draftRef.current = { name: `v${tick}` };
-        return state.draftRef.current;
       },
-      save: (snapshot) => save('identity', snapshot, { resumeOnStale: false }),
     }),
     /mudou durante o salvamento/,
   );
+  assert.equal(tick, 3);
   assert.equal(state.requests.length, 3);
   assert.equal(state.resumes, 0);
 });
