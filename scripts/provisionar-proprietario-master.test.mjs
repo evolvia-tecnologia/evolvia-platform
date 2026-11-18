@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
-  LIMITE_DA_NOTA, MOTIVOS, decidirEntrada, hostDoBanco, literal, montarSql,
+  ATOR_DO_BOOTSTRAP, LIMITE_DA_NOTA, MOTIVOS, PREFIXO_DE_ATOR_SISTEMICO,
+  decidirEntrada, ehAtorSistemico, hostDoBanco, literal, montarSql,
 } from './provisionar-proprietario-master.policy.mjs';
 
 const URL_OK = 'postgresql://evolvia:senha@db.homologacao.interno:5432/evolvia?schema=public';
@@ -144,11 +145,34 @@ test('apóstrofo é escapado, não interpolado cru', () => {
 
 test('a trilha não atribui o ato ao próprio novo proprietário', () => {
   const sql = sqlBase();
-  assert.ok(sql.includes("'platform-bootstrap'"),
+  assert.ok(sql.includes(literal(ATOR_DO_BOOTSTRAP)),
     'registrar o alvo como ator afirmaria autoconcessão pela aplicação, que não ocorreu');
   assert.match(sql, /INSERT INTO "PlatformAuditLog"/u);
   assert.ok(sql.indexOf('INSERT INTO "PlatformAuditLog"') < sql.indexOf('COMMIT;'),
     'a trilha tem de ser gravada na mesma transação');
+});
+
+test('o relatório distingue ação sistêmica de ação humana por predicado', () => {
+  assert.equal(ehAtorSistemico(ATOR_DO_BOOTSTRAP), true);
+  assert.ok(ATOR_DO_BOOTSTRAP.startsWith(PREFIXO_DE_ATOR_SISTEMICO));
+  // Ids de pessoa são cuid: alfanuméricos, sem dois-pontos. Nenhum deles pode
+  // ser lido como sistêmico, nem o contrário.
+  for (const humano of ['ckv9q8r2p0000abcd1234efgh', 'c', 'usr_1', '', 'Sistema:x', 'sistema', ' sistema:x']) {
+    assert.equal(ehAtorSistemico(humano), false, `leu "${humano}" como sistêmico`);
+  }
+  for (const naoTexto of [undefined, null, 42, {}, ['sistema:x']]) {
+    assert.equal(ehAtorSistemico(naoTexto), false, `aceitou ${String(naoTexto)}`);
+  }
+  assert.equal(PREFIXO_DE_ATOR_SISTEMICO.includes(':'), true,
+    'o separador é o que garante não colidir com cuid, que não tem dois-pontos');
+  assert.equal(/^[a-z0-9]+$/u.test('ckv9q8r2p0000abcd1234efgh'), true,
+    'se cuid passar a aceitar dois-pontos, este namespace deixa de ser seguro');
+});
+
+test('o namespace sistêmico sobrevive ao escape para SQL', () => {
+  assert.equal(literal(ATOR_DO_BOOTSTRAP), `'${ATOR_DO_BOOTSTRAP}'`,
+    'dois-pontos não precisa de escape, e o literal não pode alterar o valor');
+  assert.ok(sqlBase().includes(`'${ATOR_DO_BOOTSTRAP}'`));
 });
 
 test('o pedido explícito remove a guarda de proprietário, e só ela', () => {
