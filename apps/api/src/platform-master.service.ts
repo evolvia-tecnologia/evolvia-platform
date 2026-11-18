@@ -59,6 +59,14 @@ export interface ContextoMaster {
  * plataforma. Lançar `{ erros }` cru fazia o filtro global descartar a lista
  * de problemas e responder uma frase genérica — ver o comentário em
  * `platform-master-validation.ts`.
+ *
+ * As rotas de concessão entregam `problemas`, que levam o CAMPO recusado até o
+ * `field` da resposta; as de visão geral, catálogo e relatório ainda entregam
+ * `erros`, que é só a frase. A assimetria é transitória e deliberada: os
+ * validadores daquelas três ainda não nomeiam o campo, e `recusaDeValidacao`
+ * aceita as duas formas para que a migração aconteça um validador por vez, sem
+ * que nenhuma rota pare de funcionar nem passe a afirmar um campo que ninguém
+ * informou.
  */
 @Injectable()
 export class PlatformMasterService {
@@ -225,7 +233,7 @@ export class PlatformMasterService {
   /** O resumo que a tela mostra ANTES de confirmar, montado no servidor. */
   async revisarConcessao(corpo: unknown) {
     const leitura = validarPedidoDeConcessao(corpo);
-    if (!leitura.ok) throw recusaDeValidacao(leitura.erros);
+    if (!leitura.ok) throw recusaDeValidacao(leitura.problemas);
     const nomes = await this.nomesDasPessoas(leitura.pedido.pessoas);
     return { pedido: leitura.pedido, resumo: resumoDaConcessao(leitura.pedido, nomes) };
   }
@@ -233,7 +241,7 @@ export class PlatformMasterService {
   /** Concede. Só o proprietário chega aqui: o guard aplica `decidir`. */
   async conceder(actorUserId: string, contexto: ContextoMaster, corpo: unknown) {
     const leitura = validarPedidoDeConcessao(corpo);
-    if (!leitura.ok) throw recusaDeValidacao(leitura.erros);
+    if (!leitura.ok) throw recusaDeValidacao(leitura.problemas);
     const pedido = leitura.pedido;
     const linhas = this.linhasDaConcessao(pedido);
 
@@ -280,7 +288,7 @@ export class PlatformMasterService {
    */
   async revogar(actorUserId: string, contexto: ContextoMaster, corpo: unknown) {
     const leitura = validarPedidoDeConcessao(corpo);
-    if (!leitura.ok) throw recusaDeValidacao(leitura.erros);
+    if (!leitura.ok) throw recusaDeValidacao(leitura.problemas);
     const pedido = leitura.pedido;
     const linhas = this.linhasDaConcessao(pedido);
 
