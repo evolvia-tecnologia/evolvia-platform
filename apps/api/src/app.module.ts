@@ -76,6 +76,8 @@ import { RegistrationCommercialController } from './registration-commercial.cont
 import { RegistrationCommercialService } from './registration-commercial.service';
 import { RegistrationBenefitsController } from './registration-benefits.controller';
 import { RegistrationBenefitsService } from './registration-benefits.service';
+import { RegistrationCouponBatchController } from './registration-coupon-batch.controller';
+import { RegistrationCouponBatchService } from './registration-coupon-batch.service';
 import { RegistrationReservationsController } from './registration-reservations.controller';
 import { RegistrationReservationsService } from './registration-reservations.service';
 import { RegistrationOrderCheckoutIntentService } from './registration-order-checkout-intent.service';
@@ -157,6 +159,7 @@ import { TransmissionService } from './transmission.service';
     RegistrationFormsController,
     RegistrationCommercialController,
     RegistrationBenefitsController,
+    RegistrationCouponBatchController,
     RegistrationReservationsController,
     RegistrationOperationsController,
     RegistrationWaitlistController,
@@ -234,6 +237,7 @@ import { TransmissionService } from './transmission.service';
     { provide: RegistrationTermsDocumentStorage, useClass: LocalRegistrationTermsDocumentStorage },
     RegistrationCommercialService,
     RegistrationBenefitsService,
+    RegistrationCouponBatchService,
     RegistrationReservationsService,
     RegistrationOrderCheckoutIntentService,
     RegistrationOrderCheckoutService,
