@@ -1,4 +1,60 @@
-# Estado dos Gates — 27/10/2026
+# Estado dos Gates
+
+## Fechamento Work — 14/11/2026, 00h de Brasília
+
+Checkpoint documental da rodada encerrada em 13/11. Sem novo crédito nos 93 critérios ou nos 11 Gates. A Área do Participante ainda não está liberada para aceite do fundador.
+
+| Frente / delta | SHA e prova disponível | I | T | D | F | Pendência |
+| --- | --- | --- | --- | --- | --- | --- |
+| Work / Área do Participante | #676 em d10e1daf; predecessor b2c46cb6 passou CI43524093940 incluindo HTTP/PostgreSQL e ARM64. Nova regressão após confirmar e-mail corrigida com 7 testes locais | — | Local no novo SHA; CI pendente | — | — | CI43549537351 e revisão independente final, implantação/readiness e navegador autenticado |
+| Cursor / visual público | #672 em942546f6; CI43464220927 verde | — | CI do candidato | — | — | Duas threads de acessibilidade e revisão final |
+| Codex / reembolso | #491 em af45d9d9, aberto em conflito | — | — | — | — | Reconciliação pelo dono e compensação simulada |
+| Claude / Master | #675, acesso pelo conector não retornou snapshot nesta conferência | — | — | — | — | Conferir PR/SHA e novo handoff antes de atribuir execução |
+| Gemini / parecer independente | Fila #641 sem novo ACK após ordem6865833165 | — | — | — | — | Parecer por SHA, sem presumir sessão iniciada |
+
+A revisão independente de b2c46cb6 encontrou que confirmar o e-mail fazia a lista e a abertura ignorarem o vínculo da inscrição criada pela conta. O delta de d10e1daf preserva esse vínculo em ambos os estados. O ensaio HTTP foi ampliado para confirmar o e-mail e conferir a mesma lista e abertura. O resultado desse novo ensaio segue pendente. Inscrições públicas legadas sem vínculo persistido, em eventos de terceiros, continuam com recuperação pendente e não receberam crédito funcional. A matriz anterior permanece no histórico.
+
+## Fechamento Work — 13/11/2026, 12h de Brasília
+
+Base conferida `develop@8741613681c55f60de93f6f6072d7ba1c5c895dc`. Integração mais recente observada é #673, ordem do cabeçalho público. Candidatos abaixo continuam em branches próprias. Este checkpoint acrescenta evidências e impedimentos à matriz de 93 critérios/11 Gates.
+
+A medição de 92,9% implementação, 70,0% conclusão comprovada e 85/93 unidades abaixo é histórica, de 27/10. Nenhum novo marco I/T/D/F foi atribuído neste fechamento. Falta evidência suficiente para recalcular a conclusão atual. Refinamentos de critérios já integrados conservam sua pontuação anterior. Área Master é acompanhada como requisito adicional de lançamento, fora do denominador vigente, até decisão formal de mapeamento.
+
+I = implementação integrada; T = testes do resultado; D = implantação comprovada do SHA com prontidão; F = jornada funcional e aceite. A tabela registra o delta desta rodada. O sinal — indica ausência de novo crédito e preserva os marcos históricos.
+
+| Critério afetado | Candidato / evidência | I | T | D | F | Impedimento e próxima ação |
+| --- | --- | --- | --- | --- | --- | --- |
+| G1.1 Fundação e persistência | #651 `48fe2817`, CI42846329565 verde; revisão final registrada, zero threads abertas | — | CI candidato verde | — | — | PR aberto. Tela ainda não chama PATCH schedule. Work integra o resultado vertical após estabilizar #662/#666 e ensaia salvar/reload. |
+| G1.1 Intervalo e áreas | #662 `80dc03a5`, CI42897067759 | — | Falha no job130115637802, Migration e integração | — | — | Claude resolve falhas PG e discussão pendente; Work confere SHA novo. |
+| G1.1 Datas/local publicados | #666 `d36d9285`, base na #662 | — | Sem run PR retornado para esse SHA | — | — | Quatro threads abertas. Claude estabiliza dependência e entrega HTTP/PG; Cursor liga UI ao contrato. |
+| G1.2 Recursos por perfil | #669 `e1953396`, CI43123672258 verde | — | CI candidato verde | — | — | Uma thread aberta sobre URL científica base. Cursor responde o achado e entrega SHA final. |
+| G1.6 Página pública e G1.8 EVA | #672 `9d7d9c5b`, CI43443144469 | — | Falha Web nos contratos de tipografia e espaçamento | — | — | Cursor corrige tokens em page.module.css, preserva medidas; duas threads aguardam encerramento fundamentado. Gemini revisa delta final. |
+| G2 Catálogo de categorias/lotes | #663 `1dd010da`, CI43176605897 | — | Falha no job131044112517, Migration e integração | — | — | Uma thread aberta. Claude trata job PG e revisão de reservas/pedidos/fila. Sem novo crédito em G2.1/G2.2. |
+| G2.11 Reembolso | #491 `af45d9d9` | — | Nenhum run PR retornado | — | — | Conflito com develop, dez threads abertas. Codex entrega reconciliação e compensação simulada. |
+| G5.8 / G6.8 / G7.4 Ciência | Fila #641, cartas #518, avisos #610 e lote #558 | — | Sem novo relatório localizado | — | — | Gemini entrega primeiro parecer defensivo por SHA e depois handoff científico. |
+| G10.4 / G10.6 Impressão e kits | #671 integrado antes deste checkpoint | — | Evidência anterior preservada | — | — | Falta ensaio autenticado de impressão, retirada e estorno. Sem novo F. |
+| Requisito adicional Master | branch claude/area-master-acesso `a33bf7ce` | — | Prisma/PGlite informados no handoff Work; políticas testadas na sessão Claude | — | — | Segunda migration presente na branch. Sem PR localizado nem run PR retornado. Faltam cerimônia, serviço/rotas, teste HTTP/PG e painel autenticado. |
+
+### Comparação visual e revisão independente
+
+Cursor registrou no corpo da #672 34 testes locais aprovados e navegador local usando a oferta pública do congresso ABCI. Em1366px, título36px, resumo16px, CTA14px e48px de altura. Em390/320px, título28px, sem rolagem horizontal. São medidas declaradas pelo autor. Medidas computadas anteriores e comparação independente antes/depois continuam pendentes. Homologação ainda serve “Comprar inscrição”; o novo “Inscrever-se” do evento misto permanece candidato.
+
+A revisão Gemini das threads dos PRs é distinta da auditoria defensiva pedida na #641. Nenhum relatório novo dessa auditoria foi localizado na #570 ou na fila #641. A falta já está registrada; comentário publicado não comprova início da sessão.
+
+### Área Master e equipe
+
+Políticas de visão geral, sessão e auditoria estão nos commits c2182cc0,245a372c e1e15bb44. Work acrescentou identidade, credenciais e sessões em a33bf7ce. Concessão global para eventos futuros, revogação na operação seguinte e segundo fator obrigatório continuam aceites a demonstrar pela rota. A regra de evento sem término precisa atender a decisão #665/comment6844177700. Painel visual, relatórios, moderação e delegação por eventos aguardam jornada persistida; políticas isoladas não fornecem primeiro acesso.
+
+### Homologação e roteiro de apresentação
+
+HTTP200 conferido em13/11 às11h59 de Brasília no congresso público. Resposta contém o nome do congresso, categoria Visitante e “Comprar inscrição”. O build SHA servido e a prontidão de API/PostgreSQL desse build não foram comprovados neste fechamento.
+
+Ensaio anterior Work #571/comment6854178712 percorreu página pública → formulário → Visitante → Acesso livre → resumo Gratuito. Cabeçalho na ordem Ajuda/Eventos/Área do participante/Área do organizador; EVA presente nas duas telas. Encerrado antes do aceite e da reserva. Sem inscrição confirmada por Work nessa rodada.
+
+Roteiro condicional de5–10min para reapresentar somente esse trecho observado: página pública e informações do congresso, acesso à ficha, seleção Visitante/Acesso livre, resumo gratuito e orientação contextual EVA. Realizar prévia imediatamente antes da apresentação. URL pública https://homologacao.evolviatecnologia.com/ctcfa-e9f3b61b5e75 e formulário https://homologacao.evolviatecnologia.com/evento/ctcfa-e9f3b61b5e75/inscricao . Em falha de acesso, apresentar o roteiro e o estado comprovado do Git como contingência; demonstração offline autenticada não foi preparada.
+
+Organizador: alteração/prorrogação aguardam integração e salvar/reload autenticados. Participante: seleção gratuita observada, confirmação e área própria pendentes. Operador/expositor/autor/avaliador: nenhuma jornada nova validada neste fechamento. Proprietário/equipe Master: acesso autenticado pendente. Pagamento, reembolso real, NFS-e, envio real e impressão física ficam pendentes de seus aceites próprios.
+
 
 ## Reconciliação vigente — 27/10/2026, 10h11 (São Paulo)
 
