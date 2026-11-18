@@ -1,0 +1,62 @@
+{
+  "schemaVersion": 1,
+  "gate": "GATE_1_PUBLIC_RELEASE",
+  "source": {
+    "sha": "156ca89f82f6314bdec4bf8c737b944e8d70654d",
+    "timestamp": "2026-09-09T15:00:00.000Z",
+    "baseUrl": "https://dev.evolviatecnologia.com/",
+    "origin": "https://dev.evolviatecnologia.com"
+  },
+  "automated": [
+    {
+      "id": "runtime_publico_e_reflow",
+      "status": "PASS",
+      "validator": "scripts/validate-public-accessibility-runtime.mjs",
+      "detail": "Validador concluído sem falhas."
+    },
+    {
+      "id": "arvore_acessivel",
+      "status": "PASS",
+      "validator": "scripts/validate-public-accessibility-tree.mjs",
+      "detail": "Validador concluído sem falhas."
+    },
+    {
+      "id": "espacamento_de_texto",
+      "status": "PASS",
+      "validator": "scripts/validate-public-text-spacing.mjs",
+      "detail": "Validador concluído sem falhas."
+    },
+    {
+      "id": "evidencia_visual",
+      "status": "PASS",
+      "validator": "scripts/capture-events-visual-evidence.mjs",
+      "detail": "Validador concluído sem falhas."
+    }
+  ],
+  "human": [
+    {
+      "id": "leitor_de_tela_nvda",
+      "status": "BLOCKED_HUMAN",
+      "detail": "Exige validação humana com NVDA; não é simulada por este agregador."
+    },
+    {
+      "id": "leitor_de_tela_voiceover",
+      "status": "BLOCKED_HUMAN",
+      "detail": "Exige validação humana com VoiceOver; não é simulada por este agregador."
+    }
+  ],
+  "administrative": [
+    {
+      "id": "https_publico_e_tls",
+      "status": "BLOCKED_ADMIN",
+      "detail": "Exige prova TLS pública e intervenção administrativa mantida fora desta execução."
+    }
+  ],
+  "summary": {
+    "pass": 4,
+    "fail": 0,
+    "blockedHuman": 2,
+    "blockedAdmin": 1
+  },
+  "decision": "NOT_AUTHORIZED"
+}
