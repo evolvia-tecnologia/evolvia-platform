@@ -20,7 +20,8 @@ type Work = {
   showAbstract: boolean;
   showEposter: boolean;
 };
-type Payload = { event: { name: string }; total: number; works: Work[] };
+type StationLogo = { url: string; alt: string; width: number; height: number };
+type Payload = { event: { name: string; logo: StationLogo | null }; total: number; page: number; pageSize: number; works: Work[] };
 
 const fields: Array<{ value: Field; label: keyof ReturnType<typeof stationLabels> }> = [
   { value: 'TITLE', label: 'fieldTitle' },
@@ -31,13 +32,34 @@ const fields: Array<{ value: Field; label: keyof ReturnType<typeof stationLabels
   { value: 'CODE', label: 'fieldCode' },
 ];
 
-async function readPayload(response: Response): Promise<Payload> {
+function stationLogo(slug: string, logo: unknown): StationLogo | null {
+  if (!logo || typeof logo !== 'object' || Array.isArray(logo)) return null;
+  const record = logo as { url?: unknown; alt?: unknown; width?: unknown; height?: unknown };
+  const expected = `/api/public/events/${encodeURIComponent(slug)}/media/LOGO`;
+  if (record.url !== expected) return null;
+  const size = (value: unknown) => typeof value === 'number' && value > 0 && value <= 8000 ? value : 0;
+  return {
+    url: expected,
+    alt: typeof record.alt === 'string' ? record.alt.slice(0, 300) : '',
+    width: size(record.width),
+    height: size(record.height),
+  };
+}
+
+async function readPayload(response: Response, slug: string): Promise<Payload> {
   const value: unknown = await response.json();
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('Não foi possível carregar a estação científica.');
-  const record = value as { error?: { message?: string }; event?: { name?: string }; works?: Work[]; total?: number };
-  if (!response.ok) throw new Error(record.error?.message ?? 'Estação científica indisponível.');
+  const record = value as { error?: { message?: string }; message?: unknown; event?: { name?: string; logo?: unknown }; works?: Work[]; total?: number; page?: number; pageSize?: number };
+  const failure = record.error?.message ?? (typeof record.message === 'string' ? record.message : null);
+  if (!response.ok) throw new Error(failure ?? 'Estação científica indisponível.');
   if (!record.event?.name || !Array.isArray(record.works)) throw new Error('Não foi possível carregar a estação científica.');
-  return { event: { name: record.event.name }, total: record.total ?? record.works.length, works: record.works };
+  return {
+    event: { name: record.event.name, logo: stationLogo(slug, record.event.logo) },
+    total: record.total ?? record.works.length,
+    page: record.page && record.page > 0 ? record.page : 1,
+    pageSize: record.pageSize && record.pageSize > 0 ? record.pageSize : 20,
+    works: record.works,
+  };
 }
 
 export default function ScientificStationSearch() {
@@ -64,8 +86,10 @@ export default function ScientificStationSearch() {
     setOrigin(window.location.origin);
     const search = new URLSearchParams();
     if (current) { search.set('field', selected); search.set('q', current); }
+    const page = query.get('pagina');
+    if (page) search.set('pagina', page);
     fetch(`/api/public/events/${encodeURIComponent(slug)}/station?${search.toString()}`, { cache: 'no-store' })
-      .then(readPayload)
+      .then((response) => readPayload(response, slug))
       .then(setPayload)
       .catch((reason) => setError(reason instanceof Error ? reason.message : copy.unavailable));
   }, [slug, queryKey, copy.unavailable]);
@@ -97,10 +121,38 @@ export default function ScientificStationSearch() {
     router.push(withLanguage(new URLSearchParams()));
   }
 
-  return <main className={styles.page}>
+  const requestedPage = searchParams.get('pagina');
+  const pageNumber = requestedPage && /^[1-9]\d{0,3}$/u.test(requestedPage) ? Number(requestedPage) : 1;
+  const pageSize = payload?.pageSize ?? 20;
+  const hasNext = Boolean(payload && pageNumber * pageSize < payload.total);
+
+  function listHref(nextPage: number) {
+    const search = new URLSearchParams(searchParams.toString());
+    if (nextPage <= 1) search.delete('pagina');
+    else search.set('pagina', String(nextPage));
+    const suffix = search.size ? `?${search.toString()}` : '';
+    return `/evento/${encodeURIComponent(slug)}/estacao${suffix}`;
+  }
+
+  return <>
+    <a className="skip-link" href="#conteudo-estacao">{copy.skip}</a>
+    <main id="conteudo-estacao" className={styles.page} tabIndex={-1}>
     <section className={styles.workspace}>
+      {payload && <header className={styles.identity}>
+        {payload.event.logo && <img
+          className={styles.logo}
+          src={payload.event.logo.url}
+          alt={payload.event.logo.alt}
+          width={payload.event.logo.width || undefined}
+          height={payload.event.logo.height || undefined}
+        />}
+        <div>
+          <p className={styles.eyebrow}>{copy.station}</p>
+          <p className={styles.identityName}>{payload.event.name}</p>
+        </div>
+      </header>}
       <div className={styles.topbar}>
-        <p className={styles.meta}>{copy.book}{payload ? ` — ${payload.event.name}` : ''}</p>
+        <p className={styles.meta}>{copy.book}</p>
         <div className={styles.topActions}>
           <div className={styles.langs} role="group" aria-label={copy.book}>
             {(['pt', 'es', 'en'] as const).map((item) => <Link className={styles.lang} aria-pressed={language === item} href={languageHref(item)} hrefLang={item} key={item}>{item.toUpperCase()}</Link>)}
@@ -113,27 +165,32 @@ export default function ScientificStationSearch() {
         <h1>{copy.listTitle}</h1>
         <p>{copy.listHelp}</p>
         <form onSubmit={submit}>
-          <div className={styles.filters}>
+          <fieldset className={styles.filters}>
+            <legend>{copy.fieldGroup}</legend>
             {fields.map((item) => <label key={item.value}><input type="radio" name="campo" value={item.value} checked={field === item.value} onChange={() => setField(item.value)} /> {copy[item.label]}</label>)}
             <button className={styles.clear} type="button" onClick={clearSelection}>{copy.clear}</button>
-          </div>
+          </fieldset>
           <div className={styles.form}>
-            <label className={styles.field}>{copy.fieldQuery}<input value={text} maxLength={80} onChange={(event) => setText(event.target.value)} /></label>
+            <label className={styles.field} htmlFor="estacao-busca">{copy.fieldQuery}<input id="estacao-busca" type="search" value={text} maxLength={80} onChange={(event) => setText(event.target.value)} /></label>
             <button className={styles.primary} type="submit">{copy.search}</button>
           </div>
         </form>
       </section>
       {error && <p className={styles.error} role="alert">{error}</p>}
-      {payload && <p className={styles.meta}>
-        {payload.total} {payload.total === 1 ? copy.publishedOne : copy.publishedMany}.
-        {payload.total > payload.works.length ? ` ${copy.refine}` : ''}
+      {payload && <p className={styles.meta} role="status">
+        {payload.total} {payload.total === 1 ? copy.publishedOne : copy.publishedMany}. {copy.pageLabel} {payload.page}.
+        {hasNext ? ` ${copy.more}` : ''}
       </p>}
-      <div className={styles.list}>
+      {(pageNumber > 1 || hasNext) && <nav className={styles.pager} aria-label={copy.pages}>
+        {pageNumber > 1 && <Link className={styles.secondary} href={listHref(pageNumber - 1)}>{copy.previous}</Link>}
+        {hasNext && <Link className={styles.secondary} href={listHref(pageNumber + 1)}>{copy.next}</Link>}
+      </nav>}
+      <div className={styles.list} role="list">
         {payload?.works.map((work) => {
           const downloadPath = `/api/public/events/${encodeURIComponent(slug)}/station/${work.code}/eposter?download=1`;
           const downloadUrl = origin ? `${origin}${downloadPath}` : downloadPath;
           const langSuffix = language === 'pt' ? '' : `?idioma=${language}`;
-          return <article className={styles.result} key={work.code}>
+          return <article className={styles.result} role="listitem" key={work.code}>
             <div className={styles.resultBody}>
               <div>
                 <h2><span className={styles.mark} aria-hidden="true" />{stationWorkHeading(work.code, work.formatCode, work.title)}</h2>
@@ -156,5 +213,6 @@ export default function ScientificStationSearch() {
         {payload && payload.works.length === 0 && <p className={styles.meta}>{copy.noResults}</p>}
       </div>
     </section>
-  </main>;
+  </main>
+  </>;
 }

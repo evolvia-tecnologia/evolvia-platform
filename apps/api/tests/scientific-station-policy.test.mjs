@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { ScientificStationPolicyError, normalizeStationSearch, stationFileName, stationAvailable } from '../src/scientific-station-policy.ts';
+import { ScientificStationPolicyError, normalizeStationPage, normalizeStationSearch, stationFileName, stationAvailable } from '../src/scientific-station-policy.ts';
 
 test('a busca da estação aceita os campos públicos e recusa conteúdo inseguro', () => {
   assert.deepEqual(normalizeStationSearch('author', '  Ana  '), { field: 'AUTHOR', text: 'Ana' });
@@ -23,6 +23,17 @@ test('a disponibilidade da estação exige publicação, perfil científico e en
   }
   assert.equal(stationAvailable({ ...event, slug: ' ' }), false);
   assert.equal(stationAvailable({ ...event, profileCode: null }), false);
+});
+
+test('a página da estação começa em 1 e recusa zero, texto e número alto', () => {
+  assert.equal(normalizeStationPage(undefined), 1);
+  assert.equal(normalizeStationPage(''), 1);
+  assert.equal(normalizeStationPage('2'), 2);
+  assert.equal(normalizeStationPage('500'), 500);
+  assert.throws(() => normalizeStationPage('0'), /Página inválida/u);
+  assert.throws(() => normalizeStationPage('01'), /Página inválida/u);
+  assert.throws(() => normalizeStationPage('501'), /Página inválida/u);
+  assert.throws(() => normalizeStationPage('duas'), /Página inválida/u);
 });
 
 test('id vazio retorna lista sem filtro e id preenchido permanece numérico', () => {

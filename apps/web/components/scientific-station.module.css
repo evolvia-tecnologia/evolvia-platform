@@ -5,13 +5,20 @@
 .eyebrow{font-size:var(--font-size-xs);font-weight:var(--font-weight-bold);letter-spacing:var(--letter-spacing-kicker);color:var(--color-brand-blue-700)}
 .card h1,.article h1{margin:var(--space-4) 0 var(--space-8);font-size:var(--font-size-4xl)}
 .card p,.result p,.meta{color:var(--color-text-muted);line-height:var(--line-height-body)}
-.filters{display:flex;flex-wrap:wrap;gap:var(--space-12);margin:var(--space-16) 0}
-.filters label{display:flex;align-items:center;gap:var(--space-8);font-size:var(--font-size-sm)}
+.filters{display:flex;flex-wrap:wrap;gap:var(--space-12);margin:var(--space-16) 0;border:0;padding:0;min-inline-size:0}
+.filters legend{width:100%;font-size:var(--font-size-sm);font-weight:var(--font-weight-bold)}
+.filters label{display:flex;align-items:center;gap:var(--space-8);min-height:44px;font-size:var(--font-size-sm)}
+.identity{display:flex;align-items:center;gap:var(--space-16);margin-bottom:var(--space-16);padding:var(--space-16) var(--space-20);background:var(--color-surface);border:1px solid var(--color-border);border-radius:var(--radius-lg)}
+.logo{display:block;width:auto;max-width:min(220px,46vw);height:auto;max-height:88px;object-fit:contain}
+.identityName{margin:0;color:var(--color-text);font-size:var(--font-size-2xl);font-weight:var(--font-weight-bold);line-height:var(--line-height-heading)}
+.pager{display:flex;flex-wrap:wrap;align-items:center;gap:var(--space-12);margin:var(--space-16) 0}
+.pager a{min-height:44px}
 .filters input{accent-color:var(--color-brand-blue-600)}
 .form{display:grid;grid-template-columns:1fr auto;gap:var(--space-12);align-items:end}
 .field{display:grid;gap:var(--space-4);font-size:var(--font-size-sm);font-weight:var(--font-weight-medium)}
 .field input{width:100%;box-sizing:border-box;border:1px solid var(--color-border-strong);border-radius:var(--radius-sm);padding:var(--space-8) var(--space-12);background:var(--color-surface);color:var(--color-text);font:inherit}
 .primary,.secondary,.back{border:0;border-radius:var(--radius-sm);padding:var(--space-12) var(--space-16);background:var(--color-brand-navy-950);color:var(--color-on-dark);font-weight:var(--font-weight-semibold);cursor:pointer;text-decoration:none;display:inline-flex;align-items:center}
+.primary,.secondary{min-height:44px}
 .secondary{background:var(--color-brand-blue-700)}
 .back{background:transparent;color:var(--color-text-muted);padding:0;margin-bottom:var(--space-12)}
 .field input:focus-visible,.primary:focus-visible,.secondary:focus-visible,.back:focus-visible{outline:3px solid var(--color-brand-blue-600);outline-offset:3px}

@@ -4,7 +4,7 @@ import { AuthorizationService } from './authorization.service';
 import { EVENT_EDITOR_ROLES } from './membership-policy';
 import { PrismaService } from './prisma.service';
 import { ScientificFileStorage } from './scientific-file.storage';
-import { ScientificStationPolicyError, StationSearchField, normalizeStationSearch, stationFileName } from './scientific-station-policy';
+import { STATION_PAGE_SIZE, ScientificStationPolicyError, StationSearchField, normalizeStationPage, normalizeStationSearch, stationFileName } from './scientific-station-policy';
 
 const ACCEPTED = [ScientificSubmissionStatus.ACCEPTED, ScientificSubmissionStatus.ACCEPTED_WITH_CHANGES];
 const SUBMISSION_ID = /^[a-z0-9]{10,40}$/u;
@@ -85,28 +85,35 @@ export class ScientificStationService {
     throw new ConflictException('Não foi possível reservar o id do resumo. Tente de novo.');
   }
 
-  async search(slug: string, field: unknown, text: unknown) {
+  async search(slug: string, field: unknown, text: unknown, pageRaw?: unknown) {
     let query: ReturnType<typeof normalizeStationSearch>;
-    try { query = normalizeStationSearch(field, text); }
-    catch (error) {
+    let page = 1;
+    try {
+      query = normalizeStationSearch(field, text);
+      page = normalizeStationPage(pageRaw);
+    } catch (error) {
       if (error instanceof ScientificStationPolicyError) throw new BadRequestException(error.message);
       throw error;
     }
     const event = await this.publishedEvent(slug);
     const where = this.searchWhere(event.id, event.organizationId!, query.field, query.text);
+    const pageSize = STATION_PAGE_SIZE;
     const [total, works] = await Promise.all([
       this.prisma.scientificSubmission.count({ where }),
       this.prisma.scientificSubmission.findMany({
         where,
         orderBy: [{ title: 'asc' }, { stationPublicCode: 'asc' }],
-        take: 50,
+        skip: (page - 1) * pageSize,
+        take: pageSize,
         select: this.workSelect(),
       }),
     ]);
     return {
-      event: { name: event.name, slug: event.slug },
+      event: this.eventIdentity(event),
       query,
       total,
+      page,
+      pageSize,
       works: works.map((work) => this.publicWork(work)),
     };
   }
@@ -161,10 +168,32 @@ export class ScientificStationService {
   private async publishedEvent(slug: string) {
     const event = await this.prisma.event.findFirst({
       where: { slug: { equals: slug, mode: 'insensitive' }, status: EventStatus.PUBLISHED, profileCode: EventProfileCode.SCIENTIFIC_EVENT },
-      select: { id: true, name: true, slug: true, organizationId: true },
+      select: {
+        id: true, name: true, slug: true, organizationId: true,
+        eventPublication: { select: { logoAsset: { select: { altText: true, decorative: true, state: true, usage: true, width: true, height: true } } } },
+      },
     });
     if (!event?.organizationId) throw new NotFoundException('Estação científica indisponível.');
     return event;
+  }
+
+  private eventIdentity(event: {
+    name: string;
+    slug: string;
+    eventPublication?: { logoAsset: { altText: string | null; decorative: boolean; state: string; usage: string; width: number; height: number } | null } | null;
+  }) {
+    const logo = event.eventPublication?.logoAsset;
+    const ready = logo?.state === 'ACTIVE' && logo.usage === 'LOGO';
+    return {
+      name: event.name,
+      slug: event.slug,
+      logo: ready ? {
+        url: `/api/public/events/${encodeURIComponent(event.slug)}/media/LOGO`,
+        alt: logo.decorative ? '' : logo.altText ?? '',
+        width: logo.width,
+        height: logo.height,
+      } : null,
+    };
   }
 
   private async visibleWork(eventId: string, organizationId: string, rawCode: string) {
