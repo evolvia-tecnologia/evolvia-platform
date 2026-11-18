@@ -528,3 +528,58 @@ for (const [action, index] of [['join', 8000], ['enroll', 8001]]) {
     }
   });
 }
+
+test('promoção relê a última vaga após três conflitos reais de serialização', async () => {
+  const target = await activity(home, 'Concorrência controlada', new Date('2026-11-02T16:00:00Z'));
+  const loser = reservation(home, 11000, 'CONFIRMED');
+  const winner = reservation(home, 11001, 'CONFIRMED');
+  await prisma.eventRegistrationReservation.createMany({ data: [loser, winner] });
+  const losingEntry = `q${run}serialA`;
+  const winningEntry = `q${run}serialB`;
+  await prisma.eventActivityWaitlistEntry.createMany({ data: [
+    queueRow(home, losingEntry, loser.id, target.id),
+    queueRow(home, winningEntry, winner.id, target.id),
+  ] });
+
+  // A leitura da entrada da fila fixa o snapshot da transação Serializable.
+  // A conexão independente altera a linha já lida antes da promoção tentar gravá-la.
+  let reads = 0;
+  const reader = namedClient(`fila-releitura-${run}`);
+  const synchronized = reader.$extends({
+    query: {
+      eventActivityWaitlistEntry: {
+        async findFirst({ args, query }) {
+          const entry = await query(args);
+          if (entry?.id !== losingEntry) return entry;
+          reads += 1;
+          if (reads <= 3) {
+            await prisma.eventActivityWaitlistEntry.update({
+              where: { id: losingEntry },
+              data: { updatedAt: new Date() },
+            });
+            if (reads === 3) await waitlist.promote(ownerId, home.eventId, winningEntry);
+          }
+          return entry;
+        },
+      },
+    },
+  });
+  try {
+    const service = new ActivityWaitlistService(synchronized, {}, new AuthorizationService(synchronized));
+    await assert.rejects(service.promote(ownerId, home.eventId, losingEntry), /Não há vaga restante/u);
+    assert.equal(reads, 4);
+    const enrolled = await prisma.eventActivityEnrollment.findMany({
+      where: { activityId: target.id }, select: { reservationId: true, status: true },
+    });
+    assert.deepEqual(enrolled, [{ reservationId: winner.id, status: 'ENROLLED' }]);
+    const waiting = await prisma.eventActivityWaitlistEntry.findUnique({ where: { id: losingEntry } });
+    assert.equal(waiting.status, 'WAITING');
+    const audits = await prisma.auditLog.findMany({
+      where: { eventId: home.eventId, action: 'activity.waitlist_promoted', entityId: { in: [losingEntry, winningEntry] } },
+      select: { entityId: true },
+    });
+    assert.deepEqual(audits, [{ entityId: winningEntry }]);
+  } finally {
+    await reader.$disconnect();
+  }
+});
