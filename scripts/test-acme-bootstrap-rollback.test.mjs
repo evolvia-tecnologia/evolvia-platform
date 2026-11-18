@@ -74,6 +74,9 @@ exit 0`,
 case "$1 $2" in "reload nginx")
   n=$(( $(cat "$STUB_STATE/reload.count" 2>/dev/null || echo 0) + 1 ))
   echo "$n" > "$STUB_STATE/reload.count"
+  # Seam de sabotagem: remove a copia de backup ANTES da falha, para que finish()
+  # encontre o backup incompleto e tenha de escolher entre restaurar lixo e parar.
+  if [ -n "$SABOTAR_BACKUP" ]; then rm -f "$EVOLVIA_BACKUP_ROOT"/ssl-homologacao-*/site; fi
   case " $RELOAD_FAIL_AT " in *" $n "*) echo "Job for nginx.service failed" >&2; exit 1;; esac
   servido="$(readlink -f "$EVOLVIA_NGINX_LINK" 2>/dev/null || true)"
   if [ -n "$servido" ] && [ -f "$servido" ]; then
@@ -107,7 +110,10 @@ for a in "$@"; do case "$a" in *acme-challenge/*)
 exit 0`,
   snap: 'exit 0',
   certbot: `echo "certbot $*" >> "$STUB_STATE/calls.log"
-case "$1" in certonly) [ -n "$CERTBOT_FAIL" ] && { echo "certbot: erro de emissao" >&2; exit 1; };; esac
+case "$1" in
+  certonly) [ -n "$CERTBOT_FAIL" ] && { echo "certbot: erro de emissao" >&2; exit 1; };;
+  renew) [ -n "$CERTBOT_RENEW_FAIL" ] && { echo "certbot: dry-run de renovacao recusado" >&2; exit 1; };;
+esac
 exit 0`,
   ss: 'exit 0',
   // staging-tls exige root por `[[ "$(id -u)" -eq 0 ]]`, e `id` vem do PATH:
@@ -124,7 +130,7 @@ exit 0`,
   sudo: 'exec "$@"',
 };
 
-function ambiente({ nginxFailAt = '', reloadFailAt = '', curlAcme = 'ok', comCertificado = true, certbotFail = '', legado = 'ausente' } = {}, t) {
+function ambiente({ nginxFailAt = '', reloadFailAt = '', curlAcme = 'ok', comCertificado = true, certbotFail = '', legado = 'ausente', pularDryRun = true, renovacaoFalha = '', sabotarBackup = '' } = {}, t) {
   const base = mkdtempSync(join(tmpdir(), 'evolvia-acme-'));
   t?.after(() => rmSync(base, { recursive: true, force: true }));
   const caminhos = {
@@ -194,8 +200,13 @@ function ambiente({ nginxFailAt = '', reloadFailAt = '', curlAcme = 'ok', comCer
       RELOAD_FAIL_AT: reloadFailAt,
       CURL_ACME: curlAcme,
       CERTBOT_FAIL: certbotFail,
+      CERTBOT_RENEW_FAIL: renovacaoFalha,
+      SABOTAR_BACKUP: sabotarBackup,
       CERTBOT_EMAIL: 'operacao@exemplo.invalid',
-      CERTBOT_SKIP_DRY_RUN: '1',
+      // Os casos existentes pulam o dry-run para nao medir a renovacao de graca.
+      // Os casos de renovacao o ligam de proposito: antes disso o ramo inteiro
+      // ficava fora da suite, e com ele a decisao de nao desfazer o HTTPS ativo.
+      CERTBOT_SKIP_DRY_RUN: pularDryRun ? '1' : '0',
       EVOLVIA_HOMOLOGATION_DOMAIN: DOMINIO,
       EVOLVIA_HOMOLOGATION_IPV4: IPV4,
       EVOLVIA_NGINX_SITE: caminhos.site,
@@ -543,5 +554,67 @@ for (const [rotulo, script] of [['homologacao', HOMOLOGACAO], ['staging-tls', ST
     exigirSucesso(resultado);
     assert.doesNotMatch(chamadas(contexto), /certbot certonly/u,
       'houve emissao havendo certificado valido no lugar');
+  });
+}
+
+// O dry-run de renovacao fica FORA dos casos acima: todos definem
+// CERTBOT_SKIP_DRY_RUN=1. Enquanto ficou fora, a suite nao sabia dizer se uma
+// falha de renovacao desfazia um HTTPS que ja estava publicamente validado — e
+// essa e exatamente a decisao de escopo pedida na revisao de #689. Os dois casos
+// abaixo ligam o ramo: o primeiro prova que ele e alcancado, o segundo prova que
+// uma falha dentro dele nao reverte o site ativo.
+for (const [rotulo, script] of [['homologacao', HOMOLOGACAO], ['staging-tls', STAGING]]) {
+  test(`${rotulo}: o teste de renovacao e realmente executado quando habilitado`, (t) => {
+    const contexto = ambiente({ pularDryRun: false }, t);
+    const resultado = executar(script, contexto);
+    exigirSucesso(resultado);
+    assert.match(chamadas(contexto), /certbot renew .*--dry-run/u,
+      'o ramo de renovacao nao foi alcancado: os casos de falha abaixo passariam a vazio');
+  });
+
+  test(`${rotulo}: falha no teste de renovacao nao desfaz o HTTPS ja validado`, (t) => {
+    const contexto = ambiente({ pularDryRun: false, renovacaoFalha: '1' }, t);
+    const original = readFileSync(contexto.caminhos.site, 'utf8');
+    const resultado = executar(script, contexto);
+
+    assert.equal(resultado.signal, null, `morto por sinal (${resultado.signal})`);
+    assert.notEqual(resultado.status, 0, 'a falha de renovacao passou como sucesso');
+    assert.match(chamadas(contexto), /certbot renew .*--dry-run/u,
+      'falhou antes da renovacao: o caso nao mediu o que pretende medir');
+    assert.match(resultado.stderr, /renova/iu,
+      `falhou por outro motivo que nao a renovacao: ${resultado.stderr.trim()}`);
+
+    // O ponto do caso. Antes da correcao, CONFIG_CHANGED ainda valia 1 aqui e o
+    // finish() restaurava a configuracao anterior, derrubando um HTTPS que o
+    // proprio script acabara de validar em publico.
+    const agora = readFileSync(contexto.caminhos.site, 'utf8');
+    assert.notEqual(agora, original,
+      'a falha de renovacao reverteu o site ativo para a configuracao anterior');
+    assert.match(agora, /ssl_certificate /u,
+      'o site ativo deixou de servir TLS depois de uma falha apenas de renovacao');
+    assert.equal(readlinkSync(contexto.caminhos.link), contexto.caminhos.site,
+      'o link habilitado deixou de apontar para o site ativo');
+    assert.doesNotMatch(resultado.stdout, /restaurada e recarregada/u,
+      'houve rollback de um HTTPS que ja estava validado');
+  });
+}
+
+// A guarda de integridade do backup em finish(): quando falta uma copia, restaurar
+// e pior do que parar, porque escreveria um estado que nunca existiu. Sem este caso
+// a guarda inteira ficava sem cobertura — remove-la nao quebrava nenhum teste.
+for (const [rotulo, script] of [['homologacao', HOMOLOGACAO], ['staging-tls', STAGING]]) {
+  test(`${rotulo}: backup incompleto interrompe o rollback em vez de restaurar parcial`, (t) => {
+    const contexto = ambiente({ reloadFailAt: '1', sabotarBackup: '1' }, t);
+    const resultado = executar(script, contexto);
+
+    assert.equal(resultado.signal, null, `morto por sinal (${resultado.signal})`);
+    assert.equal(resultado.status, 2,
+      `esperado codigo 2 de recuperacao interrompida, obtido ${resultado.status}: ${resultado.stderr.trim()}`);
+    assert.match(resultado.stderr, /Rollback interrompido/u,
+      `nao houve recusa explicita de restaurar backup incompleto: ${resultado.stderr.trim()}`);
+    assert.match(resultado.stderr, /\bsite\b/u,
+      'a recusa nao identifica qual copia estava ausente');
+    assert.doesNotMatch(resultado.stdout, /restaurada e recarregada/u,
+      'declarou restauracao concluida com o backup incompleto');
   });
 }
