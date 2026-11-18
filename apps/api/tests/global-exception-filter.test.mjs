@@ -100,14 +100,14 @@ test('não expõe mensagem ou stack de falha interna na resposta', () => {
   assert.equal(JSON.stringify(result.logs).includes('senha-interna'), false);
 });
 
-test('resposta e log 500 omitem code, campos, contexto, stack, query e caminho concreto', () => {
+test('resposta e log 500 omitem code, campos, contexto, mensagem, query e caminho concreto', () => {
   const error = new HttpException({
     code: 'MARK_CODE',
     message: 'MARK_MESSAGE SELECT secret FROM documents',
     fields: ['MARK_FIELD'],
     context: { document: 'MARK_CONTEXT' },
   }, 500);
-  error.stack = `Error: MARK_MESSAGE\n    at MARK_STACK (/tmp/filter.js:1:1)`;
+  error.stack = `Error: MARK_MESSAGE\n    at MARK_STACK (/tmp/filter.js:1:1)\n    at run (/app/dist/handler.js:9:2)`;
   const result = execute(error, {
     method: 'GET',
     originalUrl: '/pessoas/MARK_PERSON?token=MARK_TOKEN#MARK_FRAGMENT',
@@ -132,15 +132,22 @@ test('resposta e log 500 omitem code, campos, contexto, stack, query e caminho c
   assert.deepEqual(entry, {
     traceId: 'trc_test-123',
     status: 500,
+    name: 'HttpException',
     method: 'GET',
     route: '/pessoas/:id',
+    frames: ['/tmp/filter.js:1:1', '/app/dist/handler.js:9:2'],
   });
   assert.equal(result.logs[0][1], undefined);
 });
 
-test('erro inesperado não leva stack nem URL concreta ao log', () => {
+test('erro inesperado registra nome e frames sem mensagem, stack bruta nem URL concreta', () => {
   const error = new Error('MARK_MESSAGE');
-  error.stack = 'Error: MARK_MESSAGE\n    at MARK_STACK';
+  error.stack = [
+    'Error: MARK_MESSAGE',
+    '    at MARK_STACK (/app/dist/service.js:12:3)',
+    '    at processTicksAndRejections (node:internal/process/task_queues:95:5)',
+    '    at impure (https://evil.example/x.js:1:1)',
+  ].join('\n');
   const result = execute(error, {
     method: 'MARK_METHOD',
     originalUrl: '/cpf/MARK_PERSON?access=MARK_TOKEN',
@@ -154,6 +161,32 @@ test('erro inesperado não leva stack nem URL concreta ao log', () => {
   assert.deepEqual(JSON.parse(result.logs[0][0]), {
     traceId: 'trc_test-123',
     status: 500,
+    name: 'Error',
+    frames: [
+      '/app/dist/service.js:12:3',
+      'node:internal/process/task_queues:95:5',
+    ],
+  });
+});
+
+test('corpo string de HttpException 500 não vaza na resposta nem no log', () => {
+  const error = new HttpException('MARK_MESSAGE SELECT secret FROM documents', 500);
+  error.stack = 'HttpException: MARK_MESSAGE\n    at boom (/app/dist/boom.js:4:1)';
+  const result = execute(error);
+
+  assert.equal(result.status, 500);
+  assert.equal(result.payload.error.code, 'INTERNAL_ERROR');
+  assert.equal(
+    result.payload.error.message,
+    'Ocorreu um erro interno. Utilize o código de rastreamento ao solicitar suporte.',
+  );
+  assert.deepEqual(leaked(result), []);
+  assert.deepEqual(JSON.parse(result.logs[0][0]), {
+    traceId: 'trc_test-123',
+    status: 500,
+    name: 'HttpException',
+    method: 'POST',
+    frames: ['/app/dist/boom.js:4:1'],
   });
 });
 

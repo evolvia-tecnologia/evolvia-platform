@@ -8,6 +8,10 @@ import {
 } from '@nestjs/common';
 
 const HTTP_METHODS = new Set(['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS']);
+const SAFE_EXCEPTION_NAME = /^[A-Za-z][A-Za-z0-9._]{0,63}$/u;
+const SAFE_FRAME_LOCATION = /^[A-Za-z0-9._/\\:-]+$/u;
+const FRAME_WITH_PARENS = /\(([^()]+):(\d+):(\d+)\)$/u;
+const FRAME_BARE = /^at ([^()\s]+):(\d+):(\d+)$/u;
 
 function validatedMethod(method: unknown): string | undefined {
   if (typeof method !== 'string') return undefined;
@@ -19,8 +23,33 @@ function frameworkRouteTemplate(route: unknown): string | undefined {
   if (!route || typeof route !== 'object') return undefined;
   const path = (route as { path?: unknown }).path;
   if (typeof path !== 'string' || !path.startsWith('/')) return undefined;
-  if (/[?#]|:\/\//u.test(path)) return undefined;
+  if (!/^[A-Za-z0-9/_\-.:]*$/u.test(path)) return undefined;
   return path;
+}
+
+/** Nome da classe apenas — nunca a mensagem interpolada. */
+function safeExceptionName(exception: unknown): string | undefined {
+  if (!(exception instanceof Error)) return undefined;
+  return SAFE_EXCEPTION_NAME.test(exception.name) ? exception.name : undefined;
+}
+
+/**
+ * Frames de diagnóstico sem a linha da mensagem.
+ * Mantém só localização (arquivo:linha:coluna); descarta nomes de função e a mensagem.
+ */
+function diagnosticFrames(exception: unknown): string[] {
+  if (!(exception instanceof Error) || typeof exception.stack !== 'string') return [];
+  const frames: string[] = [];
+  for (const rawLine of exception.stack.split('\n').slice(1)) {
+    const line = rawLine.trim();
+    const match = line.match(FRAME_WITH_PARENS) ?? (line.startsWith('at ') ? line.match(FRAME_BARE) : null);
+    if (!match) continue;
+    const location = match[1];
+    if (!SAFE_FRAME_LOCATION.test(location) || /[?#]|:\/\//u.test(location)) continue;
+    frames.push(`${location}:${match[2]}:${match[3]}`);
+    if (frames.length >= 10) break;
+  }
+  return frames;
 }
 
 function defaultCode(status: number): string {
@@ -72,11 +101,15 @@ export class GlobalExceptionFilter implements ExceptionFilter {
     if (serverError) {
       const method = validatedMethod(request.method);
       const route = frameworkRouteTemplate(request.route);
+      const name = safeExceptionName(exception);
+      const frames = diagnosticFrames(exception);
       this.logger.error(JSON.stringify({
         traceId,
         status,
+        ...(name ? { name } : {}),
         ...(method ? { method } : {}),
         ...(route ? { route } : {}),
+        ...(frames.length ? { frames } : {}),
       }));
     }
 
