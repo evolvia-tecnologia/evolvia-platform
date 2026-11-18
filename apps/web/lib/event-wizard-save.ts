@@ -18,11 +18,18 @@ export type WizardSaveContext<T, P> = {
 };
 
 function sameInstant(left: unknown, right: unknown): boolean {
-  if (left == null && right == null) return true;
-  if (typeof left !== 'string' || typeof right !== 'string' || left === '' || right === '') return left === right;
-  const parsedLeft = Date.parse(left);
-  const parsedRight = Date.parse(right);
-  if (Number.isNaN(parsedLeft) || Number.isNaN(parsedRight)) return left === right;
+  const normalize = (value: unknown): unknown => {
+    if (value == null) return null;
+    if (typeof value === 'string' && value.trim() === '') return null;
+    return value;
+  };
+  const a = normalize(left);
+  const b = normalize(right);
+  if (a == null && b == null) return true;
+  if (typeof a !== 'string' || typeof b !== 'string') return a === b;
+  const parsedLeft = Date.parse(a);
+  const parsedRight = Date.parse(b);
+  if (Number.isNaN(parsedLeft) || Number.isNaN(parsedRight)) return a === b;
   return parsedLeft === parsedRight;
 }
 
@@ -80,17 +87,22 @@ export function wizardDatesConfirmed(
     && zone(snapshot.timeZone) === zone(server.timeZone);
 }
 
+const EXIT_SAVE_ATTEMPTS = 3;
+
 /** Sai só quando o rascunho enviado ainda é o rascunho visível depois da resposta. */
 export async function saveCurrentDraftBeforeExit<T>(input: {
   currentDraft: () => T;
   save: (snapshot: T) => Promise<void>;
+  maxAttempts?: number;
 }): Promise<void> {
-  for (;;) {
+  const maxAttempts = input.maxAttempts ?? EXIT_SAVE_ATTEMPTS;
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
     const snapshot = input.currentDraft();
     const snapshotJson = JSON.stringify(snapshot);
     await input.save(snapshot);
     if (JSON.stringify(input.currentDraft()) === snapshotJson) return;
   }
+  throw new Error('O rascunho mudou durante o salvamento. Confira os valores e tente de novo.');
 }
 
 /** A saída só segue depois de um salvamento aceito. A falha permanece nesta tela. */
@@ -107,8 +119,19 @@ export function wizardSaveLabel(input: { hasEvent: boolean; saveState: string; d
   return 'Tudo salvo';
 }
 
+export type QueueWizardSaveOptions = {
+  /** Autosave usa retentativa via resume; saída/salvar explícito deixa o laço como único dono. */
+  resumeOnStale?: boolean;
+};
+
 // Compartilhado pelo Wizard e pelos testes, sem dependência do ciclo de renderização.
-export function queueWizardSave<T, P>(targetStep: string, snapshot: T, context: WizardSaveContext<T, P>): Promise<void> {
+export function queueWizardSave<T, P>(
+  targetStep: string,
+  snapshot: T,
+  context: WizardSaveContext<T, P>,
+  options?: QueueWizardSaveOptions,
+): Promise<void> {
+  const resumeOnStale = options?.resumeOnStale !== false;
   const snapshotJson = JSON.stringify(snapshot);
   const operation = context.queue.current.then(async () => {
     if (!context.getDirty() && context.savedStep.current === targetStep) return;
@@ -133,7 +156,7 @@ export function queueWizardSave<T, P>(targetStep: string, snapshot: T, context: 
       context.savedStep.current = targetStep;
       context.setDirty(!stillCurrent);
       if (stillCurrent) context.setSaveState('saved');
-      else context.resume?.();
+      else if (resumeOnStale) context.resume?.();
     } catch (reason) {
       context.setSaveState('error');
       if (context.isConflict(reason)) {
