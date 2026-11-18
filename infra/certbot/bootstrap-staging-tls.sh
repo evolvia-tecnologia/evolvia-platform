@@ -109,7 +109,7 @@ if [[ -s "${CERT_DIR}/fullchain.pem" && -s "${CERT_DIR}/privkey.pem" ]]; then
   CERTIFICATE_PRESENT=1
 fi
 
-if [[ "$CERTIFICATE_PRESENT" == "0" && -z "${CERTBOT_EMAIL:-}" && "$MODE" == staging ]]; then
+if [[ "$CERTIFICATE_PRESENT" == "0" && -z "${CERTBOT_EMAIL:-}" ]]; then
   fail "Informe CERTBOT_EMAIL para emitir o certificado e receber avisos da conta ACME."
 fi
 
@@ -311,10 +311,8 @@ ensure_certbot() {
 
 if [[ "$CERTIFICATE_PRESENT" == 0 ]]; then
   ensure_certbot
-  contact=(--register-unsafely-without-email)
-  if [[ -n "${CERTBOT_EMAIL:-}" ]]; then contact=(--email "$CERTBOT_EMAIL"); fi
   "$CERTBOT_BIN" certonly --webroot --webroot-path "$WEBROOT" --cert-name "$DOMAIN" \
-    --domain "$DOMAIN" "${contact[@]}" --agree-tos --non-interactive --keep-until-expiring
+    --domain "$DOMAIN" --email "${CERTBOT_EMAIL:?Informe CERTBOT_EMAIL para emitir o certificado.}" --agree-tos --non-interactive --keep-until-expiring
   [[ -s "$CERT_DIR/fullchain.pem" && -s "$CERT_DIR/privkey.pem" ]] || fail "Emissão incompleta."
   activate "$BACKUP_DIR/nginx-https.conf"
 fi
@@ -328,7 +326,8 @@ EOF
 if [[ ! -d "$HOOKS_DIR" ]]; then install -d -m 0755 -- "$HOOKS_DIR"; fi
 rm -f -- "$HOOK"
 install -m 0755 "$BACKUP_DIR/reload-hook" "$HOOK"
-curl -fsSI --max-time 15 "https://${DOMAIN}/" >/dev/null
+curl -fsSI --max-time 15 "https://${DOMAIN}/" >/dev/null \
+  || fail "A verificação HTTPS pública de ${DOMAIN} falhou após a recarga do Nginx."
 if [[ "${CERTBOT_SKIP_DRY_RUN:-0}" != 1 ]]; then
   ensure_certbot
   "$CERTBOT_BIN" renew --cert-name "$DOMAIN" --dry-run
