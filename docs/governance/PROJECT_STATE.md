@@ -8,6 +8,14 @@ delivery_mode: "Modo Lançamento — EVO-015"
 active_phase: "Operação de inscrição e aceitação pública em homologação"
 ---
 
+## Integração verificada — 09/11/2026 (Work)
+
+- **Develop integrado:** `1aa30453e0d43665cba15356e23c3207c320c6aa` (squash do [PR #648](https://github.com/evolvia-tecnologia/evolvia-platform/pull/648), candidato Cursor `ee4c60a9dc8b5a714cec9daaa7fe87706926c809`), em 09/11 às 20h14 UTC. Página pública da Corrida e editor de modalidades usam as seções e a ficha já publicadas, sem estoque paralelo nem cobrança.
+- **Prova de candidato:** [CI 42685499782](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/42685499782) completo aplicável aprovado; revisão independente do delta [5832058817](https://github.com/evolvia-tecnologia/evolvia-platform/pull/648#pullrequestreview-5832058817) sem bloqueadores na inspeção do Work, 0 threads abertas e merge por SHA esperado. O Cursor apresentou prova Chrome320/390 de nomes longos; o Work não repetiu ensaio de navegador.
+- **Prova pós-merge separada:** [run 42690987564](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/42690987564) estava em andamento na última consulta. Não afirmar deploy, readiness, impressão física, reserva/retirada de camiseta ou aceite humano sem evidência.
+- **Encadeamento atual:** #642 operadores/capacidades depende de CI/revisão de novo SHA e encerramento de duas threads; #652 confirmação da etiqueta aguarda backend #642 integrado e prova autenticada; #491 compensação financeira permanece sem estorno confirmado; Gemini #518/#610/#558 aguardam entrega verificável.
+- **Medição:** sem recálculo I/T/D/F de 93 critérios e 11 Gates nesta atualização. A integração de uma experiência Sports não encerra a jornada do atleta nem concede novos marcos sem demonstração.
+
 ## Estado verificado — 06/11/2026
 
 - Base integrada: `develop@49aeae51e4f2b35eab08558ca9997a0ff900fc09`, com [#637](https://github.com/evolvia-tecnologia/evolvia-platform/pull/637) e [#647](https://github.com/evolvia-tecnologia/evolvia-platform/pull/647). Sugestão do primeiro nome editável, telefone internacional sem área oculta e etiquetas consistentes no posto/totem.
