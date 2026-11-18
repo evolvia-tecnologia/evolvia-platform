@@ -24,6 +24,31 @@
 /** Limite da coluna `provisionedByNote` em `PlatformMasterIdentity`. */
 export const LIMITE_DA_NOTA = 200;
 
+/**
+ * Namespace dos atores que NÃO são pessoas.
+ *
+ * O relatório de auditoria precisa separar ação humana de ação sistêmica, e
+ * comparar com uma string solta espalharia a mesma literal por cada consulta.
+ * Um prefixo resolve melhor que um valor único: a próxima ação sistêmica que
+ * aparecer — reconciliação, rotina agendada, webhook — cabe aqui sem alterar o
+ * predicado.
+ *
+ * O prefixo não pode colidir com id de pessoa: `User.id` é `cuid()`, que é
+ * alfanumérico e não contém dois-pontos. Há teste prendendo isso.
+ */
+export const PREFIXO_DE_ATOR_SISTEMICO = 'sistema:';
+
+/** Ator desta operação de bootstrap. */
+export const ATOR_DO_BOOTSTRAP = `${PREFIXO_DE_ATOR_SISTEMICO}bootstrap-master`;
+
+/**
+ * Para o relatório decidir se a linha foi ação de pessoa ou do sistema, sem
+ * reimplementar a comparação em cada consulta.
+ */
+export function ehAtorSistemico(actorUserId) {
+  return typeof actorUserId === 'string' && actorUserId.startsWith(PREFIXO_DE_ATOR_SISTEMICO);
+}
+
 /** Conservador de propósito: recusar um e-mail válido raro é barato; aceitar
  *  um que leve caractere de controle para dentro de SQL não é. */
 const EMAIL_ACEITO = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/u;
@@ -143,13 +168,16 @@ ${guardaDeProprietario}
   INSERT INTO "PlatformMasterIdentity" ("id", "userId", "role", "status", "provisionedByNote", "provisionedAt")
   VALUES (gen_random_uuid()::text, alvo_id, 'OWNER', 'ACTIVE', ${n}, now());
 
-  -- actorUserId recebe o sentinela do bootstrap, nao o id do novo proprietario:
+  -- actorUserId recebe o ator sistemico, nao o id do novo proprietario:
   -- registrar o proprio alvo como ator afirmaria que ele se autoconcedeu poder
   -- pela aplicacao, o que nao aconteceu. Quem autorizou esta em "reason".
+  -- O prefixo "sistema:" permite ao relatorio separar acao sistemica de acao
+  -- humana por predicado, sem comparar literal espalhada por cada consulta, e
+  -- nao colide com id de pessoa porque cuid nao contem dois-pontos.
   INSERT INTO "PlatformAuditLog"
     ("id", "actorUserId", "action", "scopeKind", "organizationId", "eventId",
      "targetUserId", "reason", "result", "correlationId", "occurredAt")
-  VALUES (gen_random_uuid()::text, 'platform-bootstrap',
+  VALUES (gen_random_uuid()::text, ${literal(ATOR_DO_BOOTSTRAP)},
      'platform.master_identity_provisioned', 'GLOBAL', '', '',
      alvo_id, ${n}, 'ALLOWED', ${c}, now());
 

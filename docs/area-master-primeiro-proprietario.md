@@ -89,10 +89,23 @@ recusa **toda** assertion. É a causa mais comum de WebAuthn que "não funciona"
 - Não concede nada a delegados — isso é pela área, pelo proprietário.
 - Não roda em produção: o script recusa `NODE_ENV=production`.
 
-## Nota sobre a trilha
+## Nota sobre a trilha: ação sistêmica não é ação humana
 
-O `actorUserId` do registro de auditoria recebe o sentinela `platform-bootstrap`,
-e não o id do novo proprietário. Registrar o alvo como ator afirmaria que ele se
+O `actorUserId` do registro de auditoria recebe `sistema:bootstrap-master`, e não
+o id do novo proprietário. Registrar o alvo como ator afirmaria que ele se
 autoconcedeu poder pela aplicação, o que não aconteceu. Quem autorizou está em
-`reason`. Relatórios que juntem `actorUserId` com `User` não encontram pessoa
-para esta linha, e isso é correto: não houve pessoa agindo pela aplicação.
+`reason`.
+
+O prefixo `sistema:` é um namespace, não um valor solto. Relatórios devem chamar
+`ehAtorSistemico(actorUserId)` em vez de comparar a literal, para que a próxima
+ação sistêmica — reconciliação, rotina agendada, webhook — seja classificada sem
+alterar cada consulta.
+
+O namespace não colide com id de pessoa: `User.id` é `cuid()`, alfanumérico e sem
+dois-pontos. Há teste prendendo essa propriedade, que falha se o formato do id
+mudar.
+
+Consequência a aceitar: relatórios que juntem `actorUserId` com `User` não
+encontram pessoa nestas linhas. Isso é correto — não houve pessoa agindo pela
+aplicação — e é por isso que a distinção tem de ser feita pelo predicado, e não
+pela presença do usuário.
