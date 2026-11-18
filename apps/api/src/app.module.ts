@@ -117,6 +117,8 @@ import { ScientificReviewsController } from './scientific-reviews.controller';
 import { ScientificReviewerController, ScientificReviewerOrganizerController } from './scientific-reviewer.controller';
 import { ScientificReviewerService } from './scientific-reviewer.service';
 import { ScientificReviewsService } from './scientific-reviews.service';
+import { ScientificFileBatchController } from './scientific-file-batch.controller';
+import { ScientificFileBatchService } from './scientific-file-batch.service';
 import { LocalScientificFileStorage, ScientificFileStorage } from './scientific-file.storage';
 import { ScientificStructureController } from './scientific-structure.controller';
 import { ScientificStructureService } from './scientific-structure.service';
@@ -196,6 +198,7 @@ import { TransmissionService } from './transmission.service';
     ScientificProgramController,
     ScientificProgramPublicController,
     ScientificSubmissionsController,
+    ScientificFileBatchController,
     ScientificStationPublicController,
     ScientificStationOrganizerController,
     ScientificReviewsController,
@@ -276,6 +279,7 @@ import { TransmissionService } from './transmission.service';
     ScientificProgramService,
     ScientificProgramPublicService,
     ScientificSubmissionsService,
+    ScientificFileBatchService,
     ScientificStationService,
     ScientificReviewsService,
     ScientificReviewerService,
