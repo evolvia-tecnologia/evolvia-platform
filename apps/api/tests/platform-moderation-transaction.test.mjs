@@ -329,3 +329,33 @@ test('a criação da linha nunca deixa a fotografia implícita', async () => {
   assert.equal(upsert.create.eventId, 'evt-1');
   assert.equal(upsert.create.organizationId, 'org-1');
 });
+
+// Este caso existe por causa de uma medição contra PostgreSQL 16 real, e não por
+// simetria: o banco avalia as CHECK sobre a tupla do INSERT ANTES de arbitrar o
+// conflito do upsert. Logo, no caminho que PRESERVA a fotografia — remover vindo
+// de SUSPENSO, em que o payload de update a omite de propósito —, o ramo `create`
+// precisa carregá-la mesmo sabendo que o conflito vai acontecer. Sem ela o
+// PostgreSQL recusa com "fotografia_obrigatoria" e a remoção não grava.
+//
+// Nenhum teste com cliente falso enxerga isso, porque cliente falso não avalia
+// constraint. Eu havia classificado essa linha como mutante equivalente; era
+// engano meu, desfeito pela execução contra banco.
+test('o create carrega a fotografia mesmo quando o update a preserva por omissão', async () => {
+  const veredito = decidirModeracao(pedido({
+    acao: 'remover', estadoAtual: 'SUSPENSO', statusOriginal: 'PUBLISHED',
+    statusDoEvento: 'SUSPENDED', segundaAprovacaoPor: 'master-2',
+  }));
+  const plano = planejarGravacao(entrada({
+    acao: 'remover', veredito, statusDoEvento: 'SUSPENDED',
+    linhaAtual: { state: 'SUSPENSO', originalEventStatus: 'PUBLISHED' },
+    segundaAprovacaoPor: 'master-2',
+  }));
+  const { tx, chamadas } = clienteFalso();
+  await aplicarPlano(tx, plano);
+  const upsert = chamadas[0].args;
+
+  assert.equal(Object.prototype.hasOwnProperty.call(upsert.update, 'originalEventStatus'), false,
+    'o update deixou de preservar: mandar a coluna aqui sobrescreveria a fotografia');
+  assert.equal(upsert.create.originalEventStatus, 'PUBLISHED',
+    'sem a fotografia no create, o INSERT do upsert viola a CHECK no PostgreSQL antes de detectar o conflito');
+});
