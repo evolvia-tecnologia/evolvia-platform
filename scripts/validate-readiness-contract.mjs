@@ -94,7 +94,7 @@ assert.doesNotMatch(
 );
 assert.doesNotMatch(
   workflow,
-  /alias\s+dev/iu,
+  /\balias\s+dev\b/iu,
   'O workflow não pode voltar a exigir a comprovação do alias legado.',
 );
 
