@@ -315,7 +315,9 @@ test('salvar e sair interrompe após três tentativas se o rascunho não estabil
       save: async (snapshot) => {
         await save('identity', snapshot, { resumeOnStale: false });
         tick += 1;
+        // Simula edição do usuário: rascunho novo + dirty, senão a fila pula o PATCH.
         state.draftRef.current = { name: `v${tick}` };
+        state.dirty = true;
       },
     }),
     /mudou durante o salvamento/,
