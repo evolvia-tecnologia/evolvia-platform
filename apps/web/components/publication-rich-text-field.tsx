@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import dynamic from 'next/dynamic';
 import PublicRichText from './public-rich-text';
 import styles from './publication-rich-text-field.module.css';
@@ -38,9 +39,13 @@ export default function PublicationRichTextField({
   const helpId = `${id}-help`;
   const errorId = `${id}-error`;
   const previewId = `${id}-preview`;
+  const labelId = `${id}-label`;
+  const [bootError, setBootError] = useState('');
+  const describedBy = `${helpId}${error || bootError ? ` ${errorId}` : ''} ${previewId}`.trim();
+  const shownError = error || bootError;
 
   return <div className={styles.field}>
-    <span className={styles.label} id={`${id}-label`}>
+    <span className={styles.label} id={labelId}>
       {label}
       {required && <strong aria-hidden="true"> *</strong>}
       {optional && <em className={styles.optional}> opcional</em>}
@@ -50,21 +55,40 @@ export default function PublicationRichTextField({
       id={id}
       className={styles.editor}
       style={{ minHeight: `${Math.max(rows, 4) * 28}px` }}
-      aria-labelledby={`${id}-label`}
-      aria-describedby={`${helpId}${error ? ` ${errorId}` : ''} ${previewId}`}
-      aria-invalid={Boolean(error)}
     >
-      <PublicationCkEditor
-        value={value}
-        onChange={onChange}
-        onBlur={onBlur}
-        onFocus={onFocus}
-        maxLength={maxLength}
-        disabled={disabled}
-      />
+      {bootError ? (
+        <textarea
+          className={styles.input}
+          value={value}
+          disabled={disabled}
+          required={required}
+          maxLength={maxLength}
+          rows={rows}
+          aria-labelledby={labelId}
+          aria-describedby={describedBy}
+          aria-invalid={Boolean(shownError)}
+          onChange={(event) => onChange(event.target.value)}
+          onBlur={(event) => onBlur?.(event.target.value)}
+          onFocus={onFocus}
+        />
+      ) : (
+        <PublicationCkEditor
+          value={value}
+          onChange={onChange}
+          onBlur={onBlur}
+          onFocus={onFocus}
+          onBootError={setBootError}
+          maxLength={maxLength}
+          disabled={disabled}
+          labelledBy={labelId}
+          describedBy={describedBy}
+          invalid={Boolean(shownError)}
+          required={required}
+        />
+      )}
     </div>
     <span className={styles.counter}>{value.length}/{maxLength}</span>
-    {error && <small id={errorId} className={styles.error}>{error}</small>}
+    {shownError && <small id={errorId} className={styles.error} role="alert">{shownError}</small>}
     <div className={styles.preview} id={previewId} aria-label="Prévia da formatação">
       <p className={styles.previewTitle}>Assim aparece na página</p>
       {value.trim()

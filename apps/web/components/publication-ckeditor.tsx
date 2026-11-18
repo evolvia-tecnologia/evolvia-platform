@@ -47,6 +47,27 @@ function enqueueEditor(element: HTMLElement, task: () => Promise<void>): Promise
   return next;
 }
 
+function applyEditableA11y(
+  editor: ClassicEditor,
+  a11y: {
+    labelledBy?: string;
+    describedBy?: string;
+    invalid?: boolean;
+    required?: boolean;
+  },
+) {
+  const editable = editor.ui.getEditableElement();
+  if (!editable) return;
+  if (a11y.labelledBy) editable.setAttribute('aria-labelledby', a11y.labelledBy);
+  else editable.removeAttribute('aria-labelledby');
+  if (a11y.describedBy) editable.setAttribute('aria-describedby', a11y.describedBy);
+  else editable.removeAttribute('aria-describedby');
+  if (a11y.invalid) editable.setAttribute('aria-invalid', 'true');
+  else editable.removeAttribute('aria-invalid');
+  if (a11y.required) editable.setAttribute('aria-required', 'true');
+  else editable.removeAttribute('aria-required');
+}
+
 const editorConfig = {
   licenseKey: 'GPL',
   language: 'pt-br',
@@ -105,15 +126,25 @@ export default function PublicationCkEditor({
   onChange,
   onBlur,
   onFocus,
+  onBootError,
   maxLength,
   disabled,
+  labelledBy,
+  describedBy,
+  invalid = false,
+  required = false,
 }: {
   value: string;
   onChange: (value: string) => void;
   onBlur?: (value: string) => void;
   onFocus?: () => void;
+  onBootError?: (message: string) => void;
   maxLength: number;
   disabled: boolean;
+  labelledBy?: string;
+  describedBy?: string;
+  invalid?: boolean;
+  required?: boolean;
 }) {
   const host = useRef<HTMLDivElement>(null);
   const accepted = useRef(value);
@@ -122,12 +153,16 @@ export default function PublicationCkEditor({
   const onChangeRef = useRef(onChange);
   const onBlurRef = useRef(onBlur);
   const onFocusRef = useRef(onFocus);
+  const onBootErrorRef = useRef(onBootError);
   const maxLengthRef = useRef(maxLength);
+  const a11yRef = useRef({ labelledBy, describedBy, invalid, required });
   disabledRef.current = disabled;
   onChangeRef.current = onChange;
   onBlurRef.current = onBlur;
   onFocusRef.current = onFocus;
+  onBootErrorRef.current = onBootError;
   maxLengthRef.current = maxLength;
+  a11yRef.current = { labelledBy, describedBy, invalid, required };
 
   useEffect(() => {
     const element = host.current;
@@ -175,7 +210,17 @@ export default function PublicationCkEditor({
     const ready = enqueueEditor(element, async () => {
       if (!alive) return;
       const initial = markupToHtml(accepted.current);
-      const created = await ClassicEditor.create(initial, editorConfig);
+      let created: ClassicEditor;
+      try {
+        created = await ClassicEditor.create(initial, editorConfig);
+      } catch {
+        if (alive) {
+          onBootErrorRef.current?.(
+            'Não foi possível carregar o editor. O texto atual foi mantido; use o campo abaixo para continuar.',
+          );
+        }
+        return;
+      }
       const view = created.ui.element;
       if (!alive || !element.isConnected || !view) {
         await created.destroy();
@@ -184,6 +229,7 @@ export default function PublicationCkEditor({
       element.replaceChildren(view);
       instance = created;
       editorRef.current = created;
+      applyEditableA11y(created, a11yRef.current);
       if (markupToHtml(accepted.current) !== initial) created.setData(markupToHtml(accepted.current));
       if (disabledRef.current) created.enableReadOnlyMode('evolvia');
       created.model.document.on('change:data', () => commit(created));
@@ -216,6 +262,12 @@ export default function PublicationCkEditor({
     if (disabled) editor.enableReadOnlyMode('evolvia');
     else editor.disableReadOnlyMode('evolvia');
   }, [disabled]);
+
+  useEffect(() => {
+    const editor = editorRef.current;
+    if (!editor) return;
+    applyEditableA11y(editor, { labelledBy, describedBy, invalid, required });
+  }, [labelledBy, describedBy, invalid, required]);
 
   useEffect(() => {
     if (value === accepted.current) return;
