@@ -124,7 +124,7 @@ exit 0`,
   sudo: 'exec "$@"',
 };
 
-function ambiente({ nginxFailAt = '', reloadFailAt = '', curlAcme = 'ok', comCertificado = true, certbotFail = '' } = {}, t) {
+function ambiente({ nginxFailAt = '', reloadFailAt = '', curlAcme = 'ok', comCertificado = true, certbotFail = '', legado = 'ausente' } = {}, t) {
   const base = mkdtempSync(join(tmpdir(), 'evolvia-acme-'));
   t?.after(() => rmSync(base, { recursive: true, force: true }));
   const caminhos = {
@@ -140,6 +140,8 @@ function ambiente({ nginxFailAt = '', reloadFailAt = '', curlAcme = 'ok', comCer
     certbotBin: join(base, 'usr/local/bin/certbot'),
     envFile: join(base, 'opt/evolvia/environments/staging/.env'),
     siteAnterior: join(base, 'etc/nginx/sites-available/evolvia-anterior'),
+    siteLegado: join(base, 'etc/nginx/sites-available/evolvia'),
+    linkLegado: join(base, 'etc/nginx/sites-enabled/evolvia'),
     stub: join(base, 'stub'),
     state: join(base, 'state'),
   };
@@ -163,6 +165,17 @@ function ambiente({ nginxFailAt = '', reloadFailAt = '', curlAcme = 'ok', comCer
   // `install -m 0644` restaura o conteudo e perde a permissao, e a diferenca
   // precisa aparecer. Com 0644 no pre-estado, o caso passaria por coincidencia.
   chmodSync(caminhos.site, 0o640);
+
+  // Site legado `evolvia`, o que existe no host de homologacao desde o bootstrap
+  // administrativo anterior. 'canonico' = byte a byte um dos templates versionados;
+  // 'incerto' = conteudo que o script nao reconhece e por isso deve recusar migrar.
+  if (legado !== 'ausente') {
+    const conteudo = legado === 'canonico'
+      ? readFileSync(join(RAIZ, 'infra/nginx/evolvia.conf'), 'utf8')
+      : 'CONFIGURACAO_DE_ORIGEM_DESCONHECIDA\n';
+    writeFileSync(caminhos.siteLegado, conteudo);
+    symlinkSync(caminhos.siteLegado, caminhos.linkLegado);
+  }
 
   for (const [nome, corpo] of Object.entries(STUBS)) {
     const alvo = join(caminhos.stub, nome);
@@ -466,5 +479,30 @@ for (const [rotulo, script] of [['homologacao', HOMOLOGACAO], ['staging-tls', ST
     const servido = readFileSync(realpathSync(contexto.caminhos.link), 'utf8');
     assert.equal(estados.at(-1), servido,
       'o que esta habilitado agora nunca foi carregado por um reload bem-sucedido: o proximo reload falha');
+  });
+
+  test(`${rotulo}: falha restaura o site legado habilitado`, (t) => {
+    const contexto = ambiente({ curlAcme: 'fail', legado: 'canonico' }, t);
+    const resultado = executar(script, contexto);
+    exigirFalhaNaEtapa(resultado, probes(contexto).length > 0, 'consulta publica do desafio ACME');
+    assert.equal(lstatSync(contexto.caminhos.linkLegado).isSymbolicLink(), true,
+      'o link do site legado nao foi restaurado apos a falha');
+    assert.equal(readlinkSync(contexto.caminhos.linkLegado), contexto.caminhos.siteLegado);
+  });
+
+  test(`${rotulo}: caminho feliz retira o site legado habilitado`, (t) => {
+    const contexto = ambiente({ legado: 'canonico' }, t);
+    exigirSucesso(executar(script, contexto));
+    assert.equal(existsSync(contexto.caminhos.linkLegado), false, 'o site legado continua habilitado');
+  });
+
+  test(`${rotulo}: site legado de origem incerta impede a migracao sem tocar no ativo`, (t) => {
+    const contexto = ambiente({ legado: 'incerto' }, t);
+    const antes = readFileSync(contexto.caminhos.site, 'utf8');
+    const resultado = executar(script, contexto);
+    assert.notEqual(resultado.status, 0, 'o script aceitou migrar um site legado de origem desconhecida');
+    assert.match(resultado.stderr, /origem incerta/iu, 'a recusa nao foi a da origem incerta');
+    assert.equal(readFileSync(contexto.caminhos.site, 'utf8'), antes);
+    assert.equal(lstatSync(contexto.caminhos.linkLegado).isSymbolicLink(), true);
   });
 }
