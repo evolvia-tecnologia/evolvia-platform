@@ -233,6 +233,39 @@ const chamadas = (contexto) => {
   return existsSync(log) ? readFileSync(log, 'utf8') : '';
 };
 
+const invocacoesNginx = (contexto) => {
+  const arquivo = join(contexto.caminhos.state, 'nginx.count');
+  return existsSync(arquivo) ? Number(readFileSync(arquivo, 'utf8').trim()) : 0;
+};
+
+/**
+ * Falhar nao basta: tem de ser A falha injetada.
+ *
+ * `status !== 0` aceitaria uma falha anterior — o script morrendo na checagem de
+ * DNS satisfaria um caso que diz provar rollback de reload. Pior: com timeout no
+ * spawn, um processo morto por sinal devolve `status: null`, e `notEqual(null, 0)`
+ * PASSA. Um teste que trava viraria um teste verde.
+ *
+ * Aqui se exige saida por codigo de saida, codigo diferente de zero, e prova
+ * positiva de que a etapa injetada foi alcancada.
+ */
+const exigirFalhaNaEtapa = (resultado, alcancou, etapa) => {
+  assert.equal(resultado.error, undefined,
+    `o processo nao completou (${resultado.error?.code}): a falha de ${etapa} nao foi exercitada`);
+  assert.equal(resultado.signal, null,
+    `o processo foi morto por sinal (${resultado.signal}): a falha de ${etapa} nao foi exercitada`);
+  assert.equal(typeof resultado.status, 'number',
+    `o processo nao terminou com codigo de saida: a falha de ${etapa} nao foi exercitada`);
+  assert.notEqual(resultado.status, 0, `o script deveria falhar em ${etapa}`);
+  assert.ok(alcancou, `o script falhou ANTES de chegar a ${etapa}: este caso nao prova nada sobre ela`);
+};
+
+const exigirSucesso = (resultado) => {
+  assert.equal(resultado.error, undefined, `o processo nao completou (${resultado.error?.code})`);
+  assert.equal(resultado.signal, null, `o processo foi morto por sinal (${resultado.signal})`);
+  assert.equal(resultado.status, 0, resultado.stderr);
+};
+
 /**
  * Verificada ANTES do spawn. A checagem posterior detectava o problema tarde demais:
  * um script que ignorasse os overrides ja teria escrito no /etc da maquina que roda
@@ -312,7 +345,7 @@ for (const [rotulo, script] of [['homologacao', HOMOLOGACAO], ['staging-tls', ST
     const contexto = ambiente({ curlAcme: 'fail' }, t);
     const antes = readFileSync(contexto.caminhos.site, 'utf8');
     const resultado = executar(script, contexto);
-    assert.notEqual(resultado.status, 0, 'o script tem de falhar quando o desafio nao responde');
+    exigirFalhaNaEtapa(resultado, probes(contexto).length > 0, 'consulta publica do desafio ACME');
     assert.equal(readFileSync(contexto.caminhos.site, 'utf8'), antes,
       'o site ativo foi deixado diferente do original apos a falha');
   });
@@ -321,7 +354,7 @@ for (const [rotulo, script] of [['homologacao', HOMOLOGACAO], ['staging-tls', ST
     const contexto = ambiente({ nginxFailAt: '2' }, t);
     const antes = readFileSync(contexto.caminhos.site, 'utf8');
     const resultado = executar(script, contexto);
-    assert.notEqual(resultado.status, 0);
+    exigirFalhaNaEtapa(resultado, invocacoesNginx(contexto) >= 2, 'segunda validacao do nginx -t');
     assert.equal(readFileSync(contexto.caminhos.site, 'utf8'), antes);
   });
 
@@ -329,28 +362,33 @@ for (const [rotulo, script] of [['homologacao', HOMOLOGACAO], ['staging-tls', ST
     const contexto = ambiente({ reloadFailAt: '1' }, t);
     const antes = readFileSync(contexto.caminhos.site, 'utf8');
     const resultado = executar(script, contexto);
-    assert.notEqual(resultado.status, 0);
+    exigirFalhaNaEtapa(resultado, /systemctl reload nginx/u.test(chamadas(contexto)), 'reload do Nginx');
     assert.equal(readFileSync(contexto.caminhos.site, 'utf8'), antes);
   });
 
   test(`${rotulo}: falha restaura o link simbolico para o alvo anterior`, (t) => {
     const contexto = ambiente({ curlAcme: 'fail' }, t);
     const alvoAntes = readlinkSync(contexto.caminhos.link);
-    executar(script, contexto);
+    const resultado = executar(script, contexto);
+    exigirFalhaNaEtapa(resultado, probes(contexto).length > 0, 'consulta publica do desafio ACME');
     assert.equal(lstatSync(contexto.caminhos.link).isSymbolicLink(), true, 'o link deixou de ser link');
     assert.equal(readlinkSync(contexto.caminhos.link), alvoAntes, 'o link passou a apontar para outro alvo');
   });
 
   test(`${rotulo}: falha nao remove certificado existente`, (t) => {
     const contexto = ambiente({ curlAcme: 'fail' }, t);
-    executar(script, contexto);
+    const resultado = executar(script, contexto);
+    exigirFalhaNaEtapa(resultado, probes(contexto).length > 0, 'consulta publica do desafio ACME');
     assert.equal(readFileSync(join(contexto.caminhos.certDir, 'fullchain.pem'), 'utf8'), 'certificado-existente\n');
     assert.equal(readFileSync(join(contexto.caminhos.certDir, 'privkey.pem'), 'utf8'), 'chave-existente\n');
   });
 
   test(`${rotulo}: certificado existente nao dispara nova emissao`, (t) => {
     const contexto = ambiente({}, t);
-    executar(script, contexto);
+    const resultado = executar(script, contexto);
+    // Sem exigir sucesso, uma falha ANTES do certbot satisfaria o doesNotMatch:
+    // "nao reemitiu" por nunca ter chegado la nao e a propriedade desejada.
+    exigirSucesso(resultado);
     assert.doesNotMatch(chamadas(contexto), /certbot certonly/u,
       'houve emissao de certificado mesmo havendo um valido no lugar');
   });
@@ -358,7 +396,7 @@ for (const [rotulo, script] of [['homologacao', HOMOLOGACAO], ['staging-tls', ST
   test(`${rotulo}: caminho feliz instala a configuracao nova e recarrega`, (t) => {
     const contexto = ambiente({}, t);
     const resultado = executar(script, contexto);
-    assert.equal(resultado.status, 0, resultado.stderr);
+    exigirSucesso(resultado);
     const depois = readFileSync(contexto.caminhos.site, 'utf8');
     assert.doesNotMatch(depois, new RegExp(MARCADOR, 'u'), 'a configuracao anterior nao foi substituida');
     assert.match(chamadas(contexto), /systemctl reload nginx/u);
@@ -366,9 +404,9 @@ for (const [rotulo, script] of [['homologacao', HOMOLOGACAO], ['staging-tls', ST
 
   test(`${rotulo}: duas execucoes seguidas deixam o mesmo estado`, (t) => {
     const contexto = ambiente({}, t);
-    assert.equal(executar(script, contexto).status, 0);
+    exigirSucesso(executar(script, contexto));
     const primeira = readFileSync(contexto.caminhos.site, 'utf8');
-    assert.equal(executar(script, contexto).status, 0);
+    exigirSucesso(executar(script, contexto));
     assert.equal(readFileSync(contexto.caminhos.site, 'utf8'), primeira,
       'a segunda execucao produziu estado diferente da primeira');
   });
@@ -399,8 +437,7 @@ for (const [rotulo, script] of [['homologacao', HOMOLOGACAO], ['staging-tls', ST
     const contexto = ambiente({ comCertificado: false, certbotFail: '1' }, t);
     const antes = readFileSync(contexto.caminhos.site, 'utf8');
     const resultado = executar(script, contexto);
-    assert.notEqual(resultado.status, 0, 'o script tem de falhar quando a emissao falha');
-    assert.match(chamadas(contexto), /certbot certonly/u, 'a emissao nem chegou a ser tentada');
+    exigirFalhaNaEtapa(resultado, /certbot certonly/u.test(chamadas(contexto)), 'emissao do certificado');
     assert.equal(readFileSync(contexto.caminhos.site, 'utf8'), antes,
       'o site ativo foi deixado diferente do original apos falha de emissao');
   });
