@@ -31,7 +31,7 @@ enum PlatformModerationClass {
   OUTRO
 }
 
-/// Estado corrente. Uma linha por evento, criada só quandoहá primeira
+/// Estado corrente. Uma linha por evento, criada só quando há primeira
 /// moderação — evento sem linha é ATIVO, e é isso que mantém a migration
 /// inofensiva para o que já existe.
 model PlatformEventModeration {
