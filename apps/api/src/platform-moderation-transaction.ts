@@ -20,6 +20,29 @@
  * o aplica dentro de uma transação só. Ou as três escritas acontecem, ou
  * nenhuma acontece.
  *
+ * O ciclo de vida encerrado não é apagado por moderação
+ * ------------------------------------------------------
+ * Suspensão pela plataforma não é cancelamento pelo organizador: são fatos com
+ * responsáveis diferentes. Disso segue uma regra que faltava aqui: **se o
+ * `Event.status` já é terminal — `FINISHED` ou `CANCELLED` — a moderação nunca
+ * o escreve.** A restrição administrativa vem da linha de moderação, que é onde
+ * ela sempre devia ter vivido.
+ *
+ * Sem essa regra, suspender um evento finalizado trocava `FINISHED` por
+ * `SUSPENDED` e o devolvia só na liberação. A fotografia garantia a volta, mas
+ * durante toda a investigação o evento deixava de constar como encerrado — e é
+ * durante a investigação que o histórico precisa ser fiel.
+ *
+ * A regra vale para as quatro ações, então o estado terminal é preservado antes,
+ * durante e depois. E a consequência não é efeito colateral, é o ponto: liberar
+ * ou restaurar um evento terminal não reabre publicação, inscrição nem
+ * cobrança, porque não há status para reabrir.
+ *
+ * A supressão é nomeada em `statusPreservadoPorSerTerminal`, e não silenciosa:
+ * a política continua devolvendo `SUSPENDED`, e um plano que a ignorasse sem
+ * dizer seria a divergseria a divergência entre dois módulos que este arquivo
+ * existe para evitar.
+ *
  * A segunda razão de existir
  * --------------------------
  * As duas `CHECK` da migration e a política descrevem a mesma invariante em
@@ -43,6 +66,20 @@ import type {
 export const LIMITE_DA_CORRELACAO = 64;
 export const LIMITE_DO_STATUS = 32;
 export const LIMITE_DO_IDENTIFICADOR = 64;
+
+/**
+ * Status em que o ciclo de vida do evento já terminou.
+ *
+ * Terminal significa que não há mais nada a acontecer com o evento por
+ * iniciativa de quem o organiza. Moderação pode restringir o acesso ao que
+ * sobrou — página, catálogo, emissão — mas não pode reescrever o fato de que
+ * ele terminou ou foi cancelado.
+ */
+export const STATUS_TERMINAIS = ['FINISHED', 'CANCELLED'] as const;
+
+export function statusTerminal(status: string): boolean {
+  return (STATUS_TERMINAIS as readonly string[]).includes(status);
+}
 
 /** Ação em minúsculas na política, maiúscula no enum do banco. */
 const ACAO_NO_BANCO: Record<AcaoDeModeracao, string> = {
@@ -133,6 +170,16 @@ export interface Plano {
   readonly trilha: EscritaDaTrilha | null;
   /** `null` = não mexer no `Event.status`. */
   readonly statusDoEventoNovo: string | null;
+  /**
+   * A política pediu mudança de `Event.status` e a regra do estado terminal a
+   * suprimiu.
+   *
+   * Existe para que a supressão seja afirmada e auditável em vez de inferida de
+   * um `null`. Só liga quando havia mudança pretendida: se a política já não
+   * queria mexer, nada foi preservado por esta regra, e dizer que foi seria
+   * mentir num campo que alguém vai usar para reconstituir o caso.
+   */
+  readonly statusPreservadoPorSerTerminal: boolean;
   /** Linha que a moderação terá depois da escrita, para conferência. */
   readonly linhaResultante: LinhaDeModeracao | null;
 }
@@ -146,6 +193,7 @@ const naoGravar = (motivo: MotivoDeRecusaDaGravacao, eventId = ''): Plano => ({
   moderacao: null,
   trilha: null,
   statusDoEventoNovo: null,
+  statusPreservadoPorSerTerminal: false,
   linhaResultante: null,
 });
 
@@ -191,7 +239,14 @@ export function planejarGravacao(entrada: EntradaDaGravacao): Plano {
 
   const statusAntes = texto(entrada.statusDoEvento);
   if (statusAntes === '') return naoGravar('status_anterior_obrigatorio', eventId);
-  const statusDepois = veredito.statusDoEventoNovo ?? statusAntes;
+
+  // A regra do ciclo de vida encerrado. Vem ANTES de `statusDepois` porque a
+  // trilha tem de registrar que nada mudou, e não o que teria mudado.
+  const terminal = statusTerminal(statusAntes);
+  const statusDoEventoNovo = terminal ? null : veredito.statusDoEventoNovo;
+  const statusPreservadoPorSerTerminal = terminal && veredito.statusDoEventoNovo !== null;
+
+  const statusDepois = statusDoEventoNovo ?? statusAntes;
   if (statusAntes.length > LIMITE_DO_STATUS || statusDepois.length > LIMITE_DO_STATUS) {
     return naoGravar('status_muito_longo', eventId);
   }
@@ -257,7 +312,8 @@ export function planejarGravacao(entrada: EntradaDaGravacao): Plano {
     eventId,
     moderacao,
     trilha,
-    statusDoEventoNovo: veredito.statusDoEventoNovo,
+    statusDoEventoNovo,
+    statusPreservadoPorSerTerminal,
     linhaResultante: { state: estadoNovo, previousState, originalEventStatus: fotografiaResultante },
   };
 }
@@ -294,6 +350,9 @@ export class ModeracaoNaoGravavelError extends Error {
  * trilha. A trilha por último porque ela descreve o que as duas primeiras
  * fizeram; se qualquer uma falhar, a transação desfaz tudo e a trilha não
  * registra um fato que não aconteceu.
+ *
+ * Em evento de status terminal, `statusDoEventoNovo` é `null` e o `Event.status`
+ * não é tocado: são duas escritas, não três.
  */
 export async function aplicarPlano(tx: ClienteTransacional, plano: Plano): Promise<void> {
   if (!plano.gravar || plano.moderacao === null || plano.trilha === null) {
