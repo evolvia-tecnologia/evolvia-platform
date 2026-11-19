@@ -510,6 +510,17 @@ test('a referência de sandbox fica no pedido preparado uma vez, com autorizaç�
   await rejects(resolve(), 503);
   assert.equal(transport.mock.callCount(), 0);
   process.env[orgKey] = organizationId;
+  const member = await prisma.organizationMembership.findFirstOrThrow({where:{organizationId,userId:people.owner.id}});
+  transport.mock.mockImplementationOnce(async url => {
+    await prisma.organizationMembership.update({where:{id:member.id},data:{role:'VIEWER'}});
+    return Response.json({totalCount:1, hasMore:false, data:[{id:paymentId,checkoutSession:providerCheckoutId}]});
+  });
+  try {
+    await rejects(resolve(),409);
+    assert.equal((await prisma.registrationRefundRequest.findUniqueOrThrow({where:{id:request.id}})).sandboxPaymentId,null);
+  } finally {
+    await prisma.organizationMembership.update({where:{id:member.id},data:{role:'OWNER'}});
+  }
   const results = await Promise.all([resolve(), resolve()]);
   assert.deepEqual(results[0], { id: request.id, processingStatus: 'SANDBOX_PAYMENT_IDENTIFIED', moneyReturned: false });
   assert.deepEqual(results[0], results[1]);

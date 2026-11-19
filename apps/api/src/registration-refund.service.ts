@@ -414,7 +414,7 @@ export class RegistrationRefundService {
     const request = await tx.registrationRefundRequest.findFirst({
       where: {
         id: requestId, eventId,
-        reservation: { event: { organization: { memberships: { some: { userId, role: 'OWNER', status: 'ACTIVE' } } } } },
+        reservation: { event: { organization: { memberships: { some: { userId, role: MembershipRole.OWNER, status: 'ACTIVE' } } } } },
       },
       select: {
         organizationId: true, status: true, preparedAmountCents: true, sandboxPaymentId: true,
