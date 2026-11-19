@@ -104,8 +104,8 @@ else
   WEB_PORT=3000
   API_PORT=4000
 fi
-[[ "$WEB_PORT" =~ ^[0-9]{2,5}$ ]] || fail "WEB_HOST_PORT inválida ou ausente em ${ENV_FILE}."
-[[ "$API_PORT" =~ ^[0-9]{2,5}$ ]] || fail "API_HOST_PORT inválida ou ausente em ${ENV_FILE}."
+[[ "$WEB_PORT" =~ ^[0-9]{2,5}$ ]] || fail "WEB_HOST_PORT inválida ou ausente."
+[[ "$API_PORT" =~ ^[0-9]{2,5}$ ]] || fail "API_HOST_PORT inválida ou ausente."
 
 if [[ "$MODE" == staging ]]; then
   curl -fsS --max-time 10 "http://127.0.0.1:${API_PORT}/health" >/dev/null \
