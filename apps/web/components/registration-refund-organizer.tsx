@@ -6,8 +6,8 @@ import styles from './registration-refund.module.css';
 
 type WindowCode = 'NONE' | 'DAYS_30' | 'DAYS_7' | 'DAYS_1' | 'ANYTIME';
 type Policy = { window: WindowCode | null; message: string; pending: string | null; version: number | null };
-type Item = { id: string; protocol: string; reason: string; status: string; statusLabel: string; decisionNote: string | null; createdAt: string };
-type RequestPage = { items: Item[]; nextCursor: string | null };
+type Item = { id: string; protocol: string; reason: string; status: string; statusLabel: string; decisionNote: string | null; createdAt: string; preparedAmountCents?: number | null; sandboxPaymentIdentified?: boolean; mockRefundStatus?: 'ISSUED' | 'RECONCILED' | null };
+type RequestPage = { canSimulateRefund?: boolean; items: Item[]; nextCursor: string | null };
 type RequestFilter = '' | 'REQUESTED' | 'APPROVED' | 'REJECTED';
 
 const OPTIONS: Array<[WindowCode, string]> = [
@@ -18,12 +18,27 @@ const OPTIONS: Array<[WindowCode, string]> = [
   ['ANYTIME', 'A qualquer momento'],
 ];
 
+const simulationLabels = {
+  preparation: 'Preparar valor',
+  'sandbox-payment-reference': 'Identificar cobrança de teste',
+  'mock-refund': 'Emitir comprovante simulado',
+  'mock-reconciliation': 'Conciliar simulação',
+};
+
+function simulationStep(item: Item): keyof typeof simulationLabels {
+  if (item.preparedAmountCents == null) return 'preparation';
+  if (!item.sandboxPaymentIdentified) return 'sandbox-payment-reference';
+  return item.mockRefundStatus === 'ISSUED' ? 'mock-reconciliation' : 'mock-refund';
+}
+
 export default function RegistrationRefundOrganizer({ eventId }: { eventId: string }) {
   const [policy, setPolicy] = useState<Policy | null>(null);
   const [windowCode, setWindowCode] = useState<WindowCode>('NONE');
   const [items, setItems] = useState<Item[]>([]);
   const [requestFilter, setRequestFilter] = useState<RequestFilter>('');
   const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [canSimulate, setCanSimulate] = useState(false);
+  const [amounts, setAmounts] = useState<Record<string, string>>({});
   const [notes, setNotes] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -34,6 +49,8 @@ export default function RegistrationRefundOrganizer({ eventId }: { eventId: stri
   useEffect(() => {
     let active = true;
     setLoading(true);
+    setCanSimulate(false);
+    setItems([]);
     const params = new URLSearchParams();
     if (requestFilter) params.set('status', requestFilter);
     const query = params.toString();
@@ -46,6 +63,7 @@ export default function RegistrationRefundOrganizer({ eventId }: { eventId: stri
         setPolicy(nextPolicy);
         if (nextPolicy.window) setWindowCode(nextPolicy.window);
         setItems(nextRequests.items);
+        setCanSimulate(nextRequests.canSimulateRefund === true);
         setNextCursor(nextRequests.nextCursor);
         setError('');
       })
@@ -114,6 +132,42 @@ export default function RegistrationRefundOrganizer({ eventId }: { eventId: stri
     }
   }
 
+  async function advanceSimulation(item: Item) {
+    if (!canSimulate || busyId || item.status !== 'APPROVED' || item.mockRefundStatus === 'RECONCILED') return;
+    const step = simulationStep(item);
+    let amountCents = item.preparedAmountCents;
+    if (step === 'preparation') {
+      const value = (amounts[item.id] ?? '').trim();
+      const parts = /^(\d{1,8})(?:[,.](\d{1,2}))?$/u.exec(value);
+      amountCents = parts ? Number(parts[1]) * 100 + Number((parts[2] ?? '').padEnd(2, '0')) : 0;
+      if (amountCents < 1 || amountCents > 2147483647) {
+        setError('Informe um valor positivo em reais com até duas casas decimais.');
+        return;
+      }
+    }
+    setBusyId(item.id);
+    setError('');
+    setNotice('');
+    try {
+      const result = await api<{ id: string; amountCents?: number; moneyReturned: boolean; processingStatus?: string; simulated?: boolean; mockRefundStatus?: Item['mockRefundStatus'] }>(
+        `/events/${encodeURIComponent(eventId)}/refunds/requests/${encodeURIComponent(item.id)}/${step}`,
+        { method: 'POST', ...(step === 'preparation' ? { body: JSON.stringify({ amountCents }) } : {}) },
+      );
+      let update: Partial<Item>;
+      if (result.id !== item.id || result.moneyReturned !== false) throw new Error('Resposta inesperada. Recarregue os pedidos.');
+      if (step === 'preparation' && result.amountCents === amountCents) update = { preparedAmountCents: amountCents };
+      else if (step === 'sandbox-payment-reference' && result.processingStatus === 'SANDBOX_PAYMENT_IDENTIFIED') update = { sandboxPaymentIdentified: true };
+      else if (result.simulated && result.mockRefundStatus === (step === 'mock-refund' ? 'ISSUED' : 'RECONCILED')) update = { mockRefundStatus: result.mockRefundStatus };
+      else throw new Error('Não foi possível confirmar a etapa. Recarregue os pedidos.');
+      setItems(current => current.map(row => row.id === item.id ? { ...row, ...update } : row));
+      setNotice(`Etapa de simulação concluída para ${item.protocol}.`);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'Não foi possível concluir a simulação.');
+    } finally {
+      setBusyId('');
+    }
+  }
+
   return <section className={styles.panel} aria-labelledby="organizer-refund-title" aria-busy={loading || saving}>
     <h1 id="organizer-refund-title">Reembolsos</h1>
     <p>Publique a janela deste evento. Aprovar um pedido não devolve o dinheiro nem cancela a credencial: a situação fica como aprovado, aguardando processamento.</p>
@@ -165,7 +219,17 @@ export default function RegistrationRefundOrganizer({ eventId }: { eventId: stri
               <button type="button" disabled={busyId === item.id} onClick={() => void decide(item, 'APPROVE')}>{busyId === item.id ? 'Salvando…' : 'Aprovar'}</button>
               <button type="button" disabled={busyId === item.id} onClick={() => void decide(item, 'REJECT')}>Recusar</button>
             </div>
-          </form> : <p>{item.decisionNote}</p>}</td>
+          </form> : <p>{item.decisionNote}</p>}
+            {canSimulate && !loading && item.status === 'APPROVED' && <fieldset disabled={Boolean(busyId)}>
+              <legend>Simulação de estorno · {item.protocol}</legend>
+              <p>Nenhum valor será transferido.</p>
+              {item.preparedAmountCents == null
+                ? <label>Valor a simular (R$)<input inputMode="decimal" value={amounts[item.id] ?? ''} onChange={event => setAmounts({ ...amounts, [item.id]: event.target.value })} /></label>
+                : <p>Valor preparado: {(item.preparedAmountCents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>}
+              {item.mockRefundStatus === 'RECONCILED' ? <p>Simulação conciliada.</p>
+                : <button type="button" onClick={() => void advanceSimulation(item)}>{simulationLabels[simulationStep(item)]}</button>}
+            </fieldset>}
+          </td>
         </tr>)}
       </tbody>
     </table>}
