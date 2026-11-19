@@ -2,9 +2,10 @@ import { BadRequestException, GoneException, Injectable, NotFoundException } fro
 import { CapabilityStatus, EventStatus, MembershipRole, Prisma, RegistrationReservationStatus } from '@prisma/client';
 import { createHash } from 'node:crypto';
 import { AuthorizationService } from './authorization.service';
-import { verifyCredentialScan } from './check-in-policy';
+import { verifyCredentialScan, issueCheckInCode } from './check-in-policy';
 import { activeCheckedInAt, recordCheckIn } from './check-in-record';
 import { printedCredential } from './credential-label';
+import { categoryLabelTemplates, categoryBadgeItems } from './credential-category-template.policy';
 import {
   DeskPolicyError,
   deskDisplayName,
@@ -199,6 +200,15 @@ export class CheckInService {
       process.env.JWT_SECRET ?? '',
       readLabelConfig(event.capabilities[0]?.config),
     );
+    const categoryTemplate = categoryLabelTemplates(event.capabilities[0]?.config)
+      .find((item) => item.categoryId === reservation.category.id);
+    const printLabel = categoryTemplate ? {
+      ...label, name: null, company: null, lines: [], category: null,
+      orderedContent: categoryBadgeItems(reservation.registrationData, categoryTemplate.fields, categoryTemplate.styles),
+      qr: categoryTemplate.fields.includes('qr')
+        ? issueCheckInCode(event.id, reservation.id, process.env.JWT_SECRET ?? '') : null,
+      barcode: null,
+    } : label;
     const scope = { reservationId: reservation.id, eventId: event.id, organizationId: event.organizationId! };
     const created = await this.prisma.$transaction((tx) => recordCheckIn(
       tx,
@@ -206,7 +216,7 @@ export class CheckInService {
       null,
       { source: 'self-service', method: request.method },
     ));
-    return { ...label, checkedInAt: created.checkedInAt.toISOString(), alreadyCheckedIn: created.alreadyCheckedIn };
+    return { ...printLabel, checkedInAt: created.checkedInAt.toISOString(), alreadyCheckedIn: created.alreadyCheckedIn };
   }
 
   private assertTotemAccess(config: unknown, accessToken: string | undefined) {
@@ -239,7 +249,7 @@ export class CheckInService {
       id: true,
       protocol: true,
       registrationData: true,
-      category: { select: { name: true } },
+      category: { select: { id: true, name: true } },
     } as const;
     const scope = { eventId: event.id, organizationId: event.organizationId!, status: RegistrationReservationStatus.CONFIRMED };
     if (method === 'PROTOCOL') {

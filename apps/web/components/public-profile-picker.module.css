@@ -1,0 +1,96 @@
+.picker {
+  display: grid;
+  gap: var(--space-12);
+  margin-top: var(--space-16);
+  min-width: 0;
+}
+
+.families,
+.family {
+  display: grid;
+  gap: var(--space-8);
+  min-width: 0;
+}
+
+.families {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr));
+}
+
+.family h3 {
+  margin: 0;
+  color: var(--color-brand-navy-800);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-bold);
+  line-height: var(--line-height-compact);
+}
+
+.family h3:focus {
+  outline: 3px solid var(--color-focus-on-light);
+  outline-offset: 3px;
+}
+
+.description,
+.status {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-xs);
+  line-height: var(--line-height-ui);
+  overflow-wrap: anywhere;
+}
+
+.picker :global(.option) {
+  min-height: 44px;
+  text-align: left;
+}
+
+.picker :global(.option) strong,
+.picker :global(.option) span {
+  display: block;
+  overflow-wrap: anywhere;
+}
+
+.picker :global(.option) span {
+  margin-top: var(--space-4);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-regular);
+}
+
+.back,
+.picker :global(.option):focus-visible,
+.families:focus-visible {
+  outline: 3px solid var(--color-focus-on-light);
+  outline-offset: 3px;
+}
+
+.back {
+  justify-self: start;
+  min-height: 44px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+  color: var(--color-brand-blue-600);
+  padding: var(--space-8) var(--space-12);
+  font: inherit;
+  font-weight: var(--font-weight-bold);
+  cursor: pointer;
+}
+
+@media (max-width: 390px) {
+  .families,
+  .family :global(.options-grid) {
+    grid-template-columns: 1fr;
+  }
+
+  .picker :global(.option),
+  .back {
+    width: 100%;
+  }
+}
+
+@media (forced-colors: active) {
+  .back,
+  .picker :global(.option) {
+    border: 1px solid ButtonText;
+  }
+}

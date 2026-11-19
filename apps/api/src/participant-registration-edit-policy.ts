@@ -1,3 +1,4 @@
+import { normalizeRegistrationPhone } from './registration-phone.ts';
 import { createHash } from 'node:crypto';
 
 export type RegistrationAnswer = string | number | boolean | string[];
@@ -115,6 +116,10 @@ function normalizeValue(field: EditableRegistrationField, value: unknown): Regis
   if ((field.type === 'SELECT' || field.type === 'RADIO') && normalized !== '' && !field.options.some((item) => item.id === normalized)) {
     throw new ParticipantRegistrationEditPolicyError(`Revise o campo “${field.label}”.`);
   }
+  if (field.type === 'PHONE' && normalized) {
+    try { return normalizeRegistrationPhone(normalized); }
+    catch (error) { throw new ParticipantRegistrationEditPolicyError(error instanceof Error ? error.message : 'Informe um telefone válido.'); }
+  }
   if (field.type === 'DATE' && normalized && !/^\d{4}-\d{2}-\d{2}$/u.test(normalized)) {
     throw new ParticipantRegistrationEditPolicyError(`Revise o campo “${field.label}”.`);
   }
@@ -156,3 +161,4 @@ export function participantEditPayloadHash(patch: ParticipantRegistrationPatch):
   const ordered = Object.fromEntries(Object.entries(patch.updates).sort(([left], [right]) => left.localeCompare(right)));
   return participantEditHash(JSON.stringify({ expectedRevision: patch.expectedRevision, updates: ordered }));
 }
+

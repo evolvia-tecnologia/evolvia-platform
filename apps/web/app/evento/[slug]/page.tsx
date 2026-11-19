@@ -6,6 +6,9 @@ import RecordPublicVisit from '../../../components/record-public-visit';
 import PublicEventProgram from '../../../components/public-event-program';
 import { parsePublicProgram, publicProgramWideLayout, type PublicProgram } from '../../../lib/public-event-program';
 import PublicSiteHeader from '../../../components/public-site-header';
+import PublicSportsLanding from '../../../components/public-sports-landing';
+import { isRunningProfile } from '../../../lib/sports-public-profile';
+import { readPublishedAthletePrompts, readPublishedShirtSizes, type PublishedAthletePrompt, type PublishedShirtSize } from '../../../lib/sports-athlete-and-kits';
 import { publicApiSignal, publicApiUrl } from '../../../lib/public-api';
 import { parsePublicRegistrationOffer, type PublicRegistrationOffer } from '../../../lib/public-registration-cta';
 import styles from './page.module.css';
@@ -46,16 +49,21 @@ async function publicProgram(slug: string): Promise<PublicProgram | null> {
   }
 }
 
-async function registrationOffer(slug: string): Promise<PublicRegistrationOffer | null> {
+async function registrationOffer(slug: string): Promise<{ offer: PublicRegistrationOffer | null; shirtSizes: PublishedShirtSize[]; athletePrompts: PublishedAthletePrompt[] }> {
   try {
     const response = await fetch(publicApiUrl(`/public/events/${encodeURIComponent(slug)}/registration`), {
       cache: 'no-store',
       signal: publicApiSignal(),
     });
-    if (!response.ok) return null;
-    return parsePublicRegistrationOffer(await response.json());
+    if (!response.ok) return { offer: null, shirtSizes: [], athletePrompts: [] };
+    const payload: unknown = await response.json();
+    return {
+      offer: parsePublicRegistrationOffer(payload),
+      shirtSizes: readPublishedShirtSizes(payload),
+      athletePrompts: readPublishedAthletePrompts(payload),
+    };
   } catch {
-    return null;
+    return { offer: null, shirtSizes: [], athletePrompts: [] };
   }
 }
 
@@ -130,8 +138,9 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
 
 export default async function PublicEventPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  const [event, offer, program] = await Promise.all([getPublicEvent(slug), registrationOffer(slug), publicProgram(slug)]);
+  const [event, registration, program] = await Promise.all([getPublicEvent(slug), registrationOffer(slug), publicProgram(slug)]);
   if (!event) notFound();
+  const offer = registration.offer;
   const registrationMode = offer?.mode ?? null;
 
   const jsonLd = eventJsonLd(event);
@@ -150,6 +159,7 @@ export default async function PublicEventPage({ params }: { params: Promise<{ sl
     <PublicSiteHeader current="evento" />
 
       <PublicEventPresentation event={event} registrationMode={registrationMode} categories={offer?.categories ?? []} programContent={program?.activities.length ? <PublicEventProgram program={program} wide={publicProgramWideLayout(event.publication.themeConfig)} /> : null} />
+      {isRunningProfile(event.event.eventType) && <PublicSportsLanding event={event} registrationOpen={registrationMode !== null} shirtSizes={registration.shirtSizes} athletePrompts={registration.athletePrompts} />}
     </Fragment>
     </main>
   </>;

@@ -1,6 +1,41 @@
 # Evolvia Master Codex
 
-## Reconciliação vigente — 27/10/2026, 10h11 (São Paulo)
+## Checkpoint de execução — 06/11/2026
+
+Direção do fundador e contratos em [#571/6685989083](https://github.com/evolvia-tecnologia/evolvia-platform/issues/571#issuecomment-6685989083). Work integra e mantém #637; Codex mantém compra múltipla/reembolso/confirmação/fiscal; Claude mantém #642 e operação/CAEX; Gemini recebe cartas/comunicações e #610 mediante ACK; Cursor retomado explicitamente para etiquetas #614→#647 e Sports #621→#648, em sessão contratada sem Cloud/cobrança nova. Um dono por conjunto de paths, transferências com SHA/ACK, compartilhados serializados. Esta direção substitui as atribuições históricas incompatíveis abaixo.
+
+A meta é concluir o desenvolvimento hoje; o prazo não substitui segurança, revisão, CI ou comprovação funcional. Gates mantêm os 93 critérios, os 11 pesos e os marcos I/T/D/F. Refinamentos de inscrição/etiquetas não criam unidade nova. Não se declara 100% por agenda, branch ou comentário.
+
+### Entrega integrada: inscrição e telefone
+
+- [#637](https://github.com/evolvia-tecnologia/evolvia-platform/pull/637) integrado por squash em `4cf655b51af6480d877d7c331e668f5cd899da43`, HEAD validado `9cb2940ffbe75e62e54edf76d4451d8c428a24f6`. Árvores do HEAD e squash idênticas: `4b5e4d0bab8845e19bb23710527f925daee7e22d`.
+- Sugestão apenas do primeiro nome, preservando edição manual e branco; área +1 visível/editável, troca de DDI e colagem sem duplicação de dígitos. Cadastros históricos não são reescritos.
+- [CI 42229498792](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/42229498792) completo aplicável verde: 948 testes da API, 729 da Web, PostgreSQL, migrations e fluxo funcional, hidratação/acessibilidade runtime e ARM64 Web; ARM64 API não aplicável/skipped por imagem não alterada. 31 testes focais locais e typecheck do componente/helper aprovados. Nova suíte React detectou 5 falhas antes do ajuste e passou 6/6 depois.
+- Revisão independente Codex do delta final sem novos bloqueadores; thread histórica resolvida, base atual e merge com SHA esperado, sem bypass. A revisão Gemini antiga não foi apresentada como revisão deste HEAD.
+- Publicação pós-merge [42231851766/job127946099903](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/42231851766/job/127946099903) comprovou `develop@4cf655b5`, containers saudáveis, API/PostgreSQL prontos e HTTPS acessível em 06/11 às 11h28 São Paulo. A verificação pública falhou depois por `Server: nginx/1.24.0` e pelo alias `dev` com certificado/redirect divergentes. Isso comprova implantação, sem aprovar o gate público nem a jornada autenticada. Navegador local indisponível por download do Chromium inválido; testes React não equivalem a homologação autenticada/mobile.
+- Rollback por reversão da aplicação, sem migration ou remoção de dados. Nenhum critério novo: medição histórica 92,9% / 70,0%, 85/93 e 0/11 permanece até nova conciliação canônica.
+
+### Próximos bloqueios concretos
+
+- #471: reserva em evento PAID aceita entrada de valor zero, mas checkout conjunto rejeita a entrada após ocupar vaga; achado em [6686774524](https://github.com/evolvia-tecnologia/evolvia-platform/pull/471#issuecomment-6686774524). Correção e negativas sem escrita exigidas, preservando FREE e fluxo individual. Codex mantém ownership.
+- #647: achado da prévia `fitWarning` oculta corrigido em `828f40c1`; HEAD final `7dd48da9` integrado por squash em `develop@49aeae51`, com CI aplicável completo verde, zero threads e revisão independente final sem bloqueadores. A prévia ilegível aparece em tela e não entra na impressão; publicação e jornada física permanecem separadas. Registro: [6686639676](https://github.com/evolvia-tecnologia/evolvia-platform/pull/647#issuecomment-6686639676). #648 Sports ainda não comprova jornada completa de atleta/estoque.
+- #642: Claude mantém UI/HTTP/concorrência/impressão. Três relações inversas já presentes no schema do `59801816`, blob `6378807a`; não repetir o bloqueio histórico resolvido.
+- Reembolso exige operação financeira persistida/compensação; NFS-e exige API/persistência/adaptador e homologação municipal/provedor. Confirmação de inscrição já integrada não deve ser reimplementada; entrega externa continua sem prova/autorização nesta execução.
+
+
+## Checkpoint de execução — 05/11/2026
+
+Base integrada verificada: `develop@9fd3bed60347a8f6eefb2a0bcda46f4ff18cca21`.
+Este checkpoint registra entregas e coordenação; não recalcula a matriz de 93 critérios.
+
+- [#643](https://github.com/evolvia-tecnologia/evolvia-platform/pull/643): recuperação segura da Transmissão integrada em `dd5285b0ea01070e4dd07a29fa59e1b2ecf30c06`, HEAD validado `f3872c30e5d02af9fd2d89f97abe388efc9a1e23`. CI [42029015343](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/42029015343) completo aplicável aprovado: 944 testes API, 708 Web, integração/PostgreSQL/migration e ARM64 Web. Leitura obrigatória antes de editar, trava síncrona e recuperação por GET após resultado de escrita desconhecido; sem nova entidade, ACL ou envio externo.
+- Publicação do #643 comprovada no [run42030834086/job127262197907](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/42030834086/job/127262197907): Commit `dd5285b0` em 05/11 às 13:06:53 UTC (10h06 São Paulo), API/PostgreSQL prontos e HTTPS200 às 13:06:54 UTC. O check público falhou depois por `Server: nginx/1.24.0` e certificado do alias `dev` incompatível com o hostname. Isso comprova publicação, sem aprovar o gate público ou o ensaio autenticado.
+- [#644](https://github.com/evolvia-tecnologia/evolvia-platform/pull/644): contraste integrado em `9fd3bed6`, HEAD `2b4ef9cd7fe67d8084d8d325dfaa029c961504cb`, CI [42030957167](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/42030957167) completo aplicável verde, Gemini sem apontamentos e zero threads. Reaproveita a linha revisada do #636 sobre a base atual; branch Codex preservada. #636 foi encerrado como substituído após o merge. Contraste calculado entre 5,21:1 e 6,06:1 nas cinco superfícies claras canônicas. Publicação desse squash e avaliação humana global exigem evidência separada.
+- Refinamentos de Transmissão e contraste não criam critério novo. A última medição permanece **92,9% implementado / 70,0% comprovado, 85/93, 0/11 Gates encerrados**. Não confundir essa medição de 27/10 com uma nova auditoria funcional em 05/11.
+- Direção vigente do fundador: Codex mantém G2/financeiro/etiquetas/integrações; Claude mantém operadores/credenciamento/expositores na #640; Gemini mantém científico/comunicações/cartas/Sports na #641, respeitando locks anteriores; Work coordena, implementa cortes independentes e integra. Essa distribuição substitui a exclusividade de implementação registrada nos checkpoints históricos. Detalhes em EVO-020 e #571.
+- Atividade externa só é confirmada por ACK/commit verificável. Comentários em filas não iniciam sessões de Claude/Gemini; não existe executor externo conectado nesta sessão. Work atua nesta execução e registra o handoff, sem promessa de implementação automática entre mensagens.
+
+## Última medição dos Gates — 27/10/2026, 10h11 (São Paulo)
 
 Implementação **92,9%**; conclusão comprovada **70,0%**; **85/93** unidades integradas; **0/11 Gates encerrados**. Recálculo pelos mesmos 93 critérios e pesos iguais dos 11 Gates: 92,9154% de integração e 69,9707% de I/T/D/F. Nenhum marco foi alterado por refinamento, branch, comentário ou espera.
 
