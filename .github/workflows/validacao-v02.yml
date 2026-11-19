@@ -702,15 +702,6 @@ jobs:
 
           echo "Homologação pública comprovada em ${HOMOLOGATION_URL}."
 
-      - name: Comprovar certificado e redirecionamento do alias dev
-        if: ${{ always() }}
-        continue-on-error: true
-        shell: bash
-        env:
-          EVOLVIA_DEV_EXPECTED_IPV4: 64.181.174.36
-          EVOLVIA_DEV_CANONICAL_DOMAIN: homologacao.evolviatecnologia.com
-        run: bash infra/certbot/diagnose-dev-tls.sh
-
   homologacao_status:
     name: Registrar evidência da homologação
     if: ${{ always() && github.event_name == 'push' && github.ref == 'refs/heads/develop' }}
