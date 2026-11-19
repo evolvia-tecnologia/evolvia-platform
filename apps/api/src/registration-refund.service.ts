@@ -362,6 +362,7 @@ export class RegistrationRefundService {
         decisionNote: true,
         createdAt: true,
         decidedAt: true,
+        preparedAmountCents: true,
         reservation: { select: { protocol: true } },
       },
     });
@@ -376,9 +377,80 @@ export class RegistrationRefundService {
         decisionNote: row.decisionNote,
         createdAt: row.createdAt.toISOString(),
         decidedAt: row.decidedAt?.toISOString() ?? null,
+        preparedAmountCents: row.preparedAmountCents,
       })),
       nextCursor: rows.length > REFUND_PAGE_SIZE ? page.at(-1)?.id ?? null : null,
     };
+  }
+
+  async prepare(userId: string, eventId: string, requestId: string, input: unknown) {
+    const amount = input && typeof input === 'object' ? (input as { amountCents?: unknown }).amountCents : null;
+    if (typeof amount !== 'number' || !Number.isSafeInteger(amount) || amount < 1 || amount > 2147483647) {
+      throw new BadRequestException('Informe um valor positivo em centavos.');
+    }
+    for (let attempt = 1; ; attempt++) {
+      try {
+        return await this.prisma.$transaction(
+          tx => this.prepareOnce(tx, userId, eventId, requestId, amount),
+          { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+        );
+      } catch (error) {
+        if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== 'P2034') throw error;
+        if (attempt >= 5) throw new ConflictException('Preparação concorrente. Consulte o pedido e tente novamente.');
+        await new Promise(resolve => setTimeout(resolve, 20 * attempt + Math.floor(Math.random() * 30)));
+      }
+    }
+  }
+
+  private async prepareOnce(tx: Prisma.TransactionClient, userId: string, eventId: string, requestId: string, amountCents: number) {
+    // A identidade financeira vem da inscrição e do checkout persistidos.
+    const paymentFields = { id: true, amountCents: true, status: true, paidAt: true } as const;
+    const request = await tx.registrationRefundRequest.findFirst({
+      where: {
+        id: requestId, eventId,
+        reservation: { event: { organization: { memberships: { some: { userId, role: 'OWNER', status: 'ACTIVE' } } } } },
+      },
+      select: {
+        organizationId: true, status: true, preparedAmountCents: true,
+        reservation: { select: {
+          status: true, finalPriceCents: true, checkout: { select: paymentFields },
+          orderEntry: { select: { finalPriceCents: true, order: { select: { checkout: { select: paymentFields } } } } },
+        } },
+      },
+    });
+    if (!request) throw new NotFoundException('Pedido não encontrado.');
+    if (request.status !== 'APPROVED') throw new ConflictException('A preparação exige um pedido aprovado.');
+    const result = { id: requestId, amountCents, moneyReturned: false, processingStatus: 'AWAITING_PAYMENT_REFERENCE' as const };
+    if (request.preparedAmountCents !== null) {
+      if (request.preparedAmountCents !== amountCents) throw new ConflictException('Este pedido já tem outro valor preparado.');
+      return result;
+    }
+    const { reservation } = request;
+    const entry = reservation.orderEntry;
+    const payment = entry ? entry.order.checkout : reservation.checkout;
+    if (reservation.status !== 'CONFIRMED' || !payment?.paidAt || payment.status !== 'PAID'
+      || (entry && reservation.checkout?.status === 'PAID')) {
+      throw new ConflictException('Não foi possível identificar um único checkout pago para a inscrição.');
+    }
+    const limit = Math.min(reservation.finalPriceCents, entry?.finalPriceCents ?? reservation.finalPriceCents);
+    if (amountCents > limit) throw new ConflictException('O valor supera o preço pago por esta inscrição.');
+    const source = entry ? { preparedOrderCheckoutId: payment.id } : { preparedCheckoutId: payment.id };
+    const total = await tx.registrationRefundRequest.aggregate({
+      where: { eventId, organizationId: request.organizationId, ...source },
+      _sum: { preparedAmountCents: true },
+    });
+    if (amountCents > payment.amountCents - (total._sum.preparedAmountCents ?? 0)) {
+      throw new ConflictException('O valor supera o saldo disponível do checkout.');
+    }
+    await tx.registrationRefundRequest.update({
+      where: { id: requestId }, data: { preparedAmountCents: amountCents, ...source },
+    });
+    await tx.auditLog.create({ data: {
+      organizationId: request.organizationId, eventId, actorUserId: userId,
+      entityType: 'RegistrationRefundRequest', entityId: requestId, action: 'refund.prepared',
+      metadata: { amountCents, paymentKind: entry ? 'ORDER' : 'RESERVATION' },
+    } });
+    return result;
   }
 
   async decide(userId: string, eventId: string, requestId: string, input: unknown, now = new Date()) {
