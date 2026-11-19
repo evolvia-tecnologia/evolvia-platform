@@ -1,7 +1,5 @@
 import type { Prisma } from '@prisma/client';
-import { FiscalInvoicePolicyError, prepareFiscalInvoiceDraft, type FiscalInvoiceSource } from './nfse-draft-policy';
-
-type FiscalSetup = Pick<FiscalInvoiceSource, 'issuerId' | 'recipientId' | 'serviceCode' | 'municipalityIbgeCode'>;
+import { FiscalInvoicePolicyError, prepareFiscalInvoiceDraft, validateFiscalSetup, type FiscalSetup } from './nfse-draft-policy';
 
 /** Server-only preview for a paid individual receipt. Fiscal setup comes from the caller's verified configuration. */
 export async function previewFiscalReceipt(
@@ -12,6 +10,7 @@ export async function previewFiscalReceipt(
   if (!scope || [scope.userId, scope.organizationId, scope.eventId, scope.receiptId].some(
     value => typeof value !== 'string' || !value.trim(),
   )) throw new FiscalInvoicePolicyError('Recibo indisponível para preparação fiscal.');
+  validateFiscalSetup(setup);
   const receipt = await db.eventRegistrationPaymentReceipt.findFirst({
     where: {
       id: scope.receiptId, organizationId: scope.organizationId, eventId: scope.eventId,

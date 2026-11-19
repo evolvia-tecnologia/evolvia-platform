@@ -23,3 +23,13 @@ test('escopo incompleto é recusado antes da consulta, e divergência impede pre
     await assert.rejects(previewFiscalReceipt(reader(value),scope,setup), /Recibo indisponível/);
   }
 });
+
+test('configuração fiscal inválida falha antes da leitura do recibo', async () => {
+  let queries = 0;
+  const db = { eventRegistrationPaymentReceipt: { findFirst: async () => { queries++; return receipt; } } };
+  for (const invalid of [null, undefined, [], { ...setup, issuerId: '' }, { ...setup, recipientId: 123 },
+    { ...setup, municipalityIbgeCode: '0000000' }, { ...setup, serviceCode: {} }]) {
+    await assert.rejects(previewFiscalReceipt(db, scope, invalid), { name: 'FiscalInvoicePolicyError' });
+  }
+  assert.equal(queries, 0);
+});

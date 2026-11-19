@@ -52,12 +52,29 @@ const IBGE_UF = new Set(['11','12','13','14','15','16','17','21','22','23','24',
 const SERVICE = /^[A-Za-z0-9.\-]{1,20}$/u;
 const MAX_CENTS = 999_999_999_999;
 
+export type FiscalSetup = Pick<FiscalInvoiceSource, 'issuerId' | 'recipientId' | 'serviceCode' | 'municipalityIbgeCode'>;
+
+export function validateFiscalSetup(input: FiscalSetup): void {
+  if (!input || typeof input !== 'object' || Array.isArray(input) ||
+      [input.issuerId, input.recipientId].some(id => typeof id !== 'string' || !ID.test(id))) {
+    throw new FiscalInvoicePolicyError('Referências fiscais inválidas.');
+  }
+  if (typeof input.municipalityIbgeCode !== 'string'
+    || !IBGE.test(input.municipalityIbgeCode)
+    || !IBGE_UF.has(input.municipalityIbgeCode.slice(0, 2))
+    || input.municipalityIbgeCode.slice(2) === '00000'
+    || typeof input.serviceCode !== 'string'
+    || !SERVICE.test(input.serviceCode)) {
+    throw new FiscalInvoicePolicyError('Município ou código de serviço inválido.');
+  }
+}
+
 export function prepareFiscalInvoiceDraft(input: FiscalInvoiceSource): FiscalInvoiceDraft {
   if (!input || typeof input !== 'object' || Array.isArray(input)) {
     throw new FiscalInvoicePolicyError('Referências fiscais inválidas.');
   }
   const ids = [input.organizationId, input.eventId, input.reservationId,
-    input.receiptId, input.issuerId, input.recipientId];
+    input.receiptId];
   if (ids.some((id) => typeof id !== 'string' || !ID.test(id))) {
     throw new FiscalInvoicePolicyError('Referências fiscais inválidas.');
   }
@@ -68,14 +85,7 @@ export function prepareFiscalInvoiceDraft(input: FiscalInvoiceSource): FiscalInv
     || input.amountCents <= 0 || input.amountCents > MAX_CENTS) {
     throw new FiscalInvoicePolicyError('Valor fiscal inválido.');
   }
-  if (typeof input.municipalityIbgeCode !== 'string'
-    || !IBGE.test(input.municipalityIbgeCode)
-    || !IBGE_UF.has(input.municipalityIbgeCode.slice(0, 2))
-    || input.municipalityIbgeCode.slice(2) === '00000'
-    || typeof input.serviceCode !== 'string'
-    || !SERVICE.test(input.serviceCode)) {
-    throw new FiscalInvoicePolicyError('Município ou código de serviço inválido.');
-  }
+  validateFiscalSetup(input);
   const keySource = [
     'nfse-draft-v1', input.organizationId, input.eventId, input.reservationId,
     input.receiptId, input.issuerId, input.recipientId, input.municipalityIbgeCode,
