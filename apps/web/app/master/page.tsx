@@ -31,6 +31,12 @@ import type { OpcoesDeAutenticacaoJson, OpcoesDeRegistroJson } from '../../lib/w
  * A busca tem submissão explícita, não a cada tecla: digitar "congresso"
  * dispararia nove requisições, e a lista recarrega quando a pessoa pede.
  *
+ * **Cada seção carrega e falha por conta própria.** Painel, lista e trilha
+ * atendem permissões diferentes (`consultar` e `auditar`), e um delegado pode
+ * ter uma e não a outra. Juntar os pedidos num `Promise.all` fazia a falha de
+ * um derrubar o outro: quem tinha `consultar` e não `auditar` tomava 403 na
+ * auditoria e ficava com o painel em skeleton para sempre, tendo a permissão.
+ *
  * Nenhum CSS novo: as classes são as mesmas do painel do organizador. O CSS
  * público é do Cursor, e inventar estilo que eu não consigo renderizar nesta
  * sessão seria apostar na aparência de uma tela administrativa.
@@ -142,6 +148,29 @@ function rotuloDaAcao(acao: string): string {
 
 const quando = (iso: string) => new Date(iso).toLocaleString('pt-BR');
 
+/** 403 sem depender de `instanceof`: `api` anexa `status` ao erro que lança. */
+const semPermissao = (reason: unknown): boolean =>
+  reason instanceof Error && 'status' in reason && (reason as { status: number }).status === 403;
+
+/**
+ * A mensagem de UMA seção que não carregou.
+ *
+ * 403 não é erro da página: é o sistema funcionando, e o texto diz o que falta
+ * e a quem pedir. Esconder a seção em silêncio seria pior — a pessoa não
+ * saberia se falta permissão ou se a tela quebrou.
+ *
+ * Isto é apresentação e nada mais. Quem barra é o `deny-by-default` do
+ * backend: as rotas recusam direto na API, independentemente do que esta tela
+ * mostre.
+ */
+function recusaDaSecao(reason: unknown, oQue: string, permissao: string): string {
+  if (semPermissao(reason)) {
+    return `Você não tem a permissão “${permissao}” nesta área, então ${oQue} não aparece aqui.`
+      + ' Peça ao proprietário da plataforma se precisar deste acesso.';
+  }
+  return reason instanceof Error ? reason.message : `Não foi possível carregar ${oQue}.`;
+}
+
 export default function AreaMasterPage() {
   const router = useRouter();
 
@@ -152,6 +181,12 @@ export default function AreaMasterPage() {
   const [visao, setVisao] = useState<VisaoGeral | null>(null);
   const [trilha, setTrilha] = useState<Relatorio | null>(null);
   const [catalogo, setCatalogo] = useState<Catalogo | null>(null);
+
+  // A recusa de cada seção, separada da outra e do erro da página. `null`
+  // significa "ainda carregando ou tudo bem"; o render distingue pelos dados.
+  const [recusaDoPainel, setRecusaDoPainel] = useState<string | null>(null);
+  const [recusaDaLista, setRecusaDaLista] = useState<string | null>(null);
+  const [recusaDaTrilha, setRecusaDaTrilha] = useState<string | null>(null);
 
   // Controles da lista. `busca` é o que está digitado; `termo` é o que foi
   // submetido — separados de propósito, para a lista não recarregar a cada
@@ -176,29 +211,46 @@ export default function AreaMasterPage() {
     setPasso(temSessaoMaster() ? 'dentro' : 'entrar');
   }, [router]);
 
-  /** Erro que volta ao passo de entrada quando a sessão caiu. */
-  const tratar = useCallback((reason: unknown, padrao: string) => {
+  /** Sessão caída volta ao passo de entrada, de qualquer seção. */
+  const sessaoCaiu = useCallback((reason: unknown): boolean => {
     if (reason instanceof SessaoMasterAusente) {
       setPasso('entrar');
       setErro(reason.message);
-      return;
+      return true;
     }
-    setErro(reason instanceof Error ? reason.message : padrao);
+    return false;
   }, []);
 
+  /**
+   * Painel e trilha, simultâneos e INDEPENDENTES.
+   *
+   * `allSettled` e não `all`: as duas rotas exigem permissões diferentes
+   * (`consultar` e `auditar`), e um delegado pode ter uma só. Com `all`, a
+   * recusa de uma rejeitava o par e apagava a seção que a pessoa podia ver.
+   */
   const carregar = useCallback(async () => {
     setErro('');
-    try {
-      const [geral, auditoria] = await Promise.all([
-        apiMaster<VisaoGeral>('/platform/master/overview', { method: 'POST', body: '{}' }),
-        apiMaster<Relatorio>('/platform/master/audit', { method: 'POST', body: JSON.stringify({ limite: 20 }) }),
-      ]);
-      setVisao(geral);
-      setTrilha(auditoria);
-    } catch (reason) {
-      tratar(reason, 'Não foi possível carregar a Área Master.');
+    const [geral, auditoria] = await Promise.allSettled([
+      apiMaster<VisaoGeral>('/platform/master/overview', { method: 'POST', body: '{}' }),
+      apiMaster<Relatorio>('/platform/master/audit', { method: 'POST', body: JSON.stringify({ limite: 20 }) }),
+    ]);
+
+    if (geral.status === 'fulfilled') {
+      setVisao(geral.value);
+      setRecusaDoPainel(null);
+    } else if (!sessaoCaiu(geral.reason)) {
+      setVisao(null);
+      setRecusaDoPainel(recusaDaSecao(geral.reason, 'a visão geral da plataforma', 'consultar'));
     }
-  }, [tratar]);
+
+    if (auditoria.status === 'fulfilled') {
+      setTrilha(auditoria.value);
+      setRecusaDaTrilha(null);
+    } else if (!sessaoCaiu(auditoria.reason)) {
+      setTrilha(null);
+      setRecusaDaTrilha(recusaDaSecao(auditoria.reason, 'a trilha de auditoria', 'auditar'));
+    }
+  }, [sessaoCaiu]);
 
   const carregarLista = useCallback(async () => {
     try {
@@ -207,10 +259,13 @@ export default function AreaMasterPage() {
       setCatalogo(await apiMaster<Catalogo>('/platform/master/catalog', {
         method: 'POST', body: JSON.stringify(corpo),
       }));
+      setRecusaDaLista(null);
     } catch (reason) {
-      tratar(reason, 'Não foi possível carregar a lista de eventos.');
+      if (sessaoCaiu(reason)) return;
+      setCatalogo(null);
+      setRecusaDaLista(recusaDaSecao(reason, 'a lista de eventos', 'consultar'));
     }
-  }, [ordem, pagina, recorteDaLista, termo, tratar]);
+  }, [ordem, pagina, recorteDaLista, termo, sessaoCaiu]);
 
   useEffect(() => { if (passo === 'dentro') void carregar(); }, [passo, carregar]);
   useEffect(() => { if (passo === 'dentro') void carregarLista(); }, [passo, carregarLista]);
@@ -277,11 +332,7 @@ export default function AreaMasterPage() {
       });
       setAviso('Chave de backup registrada. Guarde-a em outro lugar físico que a principal.');
     } catch (reason) {
-      if (reason instanceof SessaoMasterAusente) {
-        setPasso('entrar');
-        setErro(reason.message);
-        return;
-      }
+      if (sessaoCaiu(reason)) return;
       setErro(mensagemDoErro(reason));
     } finally {
       setOcupado(false);
@@ -301,6 +352,9 @@ export default function AreaMasterPage() {
       setVisao(null);
       setTrilha(null);
       setCatalogo(null);
+      setRecusaDoPainel(null);
+      setRecusaDaLista(null);
+      setRecusaDaTrilha(null);
       setPasso('entrar');
       setOcupado(false);
     }
@@ -369,7 +423,9 @@ export default function AreaMasterPage() {
       {erro && <div className="error" role="alert">{erro}</div>}
       {aviso && <div className="card" role="status" style={{ padding: '1rem', marginBottom: '1.5rem' }}>{aviso}</div>}
 
-      {!visao ? <div className="events-skeleton"><div /><div /><div /></div> : <>
+      {/* Painel. Três estados próprios, e a recusa daqui não apaga as seções
+          abaixo — um delegado pode ter `auditar` sem ter `consultar`. */}
+      {visao ? <>
         <div className="dashboard-metrics">
           <div className="metric-card"><span className="metric-icon">▦</span><div><strong>{visao.totais.criados}</strong><small>Eventos criados</small></div></div>
           <div className="metric-card"><span className="metric-icon">◉</span><div><strong>{visao.totais.publicados}</strong><small>Publicados</small></div></div>
@@ -394,105 +450,121 @@ export default function AreaMasterPage() {
           aoAbrir={(chave) => filtrarLista({ areas: [chave] })}
           nota={'Um evento com duas áreas aparece nas duas, então a soma por área é maior que o total de eventos'
             + ` — e é assim mesmo. ${visao.semArea.total} evento(s) não têm área e não aparecem nesta quebra.`} />
+      </> : recusaDoPainel
+        ? <div className="card" role="status" style={{ padding: '1.25rem' }}>
+          <h2>Visão geral</h2>
+          <p className="muted">{recusaDoPainel}</p>
+        </div>
+        : <div className="events-skeleton"><div /><div /><div /></div>}
 
-        <section className="card" style={{ padding: '1.25rem', marginTop: '2rem' }} aria-labelledby="lista-titulo">
-          <div className="events-section-head">
-            <div>
-              <h2 id="lista-titulo">Eventos</h2>
-              <p>
-                {catalogo
-                  ? `${catalogo.total} evento(s) no recorte${catalogo.paginas > 1 ? `, página ${catalogo.pagina} de ${catalogo.paginas}` : ''}.`
-                  : 'Carregando a lista...'}
+      {/* Lista. Depende de `consultar`, como o painel, mas de outra rota: se uma
+          falhar por rede, a outra ainda tem o que mostrar. */}
+      <section className="card" style={{ padding: '1.25rem', marginTop: '2rem' }} aria-labelledby="lista-titulo">
+        <div className="events-section-head">
+          <div>
+            <h2 id="lista-titulo">Eventos</h2>
+            <p>
+              {catalogo
+                ? `${catalogo.total} evento(s) no recorte${catalogo.paginas > 1 ? `, página ${catalogo.pagina} de ${catalogo.paginas}` : ''}.`
+                : recusaDaLista ?? 'Carregando a lista...'}
+            </p>
+          </div>
+          {catalogo && <select className="select organization-filter" value={ordem} aria-label="Ordenar eventos"
+            onChange={(e) => { setOrdem(e.target.value); setPagina(1); }}>
+            <option value="recentes">Mais recentes</option>
+            <option value="nome">Nome</option>
+            <option value="inicio">Data de início</option>
+          </select>}
+        </div>
+
+        {/* Os controles só aparecem quando há lista para controlar. Oferecer
+            busca que não pode voltar nada é convidar a pessoa a tentar de novo
+            até concluir que a tela quebrou. */}
+        {catalogo && <form onSubmit={(e) => { e.preventDefault(); setTermo(busca.trim()); setPagina(1); }}
+          style={{ display: 'flex', gap: '0.5rem', margin: '1rem 0', flexWrap: 'wrap' }}>
+          <input className="input" value={busca} onChange={(e) => setBusca(e.target.value)}
+            placeholder="Buscar por nome, tipo ou organização" aria-label="Buscar eventos"
+            style={{ flex: '1 1 16rem' }} />
+          <button className="btn btn-secondary" type="submit">Buscar</button>
+          {(termo.length > 0 || temFiltroDaLista) && <button className="btn btn-secondary" type="button"
+            onClick={() => { setBusca(''); setTermo(''); setRecorteDaLista({}); setPagina(1); }}>
+            Limpar filtros
+          </button>}
+        </form>}
+
+        {catalogo && temFiltroDaLista && <p className="muted">
+          A lista está filtrada pelo que você abriu no painel. Os números acima continuam
+          contando a plataforma inteira.
+        </p>}
+
+        {!catalogo
+          ? (recusaDaLista ? null : <div className="events-skeleton"><div /><div /><div /></div>)
+          : catalogo.itens.length === 0
+            ? <div className="card" style={{ padding: '2rem' }}>
+              <h3>Nenhum evento neste recorte</h3>
+              <p className="muted">
+                {termo.length > 0
+                  ? `Nada encontrado para “${termo}”. Tente outro termo ou limpe os filtros.`
+                  : 'Ajuste o recorte ou limpe os filtros para ver todos os eventos.'}
               </p>
             </div>
-            <select className="select organization-filter" value={ordem} aria-label="Ordenar eventos"
-              onChange={(e) => { setOrdem(e.target.value); setPagina(1); }}>
-              <option value="recentes">Mais recentes</option>
-              <option value="nome">Nome</option>
-              <option value="inicio">Data de início</option>
-            </select>
-          </div>
-
-          {/* Submissão explícita, não busca a cada tecla: a lista recarrega quando
-              a pessoa pede, e não nove vezes enquanto ela digita. */}
-          <form onSubmit={(e) => { e.preventDefault(); setTermo(busca.trim()); setPagina(1); }}
-            style={{ display: 'flex', gap: '0.5rem', margin: '1rem 0', flexWrap: 'wrap' }}>
-            <input className="input" value={busca} onChange={(e) => setBusca(e.target.value)}
-              placeholder="Buscar por nome, tipo ou organização" aria-label="Buscar eventos"
-              style={{ flex: '1 1 16rem' }} />
-            <button className="btn btn-secondary" type="submit">Buscar</button>
-            {(termo.length > 0 || temFiltroDaLista) && <button className="btn btn-secondary" type="button"
-              onClick={() => { setBusca(''); setTermo(''); setRecorteDaLista({}); setPagina(1); }}>
-              Limpar filtros
-            </button>}
-          </form>
-
-          {temFiltroDaLista && <p className="muted">
-            A lista está filtrada pelo que você abriu no painel. Os números acima continuam
-            contando a plataforma inteira.
-          </p>}
-
-          {!catalogo ? <div className="events-skeleton"><div /><div /><div /></div>
-            : catalogo.itens.length === 0
-              ? <div className="card" style={{ padding: '2rem' }}>
-                <h3>Nenhum evento neste recorte</h3>
-                <p className="muted">
-                  {termo.length > 0
-                    ? `Nada encontrado para “${termo}”. Tente outro termo ou limpe os filtros.`
-                    : 'Ajuste o recorte ou limpe os filtros para ver todos os eventos.'}
-                </p>
+            : <>
+              <div className="events-grid premium-events-grid">
+                {catalogo.itens.map((item) => <article className="event-card" key={item.id}>
+                  <div className="event-card-head">
+                    <span className={`event-status status-${item.situacao.toLowerCase()}`}>
+                      {rotulosDeSituacao[item.situacao] ?? item.situacao}
+                    </span>
+                    <span className="event-format">{rotulosDeFormato[item.formato] ?? item.formato}</span>
+                  </div>
+                  <div className="event-card-body">
+                    <small>{item.organizacao ?? 'Sem organização'}</small>
+                    <h3>{item.nome}</h3>
+                    <p>{item.tipo}</p>
+                  </div>
+                  {item.areas.length > 0 && <div className="event-capabilities">
+                    {item.areas.map((area) => <span key={area}>{area}</span>)}
+                  </div>}
+                  <div className="event-card-footer">
+                    <span>
+                      {item.inicio
+                        ? `Início ${new Date(item.inicio).toLocaleDateString('pt-BR')}`
+                        : 'Sem data de início'}
+                    </span>
+                    {item.removido && <strong>Removido pela plataforma</strong>}
+                  </div>
+                </article>)}
               </div>
-              : <>
-                <div className="events-grid premium-events-grid">
-                  {catalogo.itens.map((item) => <article className="event-card" key={item.id}>
-                    <div className="event-card-head">
-                      <span className={`event-status status-${item.situacao.toLowerCase()}`}>
-                        {rotulosDeSituacao[item.situacao] ?? item.situacao}
-                      </span>
-                      <span className="event-format">{rotulosDeFormato[item.formato] ?? item.formato}</span>
-                    </div>
-                    <div className="event-card-body">
-                      <small>{item.organizacao ?? 'Sem organização'}</small>
-                      <h3>{item.nome}</h3>
-                      <p>{item.tipo}</p>
-                    </div>
-                    {item.areas.length > 0 && <div className="event-capabilities">
-                      {item.areas.map((area) => <span key={area}>{area}</span>)}
-                    </div>}
-                    <div className="event-card-footer">
-                      <span>
-                        {item.inicio
-                          ? `Início ${new Date(item.inicio).toLocaleDateString('pt-BR')}`
-                          : 'Sem data de início'}
-                      </span>
-                      {item.removido && <strong>Removido pela plataforma</strong>}
-                    </div>
-                  </article>)}
-                </div>
 
-                {catalogo.paginas > 1 && <div className="nav-actions" style={{ marginTop: '1.5rem' }}>
-                  <button className="btn btn-secondary" disabled={catalogo.pagina <= 1 || ocupado}
-                    onClick={() => setPagina((p) => Math.max(1, p - 1))}>Anterior</button>
-                  <span className="muted">Página {catalogo.pagina} de {catalogo.paginas}</span>
-                  <button className="btn btn-secondary" disabled={catalogo.pagina >= catalogo.paginas || ocupado}
-                    onClick={() => setPagina((p) => p + 1)}>Próxima</button>
-                </div>}
-              </>}
-        </section>
+              {catalogo.paginas > 1 && <div className="nav-actions" style={{ marginTop: '1.5rem' }}>
+                <button className="btn btn-secondary" disabled={catalogo.pagina <= 1 || ocupado}
+                  onClick={() => setPagina((p) => Math.max(1, p - 1))}>Anterior</button>
+                <span className="muted">Página {catalogo.pagina} de {catalogo.paginas}</span>
+                <button className="btn btn-secondary" disabled={catalogo.pagina >= catalogo.paginas || ocupado}
+                  onClick={() => setPagina((p) => p + 1)}>Próxima</button>
+              </div>}
+            </>}
+      </section>
 
-        <section className="card" style={{ padding: '1.25rem', marginTop: '2rem' }}>
-          <h2>Chave de backup</h2>
-          <p className="muted">
-            Registre uma segunda chave e guarde-a em outro lugar físico. Com uma chave só, perdê-la
-            significa perder o acesso à Área Master.
-          </p>
-          <button className="btn btn-secondary" onClick={registrarChaveDeBackup} disabled={ocupado}>
-            {ocupado ? 'Aguardando a chave...' : 'Registrar chave de backup'}
-          </button>
-        </section>
+      {/* Chave de backup: exige apenas sessão Master, nenhuma concessão. Fica
+          disponível mesmo para quem não tem poder nenhum — registrar a segunda
+          chave é justamente o que evita perder o acesso. */}
+      <section className="card" style={{ padding: '1.25rem', marginTop: '2rem' }}>
+        <h2>Chave de backup</h2>
+        <p className="muted">
+          Registre uma segunda chave e guarde-a em outro lugar físico. Com uma chave só, perdê-la
+          significa perder o acesso à Área Master.
+        </p>
+        <button className="btn btn-secondary" onClick={registrarChaveDeBackup} disabled={ocupado}>
+          {ocupado ? 'Aguardando a chave...' : 'Registrar chave de backup'}
+        </button>
+      </section>
 
-        {trilha && <section className="card" style={{ padding: '1.25rem', marginTop: '2rem' }} aria-labelledby="trilha-titulo">
-          <h2 id="trilha-titulo">Trilha de auditoria</h2>
+      {/* Trilha. Exige `auditar`, que é permissão própria: quem não a tem vê o
+          motivo aqui e segue usando o resto da área. */}
+      <section className="card" style={{ padding: '1.25rem', marginTop: '2rem' }} aria-labelledby="trilha-titulo">
+        <h2 id="trilha-titulo">Trilha de auditoria</h2>
+        {trilha ? <>
           <p className="muted">
             {trilha.mostrados} registro(s)
             {trilha.truncado && ' — a lista foi cortada, e os números abaixo são desta página, não do total'}.
@@ -511,8 +583,10 @@ export default function AreaMasterPage() {
                 {item.motivo && <><br /><span className="muted">{item.motivo}</span></>}
               </li>)}
             </ul>}
-        </section>}
-      </>}
+        </> : recusaDaTrilha
+          ? <p className="muted" role="status">{recusaDaTrilha}</p>
+          : <div className="events-skeleton"><div /><div /><div /></div>}
+      </section>
     </section>
   </main>;
 }

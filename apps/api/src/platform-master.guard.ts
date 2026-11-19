@@ -54,16 +54,34 @@ const hashDoToken = (token: string): string => createHash('sha256').update(token
  * na rota faz o alvo ser o evento; `organizationId` sozinho faz ser a
  * organização; nenhum dos dois faz ser a plataforma, que é o alcance mais
  * largo e por isso exige concessão global.
+ *
+ * Para um evento, a organização vem do BANCO e não do parâmetro, e isto é a
+ * correção de um defeito real: `events/:eventId/summary` e
+ * `events/:eventId/audit` não têm `:organizationId` na rota, então o alvo saía
+ * com `organizationId: ''`. Nenhuma concessão com escopo de organização casa
+ * com string vazia, e todo delegado de organização tomava `FORA_DO_ESCOPO` nas
+ * duas rotas.
+ *
+ * Resolver pelo banco mesmo quando o parâmetro existe é deliberado: a decisão
+ * de autorização não pode depender de valor que o chamador controla. Confiar no
+ * parâmetro permitiria apresentar o id de uma organização onde a pessoa tem
+ * concessão junto com o id de um evento de outra, e a conferência casaria. Não
+ * há rota assim hoje; a porta fica fechada antes de alguém criar uma.
+ *
+ * Evento inexistente resolve para `organizationId: ''`, de propósito: o guard
+ * decide normalmente, o delegado toma 403 e o proprietário segue para o
+ * controller. Responder 404 aqui faria o par 404/403 contar quais ids de evento
+ * existem para quem não tem acesso a nenhum deles.
  */
-function alvoDaRequisicao(requisicao: RequisicaoMaster): Alvo {
+async function alvoDaRequisicao(
+  requisicao: RequisicaoMaster,
+  repositorio: PlatformMasterRepository,
+): Promise<Alvo> {
   const eventId = requisicao.params?.eventId;
   const organizationId = requisicao.params?.organizationId;
   if (typeof eventId === 'string' && eventId.length > 0) {
-    return {
-      tipo: 'EVENTO',
-      eventId,
-      organizationId: typeof organizationId === 'string' ? organizationId : '',
-    };
+    const persistida = await repositorio.organizacaoDoEvento(eventId);
+    return { tipo: 'EVENTO', eventId, organizationId: persistida ?? '' };
   }
   if (typeof organizationId === 'string' && organizationId.length > 0) {
     return { tipo: 'ORGANIZACAO', organizationId };
@@ -126,7 +144,7 @@ async function resolverSessao(
     sessionId: daPessoa.sessionId,
     tokenHash,
     proprietario: leitura.sessao.proprietario,
-    alvo: alvoDaRequisicao(requisicao),
+    alvo: await alvoDaRequisicao(requisicao, repositorio),
   };
   requisicao.master = sessaoNaRequisicao;
   // Devolve o valor já estreitado, e não a união: assim quem chama não precisa

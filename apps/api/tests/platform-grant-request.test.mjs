@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   ACOES_PEDIVEIS,
+  CAMPOS,
   MAX_EVENTOS,
   MAX_PESSOAS,
   MOTIVO_MINIMO,
@@ -154,6 +155,86 @@ test('o limite exato de pessoas e de eventos é aceito', () => {
   const e = ler(base({ escopo: { tipo: 'EVENTOS', eventIds: eventos } }));
   assert.equal(e.ok, true, e.ok ? '' : e.erros.join(' | '));
   assert.equal(e.pedido.escopo.eventIds.length, MAX_EVENTOS);
+});
+
+// ------------------------------------------- o CAMPO de cada recusa
+//
+// Antes, a recusa saía só com a frase, e o contrato de erro da plataforma ia
+// com `field` vazio: a mensagem certa, sem nada para o formulário destacar nem
+// para o leitor de tela anunciar. Num pedido com quatro problemas, a pessoa
+// tinha de descobrir sozinha a qual campo cada frase se referia.
+//
+// Estes casos existem porque o `field` é consumido por código que não aparece
+// aqui: errar um nome não quebraria nada visivelmente, só produziria destaque
+// que cai no vazio.
+
+test('cada recusa nomeia o campo que o formulário deve destacar', () => {
+  const casos = [
+    [{ pessoas: [] }, CAMPOS.pessoas],
+    [{ pessoas: Array.from({ length: MAX_PESSOAS + 1 }, (_, i) => ID(i + 1)) }, CAMPOS.pessoas],
+    [{ pessoas: ['curto'] }, CAMPOS.pessoas],
+    [{ acoes: [] }, CAMPOS.acoes],
+    [{ acoes: ['administrar_equipe'] }, CAMPOS.acoes],
+    [{ escopo: undefined }, CAMPOS.escopo],
+    [{ escopo: { tipo: 'TUDO' } }, CAMPOS.escopo],
+    [{ escopo: { tipo: 'ORGANIZACAO' } }, CAMPOS.organizacao],
+    [{ escopo: { tipo: 'EVENTOS', eventIds: [] } }, CAMPOS.eventos],
+    [{ escopo: { tipo: 'EVENTOS', eventIds: Array.from({ length: MAX_EVENTOS + 1 }, (_, i) => ID(i + 1)) } }, CAMPOS.eventos],
+    [{ escopo: { tipo: 'EVENTOS', eventIds: ['curto'] } }, CAMPOS.eventos],
+    [{ motivo: 'curto' }, CAMPOS.motivo],
+    [{ motivo: 'x'.repeat(201) }, CAMPOS.motivo],
+    [{ expiraEm: 'amanhã' }, CAMPOS.prazo],
+    [{ expiraEm: 12345 }, CAMPOS.prazo],
+    [{ expiraEm: passado }, CAMPOS.prazo],
+  ];
+  for (const [extra, esperado] of casos) {
+    const r = ler(base(extra));
+    assert.equal(r.ok, false, JSON.stringify(extra));
+    assert.equal(r.problemas.length, 1, `${JSON.stringify(extra)} produziu ${r.problemas.length} problemas`);
+    assert.equal(r.problemas[0].campo, esperado, JSON.stringify(extra));
+  }
+});
+
+test('o subcampo da organização é destacado, não o escopo inteiro', () => {
+  // Quem escolheu "organização" e errou o id precisa que o destaque caia no
+  // seletor de organização, não no grupo de alcance inteiro.
+  const r = ler(base({ escopo: { tipo: 'ORGANIZACAO', organizationId: 'curto' } }));
+  assert.equal(r.problemas[0].campo, 'escopo.organizationId');
+  assert.notEqual(r.problemas[0].campo, 'escopo');
+});
+
+test('corpo inteiro inválido não finge pertencer a um campo', () => {
+  for (const corpo of [null, 'texto', 42, []]) {
+    const r = ler(corpo);
+    assert.equal(r.problemas.length, 1, JSON.stringify(corpo));
+    assert.equal(r.problemas[0].campo, '', 'inventar campo aqui daria destaque errado');
+    assert.equal(r.problemas[0].mensagem, 'Pedido inválido.');
+  }
+});
+
+test('problemas acumulados preservam o campo de cada um, na ordem de leitura', () => {
+  const r = ler({ pessoas: [], acoes: [], escopo: null, motivo: '', expiraEm: 'ontem' });
+  assert.deepEqual(r.problemas.map((p) => p.campo),
+    [CAMPOS.pessoas, CAMPOS.acoes, CAMPOS.escopo, CAMPOS.motivo, CAMPOS.prazo]);
+});
+
+test('erros é derivado de problemas, nunca mantido em paralelo', () => {
+  // Se um dia alguém acrescentar uma recusa só em `erros`, as duas listas
+  // divergem e a tela destaca um campo a menos do que a API recusou.
+  const r = ler({ pessoas: [], acoes: [], escopo: null, motivo: '', expiraEm: 'ontem' });
+  assert.deepEqual(r.erros, r.problemas.map((p) => p.mensagem));
+  assert.equal(r.erros.length, r.problemas.length);
+});
+
+test('todo campo nomeado existe no corpo que o DTO aceita', () => {
+  // Um `field` que não corresponde a nada no corpo é destaque que cai no vazio.
+  // A raiz de cada caminho pontuado tem de ser um campo do RevisarConcessaoDto.
+  const doDto = new Set(['pessoas', 'acoes', 'escopo', 'motivo', 'expiraEm']);
+  for (const [chave, caminho] of Object.entries(CAMPOS)) {
+    if (caminho === '') continue;
+    const raiz = caminho.split('.')[0];
+    assert.ok(doDto.has(raiz), `CAMPOS.${chave} aponta para "${caminho}", fora do DTO`);
+  }
 });
 
 // ------------------------------------------------------ o resumo de confirmação

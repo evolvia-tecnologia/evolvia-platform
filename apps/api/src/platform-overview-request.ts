@@ -40,6 +40,31 @@ export type Perfil = (typeof PERFIS)[number];
 export type CampoDoPeriodo = (typeof CAMPOS_DO_PERIODO)[number];
 
 /**
+ * Nomes dos campos do corpo, numa fonte só, iguais aos do `VisaoGeralDto`.
+ *
+ * Como constante, um nome digitado errado não compila. Espalhado em literais,
+ * produziria `field` que a tela tenta destacar e não encontra — destaque que
+ * cai no vazio, em silêncio.
+ */
+export const CAMPOS = {
+  corpo: '',
+  de: 'de',
+  ate: 'ate',
+  campoDoPeriodo: 'campoDoPeriodo',
+  organizationIds: 'organizationIds',
+  profileCodes: 'profileCodes',
+  areas: 'areas',
+  formatos: 'formatos',
+  situacoes: 'situacoes',
+} as const;
+
+/** Problema com o campo que o formulário deve destacar. */
+export type ProblemaDoFiltro = {
+  readonly campo: string;
+  readonly mensagem: string;
+};
+
+/**
  * O filtro já lido.
  *
  * Os campos de catálogo carregam a união derivada do próprio catálogo, e não
@@ -60,7 +85,13 @@ export type FiltroLido = {
 
 export type LeituraDoFiltro =
   | { ok: true; filtro: FiltroLido }
-  | { ok: false; erros: string[] };
+  | {
+    ok: false;
+    /** Problemas com o campo recusado. Fonte única. */
+    problemas: ProblemaDoFiltro[];
+    /** As mesmas mensagens, sem o campo. Derivado de `problemas`, nunca mantido em paralelo. */
+    erros: string[];
+  };
 
 const identificador = (valor: unknown): string | null => {
   if (typeof valor !== 'string') return null;
@@ -79,24 +110,27 @@ function unicos(valores: readonly string[]): string[] {
   return [...new Set(valores)];
 }
 
+/** Dimensão: `campo` é o que a tela destaca, `nome` é o que a pessoa lê. */
+type Dimensao = { readonly campo: string; readonly nome: string };
+
 function lerLista(
   bruto: unknown,
-  nome: string,
+  dimensao: Dimensao,
   ler: (valor: unknown) => string | null,
-  erros: string[],
+  problemas: ProblemaDoFiltro[],
 ): string[] {
   if (bruto === undefined || bruto === null) return [];
   if (!Array.isArray(bruto)) {
-    erros.push(`O filtro de ${nome} precisa ser uma lista.`);
+    problemas.push({ campo: dimensao.campo, mensagem: `O filtro de ${dimensao.nome} precisa ser uma lista.` });
     return [];
   }
   if (bruto.length > MAX_POR_DIMENSAO) {
-    erros.push(`Escolha no máximo ${MAX_POR_DIMENSAO} itens em ${nome}.`);
+    problemas.push({ campo: dimensao.campo, mensagem: `Escolha no máximo ${MAX_POR_DIMENSAO} itens em ${dimensao.nome}.` });
     return [];
   }
   const lidos = bruto.map(ler);
   if (lidos.some((item) => item === null)) {
-    erros.push(`Há valor inválido no filtro de ${nome}.`);
+    problemas.push({ campo: dimensao.campo, mensagem: `Há valor inválido no filtro de ${dimensao.nome}.` });
     return [];
   }
   return unicos(lidos as string[]);
@@ -104,65 +138,83 @@ function lerLista(
 
 function lerCatalogo<T extends string>(
   bruto: unknown,
-  nome: string,
+  dimensao: Dimensao,
   catalogo: readonly T[],
-  erros: string[],
+  problemas: ProblemaDoFiltro[],
 ): T[] {
   return lerLista(
-    bruto, nome,
+    bruto, dimensao,
     (valor) => (typeof valor === 'string' && (catalogo as readonly string[]).includes(valor.trim()) ? valor.trim() : null),
-    erros,
+    problemas,
   ) as T[];
 }
 
-function lerData(bruto: unknown, nome: string, erros: string[]): string | null {
+function lerData(bruto: unknown, campo: string, nome: string, problemas: ProblemaDoFiltro[]): string | null {
   if (bruto === undefined || bruto === null || bruto === '') return null;
   if (typeof bruto !== 'string') {
-    erros.push(`A data ${nome} não é válida.`);
+    problemas.push({ campo, mensagem: `A data ${nome} não é válida.` });
     return null;
   }
   const quando = new Date(bruto).getTime();
   if (Number.isNaN(quando)) {
-    erros.push(`A data ${nome} não é válida.`);
+    problemas.push({ campo, mensagem: `A data ${nome} não é válida.` });
     return null;
   }
   return new Date(quando).toISOString();
 }
+
+/** Uma recusa, com `erros` derivado de `problemas` em vez de repetido. */
+const recusar = (problemas: readonly ProblemaDoFiltro[]): LeituraDoFiltro => ({
+  ok: false,
+  problemas: [...problemas],
+  erros: problemas.map((problema) => problema.mensagem),
+});
 
 /**
  * Lê o filtro e acumula TODOS os problemas.
  *
  * Acumular em vez de parar no primeiro: quem monta um recorte com período,
  * organização, perfil, área e formato quer saber dos cinco de uma vez.
+ *
+ * Cada problema sai com o CAMPO a que pertence. Antes saía só a frase, e o
+ * contrato de erro ia com `field` vazio: num recorte com cinco problemas, a
+ * pessoa tinha de deduzir sozinha a qual dimensão cada frase se referia.
  */
 export function validarFiltroDaVisaoGeral(corpo: unknown): LeituraDoFiltro {
-  const erros: string[] = [];
+  const problemas: ProblemaDoFiltro[] = [];
   if (corpo !== undefined && corpo !== null && (typeof corpo !== 'object' || Array.isArray(corpo))) {
-    return { ok: false, erros: ['Filtro inválido.'] };
+    // Corpo inteiro inválido não tem campo: o problema não é de uma dimensão.
+    return recusar([{ campo: CAMPOS.corpo, mensagem: 'Filtro inválido.' }]);
   }
   const bruto = (corpo ?? {}) as Record<string, unknown>;
 
-  const de = lerData(bruto.de, 'inicial', erros);
-  const ate = lerData(bruto.ate, 'final', erros);
+  const de = lerData(bruto.de, CAMPOS.de, 'inicial', problemas);
+  const ate = lerData(bruto.ate, CAMPOS.ate, 'final', problemas);
   if (de && ate && new Date(de).getTime() > new Date(ate).getTime()) {
-    erros.push('A data inicial do período é posterior à final.');
+    // Atribuído à data inicial, e não ao par: é ela que a mensagem acusa de
+    // estar depois da final, e destacar os dois campos faria a pessoa procurar
+    // o erro em dois lugares quando só um precisa mudar.
+    problemas.push({ campo: CAMPOS.de, mensagem: 'A data inicial do período é posterior à final.' });
   }
 
   let campoDoPeriodo: CampoDoPeriodo = 'createdAt';
   if (bruto.campoDoPeriodo !== undefined && bruto.campoDoPeriodo !== null) {
     if (typeof bruto.campoDoPeriodo !== 'string' || !(CAMPOS_DO_PERIODO as readonly string[]).includes(bruto.campoDoPeriodo)) {
-      erros.push('O período pode ser contado pela criação ou pela data de início do evento.');
+      problemas.push({
+        campo: CAMPOS.campoDoPeriodo,
+        mensagem: 'O período pode ser contado pela criação ou pela data de início do evento.',
+      });
     } else {
       campoDoPeriodo = bruto.campoDoPeriodo as CampoDoPeriodo;
     }
   }
 
-  const organizationIds = lerLista(bruto.organizationIds, 'organizações', identificador, erros);
-  const areas = lerLista(bruto.areas, 'áreas', area, erros);
-  const profileCodes = lerCatalogo(bruto.profileCodes, 'perfis', PERFIS, erros);
-  const formatos = lerCatalogo(bruto.formatos, 'formatos', FORMATOS, erros);
-  const situacoes = lerCatalogo(bruto.situacoes, 'situações', SITUACOES, erros);
+  const organizationIds = lerLista(bruto.organizationIds, { campo: CAMPOS.organizationIds, nome: 'organizações' }, identificador, problemas);
+  const areas = lerLista(bruto.areas, { campo: CAMPOS.areas, nome: 'áreas' }, area, problemas);
+  const profileCodes = lerCatalogo(bruto.profileCodes, { campo: CAMPOS.profileCodes, nome: 'perfis' }, PERFIS, problemas);
+  const formatos = lerCatalogo(bruto.formatos, { campo: CAMPOS.formatos, nome: 'formatos' }, FORMATOS, problemas);
+  const situacoes = lerCatalogo(bruto.situacoes, { campo: CAMPOS.situacoes, nome: 'situações' }, SITUACOES, problemas);
 
-  if (erros.length > 0) return { ok: false, erros };
+  if (problemas.length > 0) return recusar(problemas);
   return { ok: true, filtro: { de, ate, campoDoPeriodo, organizationIds, profileCodes, areas, formatos, situacoes } };
 }

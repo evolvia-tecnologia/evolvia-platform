@@ -59,6 +59,13 @@ export interface ContextoMaster {
  * plataforma. Lançar `{ erros }` cru fazia o filtro global descartar a lista
  * de problemas e responder uma frase genérica — ver o comentário em
  * `platform-master-validation.ts`.
+ *
+ * As rotas de concessão entregam `problemas`, que levam o CAMPO recusado até o
+ * `field` da resposta; as de catálogo e relatório ainda entregam `erros`, que é
+ * só a frase. A assimetria é transitória e deliberada: os validadores daquelas
+ * ainda não nomeiam o campo, e `recusaDeValidacao` aceita as duas formas para
+ * que a migração aconteça um validador por vez, sem que nenhuma rota pare de
+ * funcionar nem passe a afirmar um campo que ninguém informou.
  */
 @Injectable()
 export class PlatformMasterService {
@@ -225,18 +232,37 @@ export class PlatformMasterService {
   /** O resumo que a tela mostra ANTES de confirmar, montado no servidor. */
   async revisarConcessao(corpo: unknown) {
     const leitura = validarPedidoDeConcessao(corpo);
-    if (!leitura.ok) throw recusaDeValidacao(leitura.erros);
+    if (!leitura.ok) throw recusaDeValidacao(leitura.problemas);
     const nomes = await this.nomesDasPessoas(leitura.pedido.pessoas);
     return { pedido: leitura.pedido, resumo: resumoDaConcessao(leitura.pedido, nomes) };
   }
 
-  /** Concede. Só o proprietário chega aqui: o guard aplica `decidir`. */
+  /**
+   * Concede. Só o proprietário chega aqui: o guard aplica `decidir`.
+   *
+   * **Atualiza antes de inserir, e a ordem não é indiferente.** A chave única da
+   * concessão é (pessoa, ação, escopo), sem a validade. Com `createMany` e
+   * `skipDuplicates` sozinhos, uma linha EXPIRADA fazia o insert ser descartado
+   * e o `expiresAt` antigo permanecia — e `concessaoVigente` trata expirada como
+   * ausente. O proprietário renovava, a resposta dizia que havia concedido, a
+   * trilha gravava GRANTED, e a pessoa continuava barrada. Medido contra
+   * PostgreSQL: 1 linha, ainda expirada.
+   *
+   * `skipDuplicates` continua no insert porque é ele que absorve a corrida com
+   * outra requisição que tenha criado a mesma linha entre o update e o insert.
+   *
+   * `updateMany` com o `where` das cinco colunas, e não `upsert`, para não
+   * depender do nome que o Prisma gera para a chave composta.
+   */
   async conceder(actorUserId: string, contexto: ContextoMaster, corpo: unknown) {
     const leitura = validarPedidoDeConcessao(corpo);
-    if (!leitura.ok) throw recusaDeValidacao(leitura.erros);
+    if (!leitura.ok) throw recusaDeValidacao(leitura.problemas);
     const pedido = leitura.pedido;
     const linhas = this.linhasDaConcessao(pedido);
+    const validade = pedido.expiraEm ? new Date(pedido.expiraEm) : null;
 
+    let renovadas = 0;
+    let criadas = 0;
     await this.auditado(
       {
         actorUserId,
@@ -249,26 +275,37 @@ export class PlatformMasterService {
       },
       async (tx) => {
         const cliente: ClienteTransacional = tx.cliente;
-        // `skipDuplicates` em vez de upsert: a unicidade da concessão já está
-        // no banco, e assim não dependo do nome que o Prisma gera para a chave
-        // composta — nome que eu não conferi e não vou presumir.
-        await cliente.platformGrant.createMany({
-          data: linhas.map((l) => ({ ...l, grantedByUserId: actorUserId, expiresAt: pedido.expiraEm ? new Date(pedido.expiraEm) : null })),
+        for (const linha of linhas) {
+          // `grantedAt` renovado junto: ele passa a dizer quando a validade
+          // ATUAL foi concedida. O histórico de cada ação continua em
+          // `PlatformGrantEvent`; manter a data da primeira concessão aqui
+          // mostraria informação errada na tela de revisão.
+          const { count } = await cliente.platformGrant.updateMany({
+            where: linha,
+            data: { grantedByUserId: actorUserId, grantedAt: new Date(), expiresAt: validade },
+          });
+          renovadas += count;
+        }
+        const inseridas = await cliente.platformGrant.createMany({
+          data: linhas.map((l) => ({ ...l, grantedByUserId: actorUserId, expiresAt: validade })),
           skipDuplicates: true,
         });
+        criadas = inseridas.count;
         await cliente.platformGrantEvent.createMany({
           data: linhas.map((l) => ({
             ...l,
             kind: 'GRANTED',
             actorUserId,
             reason: pedido.motivo,
-            expiresAt: pedido.expiraEm ? new Date(pedido.expiraEm) : null,
+            expiresAt: validade,
             correlationId: `grant-${contexto.sessionId}`,
           })),
         });
       },
     );
-    return { concedidas: linhas.length, resumo: resumoDaConcessao(pedido) };
+    // Conta o que de fato aconteceu. Antes respondia `linhas.length`, que era
+    // verdade só quando nada existia antes.
+    return { concedidas: renovadas + criadas, renovadas, criadas, resumo: resumoDaConcessao(pedido) };
   }
 
   /**
@@ -280,7 +317,7 @@ export class PlatformMasterService {
    */
   async revogar(actorUserId: string, contexto: ContextoMaster, corpo: unknown) {
     const leitura = validarPedidoDeConcessao(corpo);
-    if (!leitura.ok) throw recusaDeValidacao(leitura.erros);
+    if (!leitura.ok) throw recusaDeValidacao(leitura.problemas);
     const pedido = leitura.pedido;
     const linhas = this.linhasDaConcessao(pedido);
 
@@ -331,7 +368,7 @@ export class PlatformMasterService {
    */
   async visaoGeral(corpo: unknown) {
     const leitura = validarFiltroDaVisaoGeral(corpo);
-    if (!leitura.ok) throw recusaDeValidacao(leitura.erros);
+    if (!leitura.ok) throw recusaDeValidacao(leitura.problemas);
     const eventos = await this.repositorio.eventosParaVisaoGeral(leitura.filtro);
     return montarVisaoGeral(eventos, leitura.filtro);
   }
