@@ -14,22 +14,43 @@
 //
 // `--confirmar-host` tem de ser igual ao host do DATABASE_URL em uso. É o que
 // impede rodar contra o banco errado por engano.
+import { parseArgs } from 'node:util';
+import { fileURLToPath } from 'node:url';
+import { resolve } from 'node:path';
 import { decidirEntrada, montarSql } from './provisionar-proprietario-master.policy.mjs';
 
+/** Opções desta linha de comando, declaradas uma vez. */
+const OPCOES = {
+  email: { type: 'string' },
+  nota: { type: 'string' },
+  'confirmar-host': { type: 'string' },
+  'permitir-segundo-proprietario': { type: 'boolean' },
+};
+
+/**
+ * `parseArgs` de `node:util` em vez de laço próprio: `--chave valor` e
+ * `--chave=valor` passam a ser tratados pela biblioteca, não por regex local.
+ *
+ * `strict: false` de propósito — argumento desconhecido não derruba o processo
+ * aqui; quem decide o que falta é `decidirEntrada`, com mensagem em português,
+ * e não um erro de parser.
+ *
+ * A coerção para texto não é enfeite: medi o comportamento e `--email` sem
+ * valor devolve o BOOLEANO `true`, não string. Repassar isso adiante colocaria
+ * um booleano onde o resto do módulo espera texto. Só string sobrevive; o resto
+ * vira `undefined` e é recusado como ausente, que é o `deny-by-default` do
+ * módulo.
+ */
+const soTexto = (v) => (typeof v === 'string' ? v : undefined);
+
 export function lerArgumentos(argv) {
-  const lido = { permitirSegundoProprietario: false };
-  for (let i = 0; i < argv.length; i += 1) {
-    const atual = argv[i];
-    if (atual === '--permitir-segundo-proprietario') { lido.permitirSegundoProprietario = true; continue; }
-    const par = /^--([a-z-]+)=(.*)$/u.exec(atual ?? '');
-    const chave = par ? par[1] : (atual ?? '').replace(/^--/u, '');
-    const valor = par ? par[2] : argv[i + 1];
-    if (!par && atual?.startsWith('--')) i += 1;
-    if (chave === 'email') lido.email = valor;
-    else if (chave === 'nota') lido.nota = valor;
-    else if (chave === 'confirmar-host') lido.hostConfirmado = valor;
-  }
-  return lido;
+  const { values } = parseArgs({ args: argv, options: OPCOES, strict: false });
+  return {
+    email: soTexto(values.email),
+    nota: soTexto(values.nota),
+    hostConfirmado: soTexto(values['confirmar-host']),
+    permitirSegundoProprietario: values['permitir-segundo-proprietario'] === true,
+  };
 }
 
 /** Identificador da operação na trilha. Sem relógio no nome do arquivo para
@@ -66,7 +87,23 @@ export function executar(argv, env, saida, erro) {
   return 0;
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+/**
+ * Executado diretamente? Comparar `import.meta.url` com `file://${argv[1]}`
+ * montado à mão erra no Windows, onde o caminho usa `\\` e a URL de arquivo
+ * leva letra de unidade — a igualdade simplesmente nunca dá certo, e o script
+ * não roda. `fileURLToPath` faz a conversão na direção certa, e `resolve`
+ * cobre a invocação por caminho relativo, em que `argv[1]` não vem absoluto.
+ */
+export function chamadoDiretamente(urlDoModulo, caminhoDoArgv) {
+  if (typeof caminhoDoArgv !== 'string' || caminhoDoArgv === '') return false;
+  try {
+    return fileURLToPath(urlDoModulo) === resolve(caminhoDoArgv);
+  } catch {
+    return false;
+  }
+}
+
+if (chamadoDiretamente(import.meta.url, process.argv[1])) {
   process.exitCode = executar(
     process.argv.slice(2),
     process.env,

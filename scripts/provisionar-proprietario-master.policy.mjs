@@ -21,6 +21,8 @@
  * `deny-by-default`: entrada inesperada nega.
  */
 
+import { randomInt } from 'node:crypto';
+
 /** Limite da coluna `provisionedByNote` em `PlatformMasterIdentity`. */
 export const LIMITE_DA_NOTA = 200;
 
@@ -58,6 +60,8 @@ const NOTA_ACEITA = /^[^\p{Cc}\p{Cf}]+$/u;
 export const MOTIVOS = {
   ambiente_de_producao: 'Recusado: NODE_ENV é produção. Este script não provisiona poder em produção.',
   host_ausente: 'Recusado: não foi possível ler o host do DATABASE_URL.',
+  host_de_socket_unix:
+    'Recusado: o DATABASE_URL aponta para socket Unix, que não tem host para confirmar. Use a URL TCP do mesmo banco, com host e porta: --confirmar-host é a única guarda contra executar no banco errado.',
   host_nao_confirmado:
     'Recusado: o host confirmado não corresponde ao host do DATABASE_URL. Informe --confirmar-host com o host exato do banco de destino.',
   email_invalido: 'Recusado: informe --email com o endereço da conta que será proprietária.',
@@ -80,6 +84,33 @@ export function hostDoBanco(databaseUrl) {
 }
 
 /**
+ * URL de conexão por socket Unix: `postgresql:///banco`, ou host no parâmetro
+ * `host=`. O `hostname` vem vazio nos dois casos, e por isso `hostDoBanco`
+ * devolve `null` — o mesmo `null` de uma URL ilegível, que é coisa bem
+ * diferente. Separar os dois casos é o que permite dizer ao operador o que
+ * fazer, em vez de mandá-lo conferir um DATABASE_URL que está correto.
+ *
+ * A recusa permanece, e é deliberada: `--confirmar-host` é a única guarda
+ * contra executar no banco errado, e socket Unix não tem host para confirmar.
+ * Aceitar host vazio removeria a guarda exatamente no caso em que o operador
+ * não tem como perceber o alvo errado.
+ */
+export function ehUrlDeSocketUnix(databaseUrl) {
+  if (typeof databaseUrl !== 'string' || databaseUrl === '') return false;
+  let url;
+  try {
+    url = new URL(databaseUrl);
+  } catch {
+    return false;
+  }
+  if (!/^postgres(ql)?:$/u.test(url.protocol)) return false;
+  if (url.hostname !== '') return false;
+  // `postgresql://` sozinho não nomeia banco nenhum: é URL incompleta, não
+  // socket. Socket nomeia o banco no caminho, ou o diretório em `host=`.
+  return url.pathname.replace(/^\//u, '') !== '' || (url.searchParams.get('host') ?? '') !== '';
+}
+
+/**
  * Decide se vale gerar o SQL. A ordem é deliberada: o que protege o alvo vem
  * antes do que valida o conteúdo, para que um erro de banco de destino seja
  * recusado antes de qualquer outra coisa.
@@ -90,7 +121,7 @@ export function decidirEntrada(entrada) {
   if (texto(nodeEnv).toLowerCase() === 'production') return recusa('ambiente_de_producao');
 
   const host = hostDoBanco(databaseUrl);
-  if (host === null) return recusa('host_ausente');
+  if (host === null) return recusa(ehUrlDeSocketUnix(databaseUrl) ? 'host_de_socket_unix' : 'host_ausente');
   if (texto(hostConfirmado) !== host) return recusa('host_nao_confirmado');
 
   const emailLimpo = texto(email).toLowerCase();
@@ -106,6 +137,34 @@ export function decidirEntrada(entrada) {
 
 function recusa(motivo) {
   return { permitido: false, motivo, mensagem: MOTIVOS[motivo], email: '', nota: '', host: null };
+}
+
+/** Alfabeto do cuid do Prisma: base36 minúsculo. */
+const ALFABETO_CUID = 'abcdefghijklmnopqrstuvwxyz0123456789';
+/** Comprimento do cuid do Prisma, contando o `c` inicial. */
+export const TAMANHO_DO_CUID = 25;
+/** A forma que a coluna exige, e a que este módulo tem de produzir. */
+export const FORMA_DO_CUID = /^c[a-z0-9]{24}$/u;
+
+/**
+ * Id com a FORMA de cuid, gerado aqui porque o SQL não pode inventá-lo.
+ *
+ * `PlatformMasterIdentity.id` e `PlatformAuditLog.id` são `@default(cuid())`.
+ * Em Prisma, `cuid()` é gerado no cliente, não pelo banco: a coluna não tem
+ * DEFAULT no PostgreSQL, então o INSERT é obrigado a fornecer o id. O script
+ * fornecia `gen_random_uuid()::text`, que é um UUID — tem hífen, tem 36
+ * caracteres e não começa com `c`. Nenhuma validação de forma de cuid aceita
+ * isso, e o id ficaria diferente de todos os outros da mesma coluna.
+ *
+ * Isto reproduz a FORMA (prefixo, alfabeto, comprimento), não as entranhas do
+ * cuid — não há contador monotônico nem impressão de máquina, porque nada aqui
+ * depende de ordenação por id. A aleatoriedade vem de `node:crypto`, não de
+ * `Math.random`, já que o valor identifica uma concessão de poder.
+ */
+export function idEstiloCuid(sorteia = (limite) => randomInt(limite)) {
+  let id = 'c';
+  while (id.length < TAMANHO_DO_CUID) id += ALFABETO_CUID[sorteia(ALFABETO_CUID.length)];
+  return id;
 }
 
 /** Literal SQL. Só é chamada depois de `decidirEntrada`, que já restringiu o
@@ -126,12 +185,18 @@ export function literal(valor) {
  *    afetadas, que o operador pode ler como sucesso;
  *  - idempotente: rodar de novo informa e não altera;
  *  - nenhuma senha, hash ou token aparece;
- *  - a trilha é gravada na mesma transação, com as colunas reais do modelo.
+ *  - a trilha é gravada na mesma transação, com as colunas reais do modelo;
+ *  - o nascimento é serializado por trava, porque o esquema não o serializa.
  */
-export function montarSql({ email, nota, permitirSegundoProprietario = false, correlacao }) {
+export function montarSql({
+  email, nota, permitirSegundoProprietario = false, correlacao,
+  identidadeId = idEstiloCuid(), auditoriaId = idEstiloCuid(),
+}) {
   const e = literal(email);
   const n = literal(nota);
   const c = literal(correlacao);
+  const idIdentidade = literal(identidadeId);
+  const idAuditoria = literal(auditoriaId);
   const guardaDeProprietario = permitirSegundoProprietario
     ? '  -- Segundo proprietario autorizado explicitamente na linha de comando.'
     : `  IF EXISTS (SELECT 1 FROM "PlatformMasterIdentity" WHERE role = 'OWNER' AND status = 'ACTIVE') THEN
@@ -148,6 +213,19 @@ DECLARE
   alvo_id text;
   ja_existe text;
 BEGIN
+  -- Trava antes de qualquer leitura de estado, e e ela que torna a guarda de
+  -- proprietario confiavel. "PlatformMasterIdentity" tem indice em
+  -- (role, status), NAO restricao de unicidade: sob READ COMMITTED, duas
+  -- transacoes concorrentes para DOIS usuarios diferentes passariam as duas
+  -- pelo IF EXISTS abaixo, e as duas inseririam: nasceriam dois OWNER
+  -- ativos, que e exatamente o que este script existe para impedir.
+  -- O replay do MESMO usuario ja e barrado por "userId" @unique: a segunda
+  -- transacao falha na unicidade e desfaz tudo. A trava cobre o caso que o
+  -- indice nao cobre. Advisory lock de transacao: liberada quando a transacao
+  -- termina, com sucesso ou com erro, sem tocar no esquema e sem bloquear
+  -- leitura de ninguem.
+  PERFORM pg_advisory_xact_lock(665, 1);
+
   SELECT id INTO alvo_id FROM "User" WHERE lower(email) = ${e};
   IF alvo_id IS NULL THEN
     RAISE EXCEPTION 'Nao existe usuario com esse e-mail. O proprietario precisa ja ter conta na plataforma.';
@@ -166,7 +244,7 @@ BEGIN
 ${guardaDeProprietario}
 
   INSERT INTO "PlatformMasterIdentity" ("id", "userId", "role", "status", "provisionedByNote", "provisionedAt")
-  VALUES (gen_random_uuid()::text, alvo_id, 'OWNER', 'ACTIVE', ${n}, now());
+  VALUES (${idIdentidade}, alvo_id, 'OWNER', 'ACTIVE', ${n}, now());
 
   -- actorUserId recebe o ator sistemico, nao o id do novo proprietario:
   -- registrar o proprio alvo como ator afirmaria que ele se autoconcedeu poder
@@ -177,7 +255,7 @@ ${guardaDeProprietario}
   INSERT INTO "PlatformAuditLog"
     ("id", "actorUserId", "action", "scopeKind", "organizationId", "eventId",
      "targetUserId", "reason", "result", "correlationId", "occurredAt")
-  VALUES (gen_random_uuid()::text, ${literal(ATOR_DO_BOOTSTRAP)},
+  VALUES (${idAuditoria}, ${literal(ATOR_DO_BOOTSTRAP)},
      'platform.master_identity_provisioned', 'GLOBAL', '', '',
      alvo_id, ${n}, 'ALLOWED', ${c}, now());
 
