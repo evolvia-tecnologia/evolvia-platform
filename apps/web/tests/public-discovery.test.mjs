@@ -46,11 +46,22 @@ test('catálogo e vitrine mostram publicados sem exigir data de término', async
   assert.match(catalog, /return value === 'CURRENT' \|\| value === 'PAST' \|\| value === 'ALL' \? value : 'ALL'/u);
   assert.match(catalog, /name="area"/u);
   assert.match(catalog, /name="region"/u);
-  assert.match(catalog, /<PublicRegionSuggest \/>/u);
+  assert.match(catalog, /<PublicRegionSuggest currentSearch=/u);
+  // A fronteira única do catálogo é intencional: o HTML pode chegar fragmentado.
+  // Não permitir ilhas Suspense adicionais ou dependência de searchParams no cliente.
+  assert.match(catalog, /<Suspense key="public-catalog-content" fallback=\{<section className=\{styles\.results\} role="status"/u);
+  assert.equal((catalog.match(/<Suspense\b/gu) ?? []).length, 1);
+  assert.ok(catalog.indexOf('<PublicSiteHeader current="eventos" />') < catalog.indexOf('<Suspense key="public-catalog-content"'), 'cabeçalho público estático não deve desaparecer com fallback Suspense');
+  assert.match(catalog, /<\/Suspense>/u);
+  assert.doesNotMatch(catalog, /useSearchParams/u);
+  assert.doesNotMatch(suggest, /useSearchParams/u);
+  assert.match(suggest, /currentSearch/u);
   assert.match(suggest, /Sugerir minha região/u);
   assert.match(suggest, /enableHighAccuracy: false/u);
   assert.match(suggest, /if \(!mounted\.current\) return;/u);
-  assert.match(home, /aria-label="Documentos jurídicos"/u);
+  const footer = await readFile(new URL('../components/public-site-footer.tsx', import.meta.url), 'utf8');
+  assert.match(home, /<PublicSiteFooter \/>/u);
+  assert.match(footer, /aria-label="Documentos jurídicos"/u);
   const [headerCss, catalogCss, homeCss] = await Promise.all([
     readFile(new URL('../components/public-site-header.module.css', import.meta.url), 'utf8'),
     readFile(new URL('../app/eventos/page.module.css', import.meta.url), 'utf8'),
@@ -59,12 +70,14 @@ test('catálogo e vitrine mostram publicados sem exigir data de término', async
   assert.match(headerCss, /@media \(max-width: 520px\) \{[\s\S]*overflow-wrap: normal;[\s\S]*word-break: normal;/u);
   assert.match(catalogCss, /\.page \{[\s\S]*overflow-wrap: anywhere;/u);
   assert.doesNotMatch(catalogCss, /white-space:\s*nowrap/u);
-  assert.match(homeCss, /\.legalFooter > \* \{[\s\S]*min-width: 0;/u);
+  const footerCss = await readFile(new URL('../components/public-site-footer.module.css', import.meta.url), 'utf8');
+  assert.match(footerCss, /\.directory > \* \{[\s\S]*min-width: 0;/u);
+  assert.doesNotMatch(homeCss, /\.legalFooter/u);
   assert.doesNotMatch(preview, /from=/u);
   assert.match(preview, /pageSize: '6'/u);
   assert.match(home, /<PublicPlatformGuide \/>/u);
-  assert.match(home, /href="\/ajuda"/u);
-  assert.match(home, /href="\/acessibilidade"/u);
+  assert.match(footer, /href: '\/ajuda'/u);
+  assert.match(footer, /href="\/acessibilidade"/u);
   assert.match(help, /O download não é cobrado/u);
   assert.match(help, /não envia a coordenada/u);
 });

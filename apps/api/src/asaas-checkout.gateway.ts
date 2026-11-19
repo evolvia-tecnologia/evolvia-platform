@@ -1,9 +1,19 @@
 import { Injectable } from '@nestjs/common';
 import { createHash } from 'node:crypto';
+import {
+  ASAAS_STUB_ORGANIZER_WALLET,
+  asaasStubCreatedCheckout,
+  asaasWebhookTokenIsValid,
+  isAsaasCheckoutReady,
+  isAsaasLocalCheckoutSession,
+  isAsaasStubMode,
+  resolveAsaasWebhookToken,
+} from './asaas-checkout-policy';
 import { PaidEventCommissionError, asaasCheckoutPayload } from './paid-event-commission.policy';
 
 export type CreateAsaasCheckoutInput = {
   reservationId: string;
+  orderId?: string;
   protocol: string;
   eventName: string;
   slug: string;
@@ -73,23 +83,53 @@ async function boundedJson(response: Response): Promise<Record<string, unknown>>
 
 @Injectable()
 export class AsaasCheckoutGateway {
-  private isCiStub(): boolean {
-    return process.env.EVOLVIA_CI_MODE === '1' && process.env.ASAAS_MODE === 'ci_stub';
+  configurationStatus(): {
+    state: 'SIMULATED' | 'BLOCKED' | 'NOT_CONFIGURED' | 'CONFIGURED';
+    environment: 'local' | 'sandbox' | 'production';
+    message: string;
+  } {
+    if (this.isLocalCheckoutSession()) {
+      if (!this.isConfigured()) {
+        return { state: 'NOT_CONFIGURED', environment: 'local',
+          message: 'Configuração de simulação incompleta. Verifique a autenticação do webhook com o responsável técnico.' };
+      }
+      return { state: 'SIMULATED' as const, environment: 'local' as const,
+        message: 'Simulação local. Não há cobrança nem confirmação de pagamento pelo Asaas.' };
+    }
+    let environment: 'sandbox' | 'production';
+    try { environment = this.environment(); }
+    catch {
+      return { state: 'BLOCKED' as const, environment: 'production' as const,
+        message: 'A cobrança de produção não está autorizada neste ambiente.' };
+    }
+    if (!this.isConfigured()) {
+      return { state: 'NOT_CONFIGURED' as const, environment,
+        message: 'Configuração incompleta. Verifique credenciais, endereço público e autenticação do webhook com o responsável técnico.' };
+    }
+    return { state: 'CONFIGURED' as const, environment,
+      message: 'Configuração do conector localizada. Carteira e responsável financeiro do evento, cobrança e webhook ainda precisam de validação.' };
+  }
+
+  isStubMode(): boolean {
+    return isAsaasStubMode(process.env);
+  }
+
+  isLocalCheckoutSession(): boolean {
+    return isAsaasLocalCheckoutSession(process.env);
   }
 
   isConfigured(): boolean {
-    if (this.isCiStub()) return Boolean(publicBaseUrl()) && this.webhookTokenIsValid();
+    if (this.isLocalCheckoutSession()) return isAsaasCheckoutReady(process.env);
     const apiKey = process.env.ASAAS_API_KEY ?? '';
-    return apiKey.length >= 20 && apiKey.length <= 512 && !/\s/u.test(apiKey) && Boolean(publicBaseUrl()) && this.webhookTokenIsValid();
+    return apiKey.length >= 20 && apiKey.length <= 512 && !/\s/u.test(apiKey) && Boolean(publicBaseUrl()) && asaasWebhookTokenIsValid(this.webhookToken());
+  }
+
+  stubOrganizerWalletId(): string {
+    return ASAAS_STUB_ORGANIZER_WALLET;
   }
 
   webhookToken(): string | undefined {
-    return process.env.ASAAS_WEBHOOK_TOKEN;
-  }
-
-  private webhookTokenIsValid(): boolean {
-    const token = process.env.ASAAS_WEBHOOK_TOKEN ?? '';
-    return token.length >= 32 && token.length <= 255 && !/\s/u.test(token);
+    return resolveAsaasWebhookToken(process.env);
   }
 
   private environment(): 'sandbox' | 'production' {
@@ -104,12 +144,13 @@ export class AsaasCheckoutGateway {
 
   async createCheckout(input: CreateAsaasCheckoutInput): Promise<CreatedAsaasCheckout> {
     if (!this.isConfigured()) throw new AsaasGatewayError('provider_not_configured', 'SAFE', 'O pagamento está temporariamente indisponível.');
-    const callbackBase = publicBaseUrl();
+    const callbackBase = publicBaseUrl() ?? (this.isLocalCheckoutSession() ? new URL('http://127.0.0.1:3000') : null);
     if (!callbackBase) throw new AsaasGatewayError('invalid_public_base_url', 'SAFE');
 
     const callback = (outcome: string) => {
       const url = new URL(`/evento/${encodeURIComponent(input.slug)}/inscricao`, callbackBase);
-      url.searchParams.set('protocolo', input.protocol);
+      if (input.orderId) url.searchParams.set('pedido', input.orderId);
+      else url.searchParams.set('protocolo', input.protocol);
       url.searchParams.set('pagamento', outcome);
       return url.toString();
     };
@@ -124,9 +165,9 @@ export class AsaasCheckoutGateway {
       if (error instanceof PaidEventCommissionError) throw new AsaasGatewayError('invalid_checkout_split', 'SAFE', error.message);
       throw error;
     }
-    if (this.isCiStub()) {
+    if (this.isLocalCheckoutSession()) {
       const id = `ci_${createHash('sha256').update(input.reservationId).digest('hex').slice(0, 32)}`;
-      return { providerCheckoutId: id, checkoutUrl: `https://sandbox.asaas.com/checkoutSession/show/${id}` };
+      return asaasStubCreatedCheckout(id);
     }
 
     const environment = this.environment();
@@ -155,17 +196,25 @@ export class AsaasCheckoutGateway {
       throw new AsaasGatewayError(`provider_http_${response.status}`, safe);
     }
     const id = body.id;
-    const link = body.link;
-    if (typeof id !== 'string' || !/^[A-Za-z0-9_-]{8,200}$/u.test(id) || typeof link !== 'string') {
+    if (typeof id !== 'string' || !/^[A-Za-z0-9_-]{8,200}$/u.test(id)) {
       throw new AsaasGatewayError('provider_invalid_checkout', 'UNKNOWN');
     }
+    // The documented create response can contain only an ID. Build its
+    // hosted URL without retrying a checkout already created by the provider.
+    const hostedBase = environment === 'production' ? 'https://asaas.com' : 'https://sandbox.asaas.com';
+    const link = (body.link === undefined || body.link === null) ? `${hostedBase}/checkoutSession/show?id=${encodeURIComponent(id)}` : body.link;
+    if (typeof link !== 'string') throw new AsaasGatewayError('provider_invalid_link', 'UNKNOWN');
     let checkoutUrl: URL;
     try { checkoutUrl = new URL(link); } catch { throw new AsaasGatewayError('provider_invalid_link', 'UNKNOWN'); }
-    const allowedHost = environment === 'production' ? 'asaas.com' : 'sandbox.asaas.com';
-    const trustedHost = checkoutUrl.hostname === allowedHost || checkoutUrl.hostname.endsWith(`.${allowedHost}`);
-    if (checkoutUrl.protocol !== 'https:' || !trustedHost || checkoutUrl.username || checkoutUrl.password) {
+    // Explicit origins keep sandbox and arbitrary subdomains out of production.
+    // Preserve provider-returned www links without assuming a fixed URL path.
+    const trustedOrigins = environment === 'production'
+      ? ['https://asaas.com', 'https://www.asaas.com'] : [hostedBase];
+    if (!trustedOrigins.includes(checkoutUrl.origin) || checkoutUrl.username || checkoutUrl.password) {
       throw new AsaasGatewayError('provider_untrusted_link', 'UNKNOWN');
     }
     return { providerCheckoutId: id, checkoutUrl: checkoutUrl.toString() };
   }
 }
+
+

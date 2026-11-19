@@ -1,4 +1,4 @@
-import type { CSSProperties, ReactNode } from 'react';
+import { Fragment, type CSSProperties, type ReactNode } from 'react';
 import Link from 'next/link';
 import PublicEvaSupport from './public-eva-support';
 import PublicEventLocation from './public-event-location';
@@ -12,6 +12,9 @@ import {
   type PublicEventProfileCode,
 } from '../lib/public-event-profile';
 import {
+  publicOfferClosedLead,
+  publicOfferLead,
+  publicOfferSectionTitle,
   publicParticipantCtaLabel,
   publicRegistrationCtaLabel,
   type PublicRegistrationCategory,
@@ -175,6 +178,8 @@ export default function PublicEventPresentation({
     ? publicRegistrationCtaLabel(registrationMode, event.event.profileCode, event.event.eventType)
     : null;
   const participantLabel = publicParticipantCtaLabel(event.event.profileCode, event.event.eventType);
+  const offerTitle = publicOfferSectionTitle(event.event.profileCode, event.event.eventType);
+  const offerAnchor = offerTitle === 'Ingressos' ? 'ingressos' : 'inscricoes';
   const hasAbout = Boolean(event.publication.fullDescription?.trim());
   const hasLocation = Boolean(event.event.venue?.trim()) && event.event.format !== 'ONLINE';
   const hasAccessibility = Boolean(event.publication.accessibilitySummary?.trim());
@@ -185,6 +190,8 @@ export default function PublicEventPresentation({
   });
 
   return <article className={shellClasses} style={themeStyle}>
+    {/* Mantém a reconciliação RSC fora do host article durante suspensão/replay. */}
+    <Fragment key="public-event-presentation-content">
     {event.media.cover && <img
       className={styles.cover}
       src={mediaSources?.COVER ?? event.media.cover.url}
@@ -210,7 +217,7 @@ export default function PublicEventPresentation({
     <nav className={styles.pageNav} aria-label="Seções da página">
       {hasAbout && <a href="#sobre">Sobre</a>}
       {programContent && <a href="#programacao">Programação</a>}
-      <a href="#inscricoes">Inscrições</a>
+      <a href={`#${offerAnchor}`}>{offerTitle}</a>
       {visibleSections.map(({ section, index }) => section.title
         ? <a key={`${section.sortOrder}-${index}`} href={`#secao-${index}`}>{section.title}</a>
         : null)}
@@ -227,10 +234,10 @@ export default function PublicEventPresentation({
 
     {programContent}
 
-    <section className={styles.section} id="inscricoes" aria-labelledby="registration-title">
-      <h2 id="registration-title">Inscrições</h2>
+    <section className={styles.section} id={offerAnchor} aria-labelledby="registration-title">
+      <h2 id="registration-title">{offerTitle}</h2>
       {registrationMode && registrationLabel ? <>
-        <p className={styles.registrationLead}>A participação começa com uma inscrição nova. Quem já concluiu a inscrição entra na área do participante.</p>
+        <p className={styles.registrationLead}>{publicOfferLead(event.event.profileCode, event.event.eventType)}</p>
         {categories.length > 0 && <ul className={styles.offerList}>
           {categories.map((category) => <li key={category.id}>
             <strong>{category.name}</strong>
@@ -243,7 +250,7 @@ export default function PublicEventPresentation({
           <Link className={`${styles.registrationCta} ${styles.secondaryCta}`} href={participantHref}>{participantLabel}</Link>
         </div>
       </> : <>
-        <p className={styles.registrationLead}>Não há inscrição nova aberta agora. Quem já se inscreveu continua pela área do participante.</p>
+        <p className={styles.registrationLead}>{publicOfferClosedLead(event.event.profileCode, event.event.eventType)}</p>
         <div className={styles.heroActions}>
           <Link className={`${styles.registrationCta} ${styles.secondaryCta}`} href={participantHref}>{participantLabel}</Link>
         </div>
@@ -313,5 +320,7 @@ export default function PublicEventPresentation({
       publicContactEmail={event.publication.publicContactEmail}
       publicContactPhone={event.publication.publicContactPhone}
     />
+    </Fragment>
   </article>;
 }
+

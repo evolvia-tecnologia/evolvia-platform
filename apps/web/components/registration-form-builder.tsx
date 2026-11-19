@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { api, getToken } from '../lib/api';
+import { registrationTermsUploadFileName } from '../lib/registration-terms-upload';
 import styles from './registration-form-builder.module.css';
 
 type FieldType = 'TEXT' | 'TEXTAREA' | 'EMAIL' | 'PHONE' | 'DOCUMENT' | 'CNPJ' | 'DATE' | 'NUMBER' | 'SELECT' | 'RADIO' | 'CHECKBOX' | 'PHOTO' | 'CONSENT' | 'REGISTRATION_TYPE';
@@ -111,6 +112,7 @@ export default function RegistrationFormBuilder({ eventId }: { eventId: string }
     }
     setTermsBusy(true); setError(''); setNotice('');
     try {
+      const fileName = await registrationTermsUploadFileName(termsFile.name);
       const contentBase64 = await new Promise<string>((resolve, reject) => {
         const reader = new FileReader();
         reader.onload = () => {
@@ -122,13 +124,16 @@ export default function RegistrationFormBuilder({ eventId }: { eventId: string }
       });
       const result = await api<NonNullable<Payload['termsDocument']>>(`/events/${eventId}/registration-form/terms`, {
         method: 'POST',
-        body: JSON.stringify({ contentBase64, fileName: termsFile.name }),
+        body: JSON.stringify({ contentBase64, fileName }),
       });
       setPayload({ ...payload, termsDocument: result });
       setTermsFile(null);
       setNotice(`PDF dos termos anexado: ${result.fileName}.`);
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : 'Não foi possível anexar o PDF.');
+      const message = reason instanceof Error ? reason.message : 'Não foi possível anexar o PDF.';
+      setError(/fileName.*120|fileName must be shorter/iu.test(message)
+        ? 'O nome do PDF excede o limite permitido. Renomeie o arquivo e tente novamente.'
+        : message);
     } finally { setTermsBusy(false); }
   }
 

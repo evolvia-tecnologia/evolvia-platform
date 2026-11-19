@@ -21,7 +21,10 @@ test('a carta fica na área do autor aceito ou recusado e a EVA não promete e-m
   assert.match(panel, /decision-letter\/receipt/u);
   assert.match(panel, /DOWNLOADED/u);
   assert.match(panel, /Não enviamos e-mail/u);
-  assert.match(panel, /registro da entrega não foi gravado/u);
+  const download = panel.slice(panel.indexOf('async function downloadLetter('), panel.indexOf('async function uploadEposter('));
+  assert.match(download, /new Blob\(\[payload\.text\]/u);
+  assert.ok(download.indexOf('if (!stillCurrent(context)) return;') < download.indexOf('link.click()'));
+  assert.ok(download.indexOf("action !== 'DOWNLOADED'") < download.indexOf('link.click()'));
   assert.match(area, /Não mostro parecer, nota ou o trabalho de outra pessoa/u);
   assert.match(area, /aceita ou recusa/u);
   assert.match(area, /A EVA não envia e-mail nem parecer/u);

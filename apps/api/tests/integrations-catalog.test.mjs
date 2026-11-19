@@ -112,7 +112,9 @@ function makeService({ event = null, membership = null } = {}) {
       },
     },
   };
-  return new EventIntegrationsService(prisma, new AuthorizationService(prisma));
+  return new EventIntegrationsService(prisma, new AuthorizationService(prisma), {
+    configurationStatus: () => ({ state: 'NOT_CONFIGURED', environment: 'sandbox', message: 'Configuração incompleta.' }),
+  });
 }
 
 test('catálogo contém todos os fornecedores obrigatórios uma única vez', () => {
@@ -325,3 +327,4 @@ test('membership ausente ou inativa não distingue o motivo do acesso indevido',
     );
   }
 });
+

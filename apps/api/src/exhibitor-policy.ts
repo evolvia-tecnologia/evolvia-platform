@@ -267,6 +267,37 @@ export function normalizeExhibitorAccess(input: unknown): { email: string; docum
   return { email: address, document };
 }
 
+export type ExhibitorFormProgress = 'OPENED' | 'PENDING' | 'EXPIRED';
+
+export function exhibitorFormProgress(input: { opened: boolean; deadline: Date | null; now?: Date }): ExhibitorFormProgress {
+  if (input.opened) return 'OPENED';
+  if (exhibitorDeadlineClosed(input.deadline, input.now)) return 'EXPIRED';
+  return 'PENDING';
+}
+
+export function normalizeCompanyCredential(input: unknown): Omit<ExhibitorCredentialDraft, 'id' | 'companyId'> & { formId: string } {
+  const raw = object(input, ['formId', 'kind', 'nationality', 'document', 'fullName', 'badgeName', 'role', 'phone', 'mobile'], 'Credencial inválida.');
+  if (typeof raw.formId !== 'string' || !ID.test(raw.formId)) throw new ExhibitorPolicyError('Formulário inválido.');
+  const nationality = oneOf(raw.nationality, NATIONALITIES, 'Escolha brasileiro ou estrangeiro.');
+  return {
+    formId: raw.formId,
+    kind: oneOf(raw.kind, CREDENTIAL_KINDS, 'Escolha expositor, montador ou serviço.'),
+    nationality,
+    document: personDocument(raw.document, nationality),
+    fullName: requiredText(raw.fullName, 2, 80, 'Informe o nome completo.'),
+    badgeName: requiredText(raw.badgeName, 2, 40, 'Informe o nome do crachá.'),
+    role: requiredText(raw.role, 2, 60, 'Informe o cargo.'),
+    phone: optionalText(raw.phone, 20),
+    mobile: optionalText(raw.mobile, 20),
+  };
+}
+
+export function normalizeCompanyOrder(input: unknown): { formId: string; productId: string; quantity: number } {
+  const raw = object(input, ['formId', 'productId', 'quantity'], 'Pedido inválido.');
+  if (typeof raw.formId !== 'string' || !ID.test(raw.formId)) throw new ExhibitorPolicyError('Formulário inválido.');
+  return { formId: raw.formId, ...normalizeExhibitorOrder({ productId: raw.productId, quantity: raw.quantity }) };
+}
+
 export function normalizeOwnCompanyProfile(input: unknown): Pick<ExhibitorCompanyDraft, 'contactName' | 'contactRole' | 'contactEmail' | 'postalCode' | 'street' | 'addressNumber' | 'complement' | 'district' | 'city' | 'state' | 'country' | 'phone'> {
   const raw = object(input, ['contactName', 'contactRole', 'contactEmail', 'postalCode', 'street', 'addressNumber', 'complement', 'district', 'city', 'state', 'country', 'phone'], 'Dados da empresa inválidos.');
   return {

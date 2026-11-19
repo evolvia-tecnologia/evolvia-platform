@@ -1,13 +1,31 @@
+import {
+  parseRichTextAlign,
+  type RichTextAlign,
+  type RichTextColor,
+  type RichTextFont,
+  type RichTextSize,
+} from './publication-text-style';
+
 export type PublicRichInline =
   | { type: 'text'; value: string }
   | { type: 'strong'; value: string }
   | { type: 'em'; value: string }
-  | { type: 'link'; label: string; href: string };
+  | { type: 'link'; label: string; href: string }
+  | {
+    type: 'styled';
+    font: RichTextFont;
+    size: RichTextSize;
+    color: RichTextColor;
+    inlines: PublicRichInline[];
+  };
 
 export type PublicRichBlock =
   | { type: 'heading'; inlines: PublicRichInline[] }
-  | { type: 'paragraph'; lines: PublicRichInline[][] }
+  | { type: 'paragraph'; align: RichTextAlign; lines: PublicRichInline[][] }
   | { type: 'list'; ordered: boolean; items: PublicRichInline[][] };
+
+const FMT_OPEN = /^\[\[fmt (sans|serif) (12|14|16|18|20|24) (navy|navy-soft|blue|blue-soft|text|muted|success|warning|danger)\]\]/u;
+const FMT_CLOSE = '[[/fmt]]';
 
 const INLINE = /\[([^\]\n]{1,180})\]\((https:\/\/[^)\s]{1,500})\)|\*\*([^*\n]{1,400})\*\*|\*([^*\n]{1,400})\*/gu;
 
@@ -24,12 +42,51 @@ function safeHttps(raw: string): string | null {
   }
 }
 
+function parseStyledSegment(input: string, start: number): { inline: PublicRichInline; next: number } | null {
+  const header = FMT_OPEN.exec(input.slice(start));
+  if (!header) return null;
+  const openLength = header[0].length;
+  const contentStart = start + openLength;
+  const closeAt = input.indexOf(FMT_CLOSE, contentStart);
+  if (closeAt < 0) return null;
+  const inner = input.slice(contentStart, closeAt);
+  return {
+    inline: {
+      type: 'styled',
+      font: header[1] as RichTextFont,
+      size: Number(header[2]) as RichTextSize,
+      color: header[3] as RichTextColor,
+      inlines: parsePublicRichInlines(inner),
+    },
+    next: closeAt + FMT_CLOSE.length,
+  };
+}
+
 export function parsePublicRichInlines(input: string): PublicRichInline[] {
   const result: PublicRichInline[] = [];
-  let last = 0;
-  for (const match of input.matchAll(INLINE)) {
-    const index = match.index ?? 0;
-    if (index > last) result.push({ type: 'text', value: input.slice(last, index) });
+  let index = 0;
+  while (index < input.length) {
+    const styled = parseStyledSegment(input, index);
+    if (styled) {
+      result.push(styled.inline);
+      index = styled.next;
+      continue;
+    }
+    const slice = input.slice(index);
+    INLINE.lastIndex = 0;
+    const match = INLINE.exec(slice);
+    const nextStyle = slice.indexOf('[[fmt ', 1);
+    if (nextStyle > 0 && (!match || nextStyle <= match.index)) {
+      result.push({ type: 'text', value: slice.slice(0, nextStyle) });
+      index += nextStyle;
+      continue;
+    }
+    if (!match || match.index == null) {
+      result.push({ type: 'text', value: input.slice(index) });
+      break;
+    }
+    const absolute = index + match.index;
+    if (absolute > index) result.push({ type: 'text', value: input.slice(index, absolute) });
     if (match[1] && match[2]) {
       const href = safeHttps(match[2]);
       if (href) result.push({ type: 'link', label: match[1], href });
@@ -39,9 +96,9 @@ export function parsePublicRichInlines(input: string): PublicRichInline[] {
     } else if (match[4]) {
       result.push({ type: 'em', value: match[4] });
     }
-    last = index + match[0].length;
+    index = absolute + match[0].length;
+    INLINE.lastIndex = 0;
   }
-  if (last < input.length) result.push({ type: 'text', value: input.slice(last) });
   return result.filter((part) => part.type !== 'text' || part.value.length > 0);
 }
 
@@ -58,11 +115,24 @@ function parseChunk(chunk: string): PublicRichBlock[] {
   const blocks: PublicRichBlock[] = [];
   let paragraph: string[] = [];
 
+  let paragraphAlign: RichTextAlign = 'left';
+
   const flushParagraph = () => {
     const content = paragraph.filter((line) => line.trim().length > 0);
     paragraph = [];
-    if (content.length === 0) return;
-    blocks.push({ type: 'paragraph', lines: content.map((line) => parsePublicRichInlines(line)) });
+    if (content.length === 0) {
+      paragraphAlign = 'left';
+      return;
+    }
+    blocks.push({
+      type: 'paragraph',
+      align: paragraphAlign,
+      lines: content.map((line) => {
+        const parsed = parseRichTextAlign(line);
+        return parsePublicRichInlines(parsed.content);
+      }),
+    });
+    paragraphAlign = 'left';
   };
 
   let index = 0;
@@ -99,6 +169,9 @@ function parseChunk(chunk: string): PublicRichBlock[] {
       blocks.push({ type: 'list', ordered: true, items });
       continue;
     }
+    const nextAlign = parseRichTextAlign(lines[index]).align;
+    if (paragraph.length > 0 && nextAlign !== paragraphAlign) flushParagraph();
+    if (paragraph.length === 0) paragraphAlign = nextAlign;
     paragraph.push(lines[index]);
     index += 1;
   }
@@ -110,6 +183,21 @@ export function parsePublicRichText(source: string): PublicRichBlock[] {
   return source
     .replace(/\u0000/gu, '')
     .replace(/\r\n/gu, '\n')
+    // The editor can persist a single span across several lines. Close and
+    // reopen it before block parsing so each line keeps the original style.
+    .replace(
+      /(\[\[fmt (?:sans|serif) (?:12|14|16|18|20|24) (?:navy|navy-soft|blue|blue-soft|text|muted|success|warning|danger)\]\])([\s\S]*?)\[\[\/fmt\]\]/gu,
+      (_span, open: string, content: string) => content.split('\n')
+        .map((line) => {
+          if (!line) return '';
+          // Block markers must remain outside inline styling for the parser.
+          const prefix = /^(?:@(?:left|center|right) )?(?:#{1,3} |[-*] |\d{1,3}\. )?/u.exec(line)![0];
+          return `${prefix}${open}${line.slice(prefix.length)}[[/fmt]]`;
+        })
+        .join('\n'),
+    )
     .split(/\n{2,}/u)
     .flatMap((chunk) => parseChunk(chunk));
 }
+
+

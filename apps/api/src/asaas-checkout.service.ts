@@ -5,6 +5,7 @@ import {
   NotFoundException,
   ServiceUnavailableException,
   UnauthorizedException,
+  UnprocessableEntityException,
 } from '@nestjs/common';
 import { EventStatus, Prisma, RegistrationCheckoutStatus, RegistrationReservationStatus } from '@prisma/client';
 import { createHash } from 'node:crypto';
@@ -12,9 +13,13 @@ import { AsaasCheckoutGateway, AsaasGatewayError } from './asaas-checkout.gatewa
 import {
   AsaasCheckoutPolicyError,
   NormalizedAsaasCheckoutWebhook,
+  asaasDuplicateWebhookDecision,
+  asaasStubPaidWebhook,
+  authorizeAsaasCheckoutWebhook,
   normalizeAsaasCheckoutWebhook,
   normalizeReservationProtocol,
-  secureTokenMatches,
+  publicCheckoutNextStep,
+  shouldAutoConfirmAsaasCheckout,
   webhookFingerprint,
 } from './asaas-checkout-policy';
 import type { ConfirmedRegistrationNotice } from './integration-foundation.policy';
@@ -30,7 +35,9 @@ import {
   registrationCountry,
   type CommissionQuote,
 } from './paid-event-commission.policy';
-import { RegistrationReservationPolicyError, normalizeIdempotencyKey } from './registration-reservations-policy';
+import { checkoutRefundBlock } from './registration-refund-policy';
+import { RegistrationRefundService } from './registration-refund.service';
+import { RegistrationReservationPolicyError, isPublicTicketOffer, normalizeIdempotencyKey } from './registration-reservations-policy';
 
 const PROVIDER = 'ASAAS';
 const MIN_CHECKOUT_MINUTES = 10;
@@ -45,6 +52,7 @@ export class AsaasCheckoutService {
     private readonly prisma: PrismaService,
     private readonly gateway: AsaasCheckoutGateway,
     private readonly foundation: IntegrationFoundationService,
+    private readonly refunds: RegistrationRefundService,
   ) {}
 
   isConfigured(): boolean {
@@ -63,12 +71,12 @@ export class AsaasCheckoutService {
       }
       throw error;
     }
-    if (!this.gateway.isConfigured()) throw new ServiceUnavailableException('O pagamento está temporariamente indisponível.');
+    if (!this.gateway.isConfigured()) throw new UnprocessableEntityException('O pagamento está temporariamente indisponível.');
 
     const slug = slugValue.trim().toLowerCase();
     const event = await this.prisma.event.findUnique({
       where: { slug },
-      select: { id: true, organizationId: true, name: true, status: true },
+      select: { id: true, organizationId: true, name: true, status: true, profileCode: true, eventType: true },
     });
     if (!event?.organizationId || event.status !== EventStatus.PUBLISHED) throw new NotFoundException('Reserva não encontrada.');
     const organizationId = event.organizationId;
@@ -93,9 +101,15 @@ export class AsaasCheckoutService {
         expiresAt: true,
         category: { select: { proofRequirement: true } },
         categoryProof: { select: { state: true } },
+        orderEntry: { select: { orderId: true } },
       },
     });
     if (!reservation) throw new NotFoundException('Reserva não encontrada.');
+    // An order entry must never be charged as an independent reservation:
+    // one order owns exactly one grouped checkout and one payment webhook.
+    if (reservation.orderEntry) {
+      throw new ConflictException('Esta inscrição pertence a uma compra múltipla. Utilize o checkout do pedido.');
+    }
     const proofBlock = categoryProofPaymentBlock(reservation.category.proofRequirement, reservation.categoryProof?.state ?? null);
     if (proofBlock) throw new ConflictException(proofBlock);
     const now = new Date();
@@ -151,12 +165,17 @@ export class AsaasCheckoutService {
         throw new ConflictException('A reserva já possui uma tentativa de checkout com outra chave.');
       }
       if (checkout.status === RegistrationCheckoutStatus.ACTIVE || checkout.status === RegistrationCheckoutStatus.PAID) {
-        return this.toPublicCheckout(protocol, reservation.status, checkout);
+        return this.toPublicCheckout(protocol, reservation.status, checkout, 'NONE', null, isPublicTicketOffer(event.profileCode, event.eventType));
       }
     }
+    const published = await this.refunds.hasPublishedPolicy(event.id, organizationId);
+    if (!published) throw new ConflictException(checkoutRefundBlock(false));
     let split: { walletId: string; fixedValue: number };
     try {
-      split = asaasOrganizerSplit(quote, seller.asaasWalletId);
+      split = asaasOrganizerSplit(
+        quote,
+        seller.asaasWalletId || (this.gateway.isStubMode() ? this.gateway.stubOrganizerWalletId() : null),
+      );
     } catch (error) {
       if (error instanceof PaidEventCommissionError) throw new ConflictException(error.message);
       throw error;
@@ -228,6 +247,11 @@ export class AsaasCheckoutService {
             failureCode: null,
           },
         });
+        await this.refunds.recordAcceptance(tx, {
+          eventId: event.id,
+          organizationId,
+          reservationId: reservation.id,
+        }, now);
         await tx.auditLog.create({
           data: {
             organizationId,
@@ -248,9 +272,15 @@ export class AsaasCheckoutService {
         return updated;
       });
       await this.reconcilePendingEvents(created.providerCheckoutId);
+      if (shouldAutoConfirmAsaasCheckout() && this.gateway.isStubMode()) {
+        await this.receiveWebhook(
+          this.gateway.webhookToken(),
+          asaasStubPaidWebhook(created.providerCheckoutId, active.amountCents),
+        );
+      }
       const current = await this.prisma.eventRegistrationCheckout.findUniqueOrThrow({ where: { id: active.id } });
       const currentReservation = await this.prisma.eventRegistrationReservation.findUniqueOrThrow({ where: { id: reservation.id } });
-      return this.toPublicCheckout(protocol, currentReservation.status, current);
+      return this.toPublicCheckout(protocol, currentReservation.status, current, 'NONE', null, isPublicTicketOffer(event.profileCode, event.eventType));
     } catch (error) {
       if (error instanceof AsaasGatewayError) {
         const status = error.retrySafety === 'SAFE' ? RegistrationCheckoutStatus.FAILED : RegistrationCheckoutStatus.UNKNOWN;
@@ -258,7 +288,9 @@ export class AsaasCheckoutService {
           where: { id: checkout.id, status: RegistrationCheckoutStatus.CREATING },
           data: { status, failureCode: error.code },
         });
-        throw new ServiceUnavailableException(error.message);
+        throw error.retrySafety === 'SAFE'
+          ? new UnprocessableEntityException(error.message)
+          : new ServiceUnavailableException(error.message);
       }
       await this.prisma.eventRegistrationCheckout.updateMany({
         where: { id: checkout.id, status: RegistrationCheckoutStatus.CREATING },
@@ -274,7 +306,7 @@ export class AsaasCheckoutService {
     catch (error) { throw new BadRequestException(error instanceof Error ? error.message : 'Protocolo inválido.'); }
     const event = await this.prisma.event.findUnique({
       where: { slug: slugValue.trim().toLowerCase() },
-      select: { id: true, organizationId: true, status: true },
+      select: { id: true, organizationId: true, status: true, profileCode: true, eventType: true },
     });
     if (!event?.organizationId || event.status !== EventStatus.PUBLISHED) throw new NotFoundException('Reserva não encontrada.');
     const reservation = await this.prisma.eventRegistrationReservation.findFirst({
@@ -288,24 +320,35 @@ export class AsaasCheckoutService {
         where: { id: reservation.id },
         include: { checkout: true, category: { select: { proofRequirement: true } }, categoryProof: { select: { state: true } } },
       });
-      return this.toPublicCheckout(protocol, refreshed.status, refreshed.checkout, refreshed.category.proofRequirement, refreshed.categoryProof?.state ?? null);
+      return this.toPublicCheckout(protocol, refreshed.status, refreshed.checkout, refreshed.category.proofRequirement, refreshed.categoryProof?.state ?? null, isPublicTicketOffer(event.profileCode, event.eventType));
     }
-    return this.toPublicCheckout(protocol, reservation.status, reservation.checkout, reservation.category.proofRequirement, reservation.categoryProof?.state ?? null);
+    return this.toPublicCheckout(protocol, reservation.status, reservation.checkout, reservation.category.proofRequirement, reservation.categoryProof?.state ?? null, isPublicTicketOffer(event.profileCode, event.eventType));
   }
 
   async receiveWebhook(rawToken: string | undefined, rawBody: unknown) {
-    if (!secureTokenMatches(rawToken, this.gateway.webhookToken())) throw new UnauthorizedException('Webhook não autorizado.');
+    if (!authorizeAsaasCheckoutWebhook(rawToken)) throw new UnauthorizedException('Webhook não autorizado.');
     let event: NormalizedAsaasCheckoutWebhook;
     try { event = normalizeAsaasCheckoutWebhook(rawBody); }
     catch (error) { throw new BadRequestException(error instanceof Error ? error.message : 'Webhook inválido.'); }
+    return this.receiveNormalizedWebhook(event);
+  }
+
+  // Authenticated controller dispatches the already-normalized event here;
+  // direct webhook callers retain token authentication in receiveWebhook.
+  async receiveNormalizedWebhook(event: NormalizedAsaasCheckoutWebhook) {
     const fingerprint = webhookFingerprint(event);
 
     try {
       const outcome = await this.prisma.$transaction(async (tx) => {
         const duplicate = await tx.asaasCheckoutWebhookEvent.findUnique({ where: { providerEventId: event.providerEventId } });
         if (duplicate) {
-          if (duplicate.payloadHash !== fingerprint) throw new ConflictException('O identificador do webhook já foi recebido com outro conteúdo.');
-          if (duplicate.processedAt) return { response: { accepted: true, duplicate: true, queued: false }, confirmed: null };
+          const decision = asaasDuplicateWebhookDecision({
+            storedHash: duplicate.payloadHash,
+            incomingHash: fingerprint,
+            processedAt: duplicate.processedAt,
+          });
+          if (decision === 'conflict') throw new ConflictException('O identificador do webhook já foi recebido com outro conteúdo.');
+          if (decision === 'already_processed') return { response: { accepted: true, duplicate: true, queued: false }, confirmed: null };
           const knownCheckout = await tx.eventRegistrationCheckout.findFirst({
             where: { provider: PROVIDER, providerCheckoutId: duplicate.externalCheckoutId },
           });
@@ -340,10 +383,15 @@ export class AsaasCheckoutService {
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
         const duplicate = await this.prisma.asaasCheckoutWebhookEvent.findUnique({ where: { providerEventId: event.providerEventId } });
-        if (!duplicate || duplicate.payloadHash !== fingerprint) {
+        const raced = asaasDuplicateWebhookDecision({
+          storedHash: duplicate?.payloadHash ?? '',
+          incomingHash: fingerprint,
+          processedAt: duplicate?.processedAt ?? null,
+        });
+        if (!duplicate || raced === 'conflict') {
           throw new ConflictException('O identificador do webhook já foi recebido com outro conteúdo.');
         }
-        return { accepted: true, duplicate: true, queued: duplicate?.processedAt === null };
+        return { accepted: true, duplicate: true, queued: raced === 'retry_unprocessed' };
       }
       throw error;
     }
@@ -533,6 +581,7 @@ export class AsaasCheckoutService {
     checkout: { status: RegistrationCheckoutStatus; checkoutUrl: string | null; amountCents: number; expiresAt: Date; paidAt: Date | null } | null,
     proofRequirement: 'NONE' | 'OPTIONAL' | 'REQUIRED_BEFORE_PAYMENT' = 'NONE',
     proofState: 'PENDING_REVIEW' | 'APPROVED' | 'REJECTED' | null = null,
+    ticketEvent = false,
   ) {
     const proofBlock = categoryProofPaymentBlock(proofRequirement, proofState);
     return {
@@ -548,15 +597,13 @@ export class AsaasCheckoutService {
         required: proofRequirement === 'REQUIRED_BEFORE_PAYMENT',
         state: proofRequirement === 'NONE' ? null : proofState,
       },
-      nextStep: reservationStatus === RegistrationReservationStatus.CONFIRMED
-        ? 'Pagamento confirmado pelo Asaas. Sua inscrição está confirmada.'
-        : proofBlock && reservationStatus === RegistrationReservationStatus.PENDING_PAYMENT
-          ? proofBlock
-          : checkout?.status === RegistrationCheckoutStatus.PAID_REVIEW
-            ? 'Pagamento recebido e encaminhado para conciliação segura.'
-            : reservationStatus === RegistrationReservationStatus.PENDING_PAYMENT
-              ? 'Conclua o pagamento no ambiente seguro do Asaas. No Brasil, Pix ou cartão; em outro país, cartão. Aguarde a confirmação automática.'
-              : 'Esta reserva não está mais disponível para pagamento.',
+      nextStep: publicCheckoutNextStep({
+        reservationStatus,
+        checkoutStatus: checkout?.status ?? null,
+        proofBlock,
+        simulated: this.gateway.isStubMode(),
+        ticketEvent,
+      }),
     };
   }
 }

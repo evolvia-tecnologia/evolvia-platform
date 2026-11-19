@@ -1,0 +1,4 @@
+.root { display: none; }
+@media print {
+  .root { display: block !important; position: static; margin: 0; padding: 0; }
+}
