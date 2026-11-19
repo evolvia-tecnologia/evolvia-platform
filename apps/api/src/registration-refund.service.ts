@@ -17,6 +17,9 @@ import {
   type RefundWindow,
 } from './registration-refund-policy';
 
+// Private refund routes remain available for prior purchases after suspension or closure.
+const REFUND_EVENT_STATUS = { in: [EventStatus.PUBLISHED, EventStatus.SUSPENDED, EventStatus.CANCELLED, EventStatus.FINISHED] };
+
 const ORGANIZER_ROLES = [MembershipRole.OWNER, MembershipRole.ADMIN, MembershipRole.MANAGER];
 
 function policyError(error: unknown): never {
@@ -243,7 +246,7 @@ export class RegistrationRefundService {
     scope: {
       emailHash: string;
       identityHash: { in: string[] };
-      event: { slug: string; status: EventStatus };
+      event: { slug: string; status: typeof REFUND_EVENT_STATUS };
     },
   ) {
     const select = { id: true, eventId: true, organizationId: true, protocol: true } as const;
@@ -296,7 +299,7 @@ export class RegistrationRefundService {
     const reservation = await this.paidAccountReservation({
       emailHash,
       identityHash: { in: links.map((link) => link.identityHash) },
-      event: { slug: slug.trim().toLowerCase(), status: EventStatus.PUBLISHED },
+      event: { slug: slug.trim().toLowerCase(), status: REFUND_EVENT_STATUS },
     });
     if (!reservation) throw new NotFoundException('Inscrição paga não encontrada.');
     return this.createRequest(reservation, input, userId, now);
@@ -311,7 +314,7 @@ export class RegistrationRefundService {
     const scope = {
       emailHash,
       identityHash: { in: links.map((link) => link.identityHash) },
-      event: { slug: slug.trim().toLowerCase(), status: EventStatus.PUBLISHED },
+      event: { slug: slug.trim().toLowerCase(), status: REFUND_EVENT_STATUS },
     };
     const paidReservation = await this.paidAccountReservation(scope);
     const reservation = paidReservation ?? await this.prisma.eventRegistrationReservation.findFirst({
@@ -772,7 +775,7 @@ export class RegistrationRefundService {
         tokenHash: participantHash(token),
         revokedAt: null,
         expiresAt: { gt: new Date() },
-        reservation: { event: { slug: slug.trim().toLowerCase(), status: EventStatus.PUBLISHED } },
+        reservation: { event: { slug: slug.trim().toLowerCase(), status: REFUND_EVENT_STATUS } },
       },
       select: { reservationId: true, eventId: true, organizationId: true, reservation: { select: { protocol: true } } },
     });

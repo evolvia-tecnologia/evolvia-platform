@@ -288,6 +288,9 @@ test('pedido repetido ou concorrente permanece único e a aprovação não devol
       expiresAt: new Date(Date.now() + 3_600_000),
     },
   });
+  await prisma.event.update({ where: { id: event.id }, data: { status: 'SUSPENDED' } });
+  await rejects(refunds.publicPolicy(event.slug), 404);
+  assert.equal((await refunds.accountView(people.buyer.id, event.slug)).protocol, row.protocol);
   const seen = await refunds.participantView(event.slug, `Bearer ${token}`);
   assert.equal(seen.protocol, row.protocol);
   assert.equal(seen.paid, true);
