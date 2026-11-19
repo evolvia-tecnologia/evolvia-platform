@@ -58,16 +58,36 @@ export function podeOperar(linha: LinhaDeModeracao | null | undefined, operacao:
 }
 
 /**
+ * Os estados que PERMITEM a operação.
+ *
+ * Existe para quem filtra uma LISTA em vez de perguntar por um evento. As
+ * tabelas de moderação não declaram relação com `Event` — decisão do corte,
+ * porque `schema.prisma` é compartilhado — então uma listagem não pode fazer
+ * join e precisa dos estados para montar o recorte.
+ *
+ * Devolve os PERMITIDOS, e não os bloqueados, de propósito: quem filtra escreve
+ * "tudo que não está entre estes", que falha FECHADO. A lista de bloqueados
+ * levaria à formulação oposta, e um estado novo na política passaria a aparecer
+ * em listagem pública até alguém lembrar de atualizar a lista.
+ *
+ * O chamador não decide quais são: eles saem de `permite()`, que é a mesma
+ * função usada por `podeOperar`. Duas definições do mesmo efeito é como elas
+ * divergem.
+ */
+export function estadosQuePermitem(operacao: Operacao | string): EstadoDeModeracao[] {
+  return ESTADOS.filter((estado) => permite(estado, operacao));
+}
+
+/**
  * Pontos de consumo, nomeados para que a fiação seja mecânica e conferível.
  *
  * Esta lista é documentação executável: o teste confere que toda operação do
  * catálogo aparece em pelo menos um ponto, para que nenhuma fique definida e
  * nunca consultada — uma operação que ninguém pergunta é efeito que não existe.
  *
- * A fiação em si NÃO está neste corte: cada arquivo abaixo tem dono, e trocar
- * código alheio sem lock é como dois agentes se sobrescrevem. O corte entrega a
- * decisão, a persistência e a trilha; a ligação é pedido explícito a quem é
- * dono de cada caminho.
+ * `divulgacao_publica` e `listagem_publica` já estão ligadas. As demais ainda
+ * não: cada arquivo tem dono, e trocar código alheio sem lock é como dois
+ * agentes se sobrescrevem.
  */
 export const PONTOS_DE_CONSUMO: ReadonlyArray<{
   readonly operacao: Operacao;
