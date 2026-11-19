@@ -76,7 +76,11 @@ test('nota é obrigatória, limitada à coluna e sem caractere de controle', () 
   }
   assert.equal(decidirEntrada(base({ nota: 'a'.repeat(LIMITE_DA_NOTA) })).permitido, true);
   assert.equal(decidirEntrada(base({ nota: 'a'.repeat(LIMITE_DA_NOTA + 1) })).motivo, 'nota_muito_longa');
-  for (const nota of ['linha1\nlinha2', 'com\ttab', 'com\u0000nulo', 'com​zero']) {
+  // O último caso usa U+200B (espaço de largura zero) escrito por código, e não
+  // como caractere literal nem como escape: caractere invisível no fonte é
+  // armadilha para quem revisa, e o escape ​ não sobreviveu ao conector
+  // que escreve no repositorio.
+  for (const nota of ['linha1\nlinha2', 'com\ttab', 'com\u0000nulo', 'com' + String.fromCharCode(0x200b) + 'zero']) {
     assert.equal(decidirEntrada(base({ nota })).motivo, 'nota_com_controle', `aceitou ${JSON.stringify(nota)}`);
   }
 });

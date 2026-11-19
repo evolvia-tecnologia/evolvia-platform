@@ -40,12 +40,41 @@ guarda contra rodar no banco errado: se divergir, o script recusa e não gera na
 `--nota` é obrigatória, vai para a coluna `provisionedByNote` e para a trilha, e
 é o que responde "quem autorizou". Máximo de 200 caracteres, uma linha.
 
+**O `DATABASE_URL` tem de ser TCP, com host e porta.** URL de socket Unix
+(`postgresql:///banco`, ou host em `host=`) não tem host para confirmar, e o
+script recusa com essa mensagem. A limitação é deliberada e não é para
+contornar: `--confirmar-host` é a única guarda contra executar no banco errado,
+e com host vazio não existiria guarda nenhuma — exatamente no caso em que você
+não teria como perceber o alvo trocado. Se o ambiente de destino só for
+alcançável por socket, use a URL TCP do mesmo banco para gerar o SQL e execute
+o arquivo gerado pelo caminho que você já usa.
+
 ## Passo 2 — ler o SQL
 
-Abra `/tmp/master-owner.sql`. Ele deve ter, nesta ordem: `BEGIN`, três
-`RAISE EXCEPTION` (usuário inexistente, e-mail não verificado, proprietário já
-existente), o caminho idempotente, um `INSERT` em `PlatformMasterIdentity`, um
-`INSERT` em `PlatformAuditLog` e `COMMIT`. Se algo estiver diferente, pare.
+Abra `/tmp/master-owner.sql`. Ele deve ter, nesta ordem: `BEGIN`,
+`PERFORM pg_advisory_xact_lock(665, 1)`, três `RAISE EXCEPTION` (usuário
+inexistente, e-mail não verificado, proprietário já existente), o caminho
+idempotente, um `INSERT` em `PlatformMasterIdentity`, um `INSERT` em
+`PlatformAuditLog` e `COMMIT`. Se algo estiver diferente, pare.
+
+Duas coisas na lista merecem explicação, porque são o que mudou depois da
+revisão independente da PR #690:
+
+- **A trava vem antes de qualquer leitura de estado, e é ela que torna a guarda
+  de proprietário confiável.** `PlatformMasterIdentity` tem índice em
+  `(role, status)`, não restrição de unicidade. Sem a trava, duas execuções
+  simultâneas para **usuários diferentes** passariam as duas pela verificação
+  "já existe proprietário ativo?" e inseririam as duas: nasceriam dois `OWNER`
+  ativos. Repetir o **mesmo** usuário já era barrado por `userId @unique`. A
+  trava é liberada quando a transação termina, de um jeito ou de outro, e não
+  bloqueia leitura de ninguém.
+- **Os dois `id` vêm escritos no arquivo, como literais no formato `c…`**, em
+  vez de `gen_random_uuid()`. As colunas são `@default(cuid())`, e em Prisma o
+  `cuid()` é gerado no cliente — a coluna não tem `DEFAULT` no banco, então o
+  `INSERT` é obrigado a trazer o id. Um UUID ali ficaria com hífen, com 36
+  caracteres e sem o `c` inicial: diferente de todos os outros id da mesma
+  coluna. Se você reexecutar o gerador, os literais mudam — isso é esperado, e
+  não torna o arquivo anterior inválido.
 
 ## Passo 3 — executar
 
