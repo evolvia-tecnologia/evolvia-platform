@@ -510,6 +510,13 @@ test('a referência de sandbox fica no pedido preparado uma vez, com autorizaç�
   await rejects(resolve(), 503);
   assert.equal(transport.mock.callCount(), 0);
   process.env[orgKey] = organizationId;
+  transport.mock.mockImplementationOnce(async () => new Response('detalhe reservado', { status: 503 }));
+  await assert.rejects(resolve(), error => {
+    assert.equal(error.getStatus(), 503);
+    assert.equal(error.cause, 'HTTP_503');
+    assert.doesNotMatch(JSON.stringify(error.getResponse()), /HTTP_503|detalhe reservado/u);
+    return true;
+  });
   const member = await prisma.organizationMembership.findFirstOrThrow({where:{organizationId,userId:people.owner.id}});
   transport.mock.mockImplementationOnce(async url => {
     await prisma.organizationMembership.update({where:{id:member.id},data:{role:'VIEWER'}});

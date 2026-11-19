@@ -490,8 +490,12 @@ export class RegistrationRefundService {
         { organizationId, eventId, providerCheckoutId: checkout.providerCheckoutId },
         { organizationId: accountOrg, token },
       );
-    } catch {
-      throw new ServiceUnavailableException('Não foi possível identificar a cobrança na homologação.');
+    } catch (error) {
+      // The adapter owns the transport and emits only these diagnostic categories.
+      const code = error instanceof Error ? error.cause : undefined;
+      const cause = typeof code === 'string' && /^(TRANSPORT|INVALID_JSON|HTTP_[1-5][0-9]{2})$/u.test(code)
+        ? code : 'UNVERIFIED_PAYMENT';
+      throw new ServiceUnavailableException('Não foi possível identificar a cobrança na homologação.', { cause });
     }
     const source = { id: checkout.id, provider: 'ASAAS', status: 'PAID' as const, providerCheckoutId: checkout.providerCheckoutId };
     const scope = {
