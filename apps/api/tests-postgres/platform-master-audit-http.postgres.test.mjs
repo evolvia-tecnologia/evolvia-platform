@@ -39,6 +39,7 @@ async function cenario(rotulo) {
     proprietario,
     delegado,
     ator,
+    dono,
     jwtOwner: crachar(proprietario.id, proprietario.email),
     jwtDeleg: crachar(delegado.id, delegado.email),
     masterOwner: await sessao(identOwner.id),
@@ -279,25 +280,46 @@ test('o relatório da organização não mostra linha de outra organização', {
   assert.deepEqual(r.corpo.itens.map((i) => i.correlacao), ['or-dentro']);
 });
 
-test('LIMITAÇÃO DECLARADA: concessão de organização não alcança a rota de evento', { timeout: 120000 }, async () => {
-  // O alvo sai dos parâmetros da rota, e `/events/:eventId/audit` não carrega
-  // organizationId — então o alvo fica com organizationId vazio e
-  // `escopoAlcanca` recusa. Quem tem `auditar` na organização usa a rota da
-  // organização.
+test('concessão de organização alcança a rota de evento DAQUELA organização, e não de outra', { timeout: 120000 }, async () => {
+  // Este caso media uma LIMITAÇÃO, não um requisito: o alvo saía dos parâmetros
+  // da rota, e `/events/:eventId/audit` não carrega `organizationId`, então o
+  // alvo ficava com organização vazia e `escopoAlcanca` recusava. O comentário
+  // anterior dizia que, se a decisão fosse corrigir, era ESTE teste que
+  // mudaria, de propósito — e foi o que aconteceu, em 05684bc0, atendendo a
+  // revisão do Codex em r4621823736.
   //
-  // Isto é discutível, e o teste fixa o comportamento ATUAL de propósito: é o
-  // mesmo de `/events/:eventId/summary`, que já era assim antes desta demanda.
-  // A correção — o guard resolver a organização do evento no banco antes de
-  // decidir — muda a forma de um guard compartilhado e foi para o Work como
-  // pergunta. Se a decisão for corrigir, é ESTE teste que muda, e de propósito.
+  // O caso ficou mais forte, não mais fraco: antes media só a recusa, agora
+  // mede o alcance E o limite. A correção amplia acesso, e medir só a
+  // ampliação seria medir metade.
   const c = await cenario('aud-org-evento');
+
+  // Segunda organização com evento próprio: o `cenario()` monta os dois eventos
+  // na MESMA organização, e dois eventos da mesma organização não distinguem
+  // alcance de vazamento.
+  const outroDono = await pessoa('aud-org-evento-outro-dono');
+  const outraOrg = await organizacao('aud-org-evento-outra', outroDono.id);
+  const eventoDeOutra = await evento('aud-org-evento-outra-ev', outroDono.id, outraOrg.id);
+
   await conceder(c, ['auditar'], { tipo: 'ORGANIZACAO', organizationId: c.org.id });
 
   const naOrg = await relatorio(`/platform/master/organizations/${c.org.id}/audit`, c.jwtDeleg, c.masterDeleg, {});
   assert.equal(naOrg.status, 201, `na rota da organização passa: ${naOrg.corpo}`);
 
   const noEvento = await relatorio(`/platform/master/events/${c.eventoA.id}/audit`, c.jwtDeleg, c.masterDeleg, {});
-  assert.equal(noEvento.status, 403, 'comportamento atual, medido e declarado');
+  assert.equal(
+    noEvento.status, 201,
+    `o evento é da organização concedida e tem de passar: ${noEvento.corpo}`,
+  );
+  assert.deepEqual(noEvento.corpo.escopo, { tipo: 'EVENTO', eventId: c.eventoA.id });
+
+  // O limite preservado: concessão de uma organização não atravessa para o
+  // evento de outra. Sem este assert, a ampliação de acesso ficaria sem prova
+  // de que não vazou.
+  const noAlheio = await relatorio(`/platform/master/events/${eventoDeOutra.id}/audit`, c.jwtDeleg, c.masterDeleg, {});
+  assert.equal(
+    noAlheio.status, 403,
+    'a concessão de uma organização alcançou o evento de outra: isolamento quebrado',
+  );
 });
 
 // --------------------------------------------------- sessão e identidade
