@@ -1,85 +1,54 @@
-// Disposable CI database only; fixture rows are preserved.
+// Disposable CI PostgreSQL only. Unique fixture data is preserved, never deleted.
 //
-// O escopo do guard nas rotas de evento só se prova com banco, porque o defeito
-// era de RESOLUÇÃO: `events/:eventId/summary` e `events/:eventId/audit` não têm
-// `:organizationId` na rota, então o alvo saía com `organizationId: ''` e
-// nenhuma concessão de organização casava com string vazia. Descobrir a
-// organização do evento exige o evento gravado — com cliente falso, a resposta
-// é o que o dublê mandar, e o defeito desaparece.
+// O escopo do guard nas rotas de evento, exercitado contra banco real.
 //
-// O guard carrega decorators, que o Node com type stripping não parseia. Por
-// isso a importação vem do `dist`, como nos outros arquivos desta pasta.
+// O defeito que este arquivo fixa era de RESOLUÇÃO: `events/:eventId/summary` e
+// `events/:eventId/audit` não têm `:organizationId` na rota, então o alvo saía
+// com `organizationId: ''` e nenhuma concessão de organização casava com string
+// vazia. Descobrir a organização do evento exige o evento gravado — com cliente
+// falso a resposta é o que o dublê mandar, e o defeito desaparece.
+//
+// A montagem vem toda de `master-fixtures.mjs`. Na primeira versão eu escrevi
+// helpers próprios e eles divergiram do schema — faltava
+// `provisionedByNote` —, derrubando os cinco casos antes das asserções. Uma
+// fonte só de fixture é o que impede isso de voltar.
+//
+// O guard carrega decorators, que o Node com type stripping não parseia; por
+// isso ele vem do `dist`, pelo reexport do fixture.
 import assert from 'node:assert/strict';
 import test, { after } from 'node:test';
-import { randomUUID, createHash } from 'node:crypto';
-import { PrismaClient } from '@prisma/client';
-import { PlatformMasterRepository } from '../dist/platform-master.repository.js';
-import { PlatformMasterGuard, CABECALHO_DA_SESSAO } from '../dist/platform-master.guard.js';
+import {
+  PlatformMasterRepository, derrubarApp, evento, identidade,
+  organizacao, pessoa, prisma, sessao,
+} from './master-fixtures.mjs';
 
-const db = new PrismaClient();
-after(() => db.$disconnect());
+const { PlatformMasterGuard } = await import('../dist/platform-master.guard.js');
 
-const repositorio = new PlatformMasterRepository(db);
+after(async () => { await derrubarApp(); });
+
+const repositorio = new PlatformMasterRepository(prisma);
 
 // Dublê do Reflector: devolve sempre a ação declarada pela rota. O que está em
-// prova aqui é o ESCOPO, não a leitura da metadata — e o caso de rota sem ação
-// declarada já tem cobertura própria.
-const reflector = (acao) => ({ get: () => acao });
-
-const guard = (acao) => new PlatformMasterGuard(reflector(acao), repositorio);
+// prova aqui é o ESCOPO, não a leitura da metadata — e rota sem ação declarada
+// já tem cobertura própria.
+const guard = (acao) => new PlatformMasterGuard({ get: () => acao }, repositorio);
 
 const contexto = (requisicao) => ({
   switchToHttp: () => ({ getRequest: () => requisicao }),
   getHandler: () => function manipulador() {},
 });
 
-const hash = (token) => createHash('sha256').update(token).digest('hex');
+const CABECALHO = 'x-evolvia-master-session';
 
-const pessoa = (rotulo) => db.user.create({
-  data: { name: rotulo, email: `guard-${randomUUID()}@evolvia-ci.local`, passwordHash: 'fixture' },
+const requisicao = (userId, token, params) => ({
+  user: { id: userId },
+  params,
+  headers: { [CABECALHO]: token },
 });
 
-/** Identidade Master ativa com sessão fresca, e o token cru para o cabeçalho. */
-async function comSessao(userId, papel) {
-  const identidade = await db.platformMasterIdentity.create({
-    data: { userId, role: papel, status: 'ACTIVE' },
-    select: { id: true },
-  });
-  const token = randomUUID();
-  const agora = new Date();
-  await db.platformMasterSession.create({
-    data: {
-      identityId: identidade.id,
-      tokenHash: hash(token),
-      secondFactorAt: agora,
-      stepUpAt: agora,
-      expiresAt: new Date(agora.getTime() + 3600_000),
-    },
-  });
-  return token;
-}
-
-async function organizacaoComEvento(proprietarioId, rotulo) {
-  const organizacao = await db.organization.create({
-    data: { name: `GUARD ${rotulo} ${randomUUID()}`, slug: `guard-${randomUUID()}`, createdById: proprietarioId },
-  });
-  const evento = await db.event.create({
-    data: {
-      ownerId: proprietarioId,
-      organizationId: organizacao.id,
-      name: `GUARD evento ${rotulo}`,
-      slug: `guard-evento-${randomUUID()}`,
-      eventType: 'CONGRESSO',
-      format: 'IN_PERSON',
-      registrationMode: 'FREE',
-    },
-  });
-  return { organizacao, evento };
-}
-
-/** Concessão com escopo de ORGANIZAÇÃO, gravada direto. */
+/** Concessão com escopo de ORGANIZAÇÃO, gravada direto: o alvo é o guard. */
 const concederNaOrganizacao = (proprietarioId, delegadoId, organizationId, acao) =>
-  db.platformGrant.create({
+  prisma.platformGrant.create({
     data: {
       targetUserId: delegadoId,
       action: acao,
@@ -90,12 +59,6 @@ const concederNaOrganizacao = (proprietarioId, delegadoId, organizationId, acao)
       expiresAt: new Date(Date.now() + 30 * 86400_000),
     },
   });
-
-const requisicao = (userId, token, params) => ({
-  user: { id: userId },
-  params,
-  headers: { [CABECALHO_DA_SESSAO]: token },
-});
 
 /**
  * Devolve o erro em vez de deixá-lo subir, para que o caso confira o STATUS.
@@ -112,22 +75,30 @@ async function recusa(executar) {
   return null;
 }
 
-async function cenario() {
-  const proprietario = await pessoa('GUARD proprietário');
-  const delegado = await pessoa('GUARD delegado');
-  const propria = await organizacaoComEvento(proprietario.id, 'própria');
-  const alheia = await organizacaoComEvento(proprietario.id, 'alheia');
-  const token = await comSessao(delegado.id, 'DELEGADO');
-  await concederNaOrganizacao(proprietario.id, delegado.id, propria.organizacao.id, 'consultar');
-  return { proprietario, delegado, token, propria, alheia };
+/** Delegado com concessão de `consultar` na organização PRÓPRIA, e nada na alheia. */
+async function cenario(rotulo) {
+  const proprietario = await pessoa(`${rotulo}-owner`);
+  const delegado = await pessoa(`${rotulo}-deleg`);
+  const dono = await pessoa(`${rotulo}-dono`);
+
+  const propria = await organizacao(`${rotulo}-propria`, dono.id);
+  const alheia = await organizacao(`${rotulo}-alheia`, dono.id);
+  const eventoProprio = await evento(`${rotulo}-proprio`, dono.id, propria.id);
+  const eventoAlheio = await evento(`${rotulo}-alheio`, dono.id, alheia.id);
+
+  const ident = await identidade(delegado.id, 'DELEGADO');
+  const token = await sessao(ident.id);
+  await concederNaOrganizacao(proprietario.id, delegado.id, propria.id, 'consultar');
+
+  return { proprietario, delegado, token, propria, alheia, eventoProprio, eventoAlheio };
 }
 
-test('delegado de organização ALCANÇA a rota do evento da sua organização', async () => {
-  const { delegado, token, propria } = await cenario();
+test('delegado de organização ALCANÇA a rota do evento da sua organização', { timeout: 120000 }, async () => {
+  const c = await cenario('guard-alcanca');
 
   // A rota real não traz `:organizationId` — é exatamente isto que produzia o
   // defeito, e por isso o parâmetro não aparece aqui.
-  const req = requisicao(delegado.id, token, { eventId: propria.evento.id });
+  const req = requisicao(c.delegado.id, c.token, { eventId: c.eventoProprio.id });
 
   const permitido = await guard('consultar').canActivate(contexto(req));
 
@@ -138,26 +109,26 @@ test('delegado de organização ALCANÇA a rota do evento da sua organização',
   );
 });
 
-test('o alvo validado leva a organização PERSISTIDA para quem responde', async () => {
-  const { delegado, token, propria } = await cenario();
-  const req = requisicao(delegado.id, token, { eventId: propria.evento.id });
+test('o alvo validado leva a organização PERSISTIDA para quem responde', { timeout: 120000 }, async () => {
+  const c = await cenario('guard-alvo');
+  const req = requisicao(c.delegado.id, c.token, { eventId: c.eventoProprio.id });
 
   await guard('consultar').canActivate(contexto(req));
 
   // Liberar a rota e entregar um alvo com organização vazia seria autorizar por
   // um recurso e aplicar a outro — o que a derivação única existe para impedir.
   assert.equal(req.master.alvo.tipo, 'EVENTO');
-  assert.equal(req.master.alvo.eventId, propria.evento.id);
+  assert.equal(req.master.alvo.eventId, c.eventoProprio.id);
   assert.equal(
     req.master.alvo.organizationId,
-    propria.organizacao.id,
+    c.propria.id,
     'o alvo validado não carregou a organização do evento',
   );
 });
 
-test('delegado de organização NÃO alcança evento de OUTRA organização', async () => {
-  const { delegado, token, alheia } = await cenario();
-  const req = requisicao(delegado.id, token, { eventId: alheia.evento.id });
+test('delegado de organização NÃO alcança evento de OUTRA organização', { timeout: 120000 }, async () => {
+  const c = await cenario('guard-alheio');
+  const req = requisicao(c.delegado.id, c.token, { eventId: c.eventoAlheio.id });
 
   const erro = await recusa(() => guard('consultar').canActivate(contexto(req)));
 
@@ -167,14 +138,14 @@ test('delegado de organização NÃO alcança evento de OUTRA organização', as
   assert.equal(erro.getStatus?.(), 403, 'a recusa de escopo deveria ser 403');
 });
 
-test('o organizationId do parâmetro não amplia o alcance', async () => {
-  const { delegado, token, propria, alheia } = await cenario();
+test('o organizationId do parâmetro não amplia o alcance', { timeout: 120000 }, async () => {
+  const c = await cenario('guard-parametro');
 
   // A organização onde a pessoa TEM concessão, com um evento de outra. Se a
   // decisão aceitasse o parâmetro, isto passaria.
-  const req = requisicao(delegado.id, token, {
-    eventId: alheia.evento.id,
-    organizationId: propria.organizacao.id,
+  const req = requisicao(c.delegado.id, c.token, {
+    eventId: c.eventoAlheio.id,
+    organizationId: c.propria.id,
   });
 
   const erro = await recusa(() => guard('consultar').canActivate(contexto(req)));
@@ -183,14 +154,14 @@ test('o organizationId do parâmetro não amplia o alcance', async () => {
   assert.equal(erro.getStatus?.(), 403);
   assert.equal(
     req.master.alvo.organizationId,
-    alheia.organizacao.id,
+    c.alheia.id,
     'o alvo ficou com a organização do parâmetro em vez da persistida',
   );
 });
 
-test('evento inexistente recusa com 403, e não com 404', async () => {
-  const { delegado, token } = await cenario();
-  const req = requisicao(delegado.id, token, { eventId: `inexistente-${randomUUID()}` });
+test('evento inexistente recusa com 403, e não com 404', { timeout: 120000 }, async () => {
+  const c = await cenario('guard-inexistente');
+  const req = requisicao(c.delegado.id, c.token, { eventId: 'evento-que-nao-existe-no-banco' });
 
   const erro = await recusa(() => guard('consultar').canActivate(contexto(req)));
 
