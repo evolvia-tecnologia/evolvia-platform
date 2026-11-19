@@ -292,6 +292,15 @@ export class PlatformMasterRepository {
     return { tipo: 'GLOBAL' };
   }
 
+  /** A organização persistida de um evento, ou `null` se ele não existe. */
+  async organizacaoDoEvento(eventId: string): Promise<string | null> {
+    const evento = await this.prisma.event.findUnique({
+      where: { id: eventId },
+      select: { organizationId: true },
+    });
+    return evento?.organizationId ?? null;
+  }
+
   /**
    * O `where` do recorte, usado pela visão geral E pelo catálogo.
    *
@@ -389,15 +398,38 @@ export class PlatformMasterRepository {
   /**
    * As linhas da trilha, já estreitadas pelo escopo e pelo filtro.
    *
+   * Lê DUAS tabelas, e isto é o ponto do método.
+   *
+   * `PlatformAuditLog` guarda uma linha por OPERAÇÃO privilegiada, porque
+   * `executarAuditado` grava uma e só uma — é a garantia de que a mudança e o
+   * seu registro vivem na mesma transação. Mas uma concessão alcança N pessoas
+   * × M eventos, e isso não cabe nas colunas escalares `eventId` e
+   * `targetUserId`: elas saem vazias. Resultado, antes desta mudança: o
+   * relatório de um evento nunca mostrava mudança de acesso, e o filtro por
+   * destinatário não as encontrava nem no relatório global.
+   *
+   * `PlatformGrantEvent` já tem os identificadores, uma linha por (pessoa,
+   * ação, alcance), gravada na mesma transação. Então a leitura passa a
+   * incluí-la, em vez de duplicar aquela informação dentro de
+   * `PlatformAuditLog` — duas fontes para o mesmo fato é como elas divergem.
+   *
+   * No relatório GLOBAL as duas granularidades aparecem: a linha da operação
+   * (a decisão, com as contagens em `changes`) e as linhas por destinatário (o
+   * efeito). Compartilham o `correlationId`, então quem lê consegue amarrá-las.
+   * No relatório por evento não há duplicação: a linha de operação tem
+   * `eventId` vazio e `dentroDoEscopo` a exclui.
+   *
    * A restrição do escopo vem de `restricaoDoEscopo`, derivada do alvo que o
    * guard autorizou — nunca do corpo. Mesmo assim, quem monta o relatório
-   * aplica `dentroDoEscopo` sobre o que voltar: esta cláusula é otimização, e a
-   * fronteira de segurança é a função pura. Duas camadas de propósito, porque
-   * esquecer um `where` é o tipo de erro que não aparece em teste de unidade.
+   * aplica `dentroDoEscopo` sobre o que voltar: estas cláusulas são otimização,
+   * e a fronteira de segurança é a função pura. Duas camadas de propósito,
+   * porque esquecer um `where` é o tipo de erro que não aparece em teste de
+   * unidade.
    *
-   * `take` é `limite + 1` para que o relatório consiga dizer que truncou sem
-   * precisar de uma segunda consulta — e truncar sem dizer é o que torna um
-   * painel de auditoria enganoso.
+   * `take` é `limite + 1` em CADA fonte para que o relatório consiga dizer que
+   * truncou sem uma segunda consulta. Os `limite + 1` mais recentes da união
+   * estão contidos na união dos `limite + 1` mais recentes de cada lado, então
+   * a ordenação e o corte feitos por `montarRelatorio` continuam corretos.
    */
   async trilhaDeAuditoria(
     restricao: { organizationId?: string; eventId?: string },
@@ -410,23 +442,28 @@ export class PlatformMasterRepository {
     if (filtro.resultados.length > 0) where.result = { in: [...filtro.resultados] };
     if (filtro.actorUserId) where.actorUserId = filtro.actorUserId;
     if (filtro.targetUserId) where.targetUserId = filtro.targetUserId;
-    if (filtro.de || filtro.ate) {
-      where.occurredAt = {
+    const periodo = filtro.de || filtro.ate
+      ? {
         ...(filtro.de ? { gte: new Date(filtro.de) } : {}),
         ...(filtro.ate ? { lte: new Date(filtro.ate) } : {}),
-      };
-    }
+      }
+      : null;
+    if (periodo) where.occurredAt = periodo;
 
-    const linhas = await this.prisma.platformAuditLog.findMany({
-      where: where as never,
-      select: {
-        actorUserId: true, action: true, scopeKind: true, organizationId: true, eventId: true,
-        targetUserId: true, reason: true, result: true, changes: true, correlationId: true, occurredAt: true,
-      },
-      orderBy: { occurredAt: 'desc' },
-      take: filtro.limite + 1,
-    });
-    return linhas.map((l) => ({
+    const [operacoes, concessoes] = await Promise.all([
+      this.prisma.platformAuditLog.findMany({
+        where: where as never,
+        select: {
+          actorUserId: true, action: true, scopeKind: true, organizationId: true, eventId: true,
+          targetUserId: true, reason: true, result: true, changes: true, correlationId: true, occurredAt: true,
+        },
+        orderBy: { occurredAt: 'desc' },
+        take: filtro.limite + 1,
+      }),
+      this.historicoDeConcessoes(restricao, filtro, periodo),
+    ]);
+
+    const daOperacao: LinhaDaTrilha[] = operacoes.map((l) => ({
       actorUserId: l.actorUserId,
       action: l.action,
       scopeKind: String(l.scopeKind) as LinhaDaTrilha['scopeKind'],
@@ -436,6 +473,71 @@ export class PlatformMasterRepository {
       reason: l.reason,
       result: String(l.result) as LinhaDaTrilha['result'],
       changes: l.changes,
+      correlationId: l.correlationId,
+      occurredAt: l.occurredAt,
+    }));
+
+    return [...daOperacao, ...concessoes];
+  }
+
+  /**
+   * O histórico de concessão, já na forma da trilha.
+   *
+   * A tradução do filtro é estreita de propósito, nunca larga:
+   *
+   *  - `acoes` vira `kind`. Se o filtro pedir apenas ações que não existem no
+   *    histórico, a consulta é DISPENSADA em vez de devolver tudo — traduzir
+   *    para "sem filtro" seria alargar o pedido, e num relatório de auditoria
+   *    isso mostra o que não foi pedido.
+   *  - `resultados` sem `ALLOWED` dispensa igual: concessão gravada é concessão
+   *    que aconteceu, então toda linha daqui é `ALLOWED`. Não há `DENIED` nem
+   *    `FAILED` para mostrar, e inventar um seria afirmar o que não ocorreu.
+   *
+   * A ação CONCEDIDA (`consultar`, `suspender`…) vai em `changes`, porque a
+   * coluna `action` do relatório descreve a operação administrativa — conceder
+   * ou revogar — e misturar as duas no mesmo campo faria o filtro por ação
+   * responder coisas diferentes dependendo da fonte.
+   */
+  private async historicoDeConcessoes(
+    restricao: { organizationId?: string; eventId?: string },
+    filtro: FiltroDoRelatorio,
+    periodo: Record<string, Date> | null,
+  ): Promise<LinhaDaTrilha[]> {
+    const porAcao: Record<string, 'GRANTED' | 'REVOKED'> = { conceder: 'GRANTED', revogar: 'REVOKED' };
+    const tipos = filtro.acoes.length === 0
+      ? ['GRANTED', 'REVOKED']
+      : [...new Set(filtro.acoes.map((acao) => porAcao[acao]).filter((kind): kind is 'GRANTED' | 'REVOKED' => Boolean(kind)))];
+    if (tipos.length === 0) return [];
+    if (filtro.resultados.length > 0 && !filtro.resultados.includes('ALLOWED')) return [];
+
+    const where: Record<string, unknown> = { kind: { in: tipos } };
+    if (restricao.eventId) where.eventId = restricao.eventId;
+    if (restricao.organizationId) where.organizationId = restricao.organizationId;
+    if (filtro.actorUserId) where.actorUserId = filtro.actorUserId;
+    if (filtro.targetUserId) where.targetUserId = filtro.targetUserId;
+    if (periodo) where.occurredAt = periodo;
+
+    const linhas = await this.prisma.platformGrantEvent.findMany({
+      where: where as never,
+      select: {
+        kind: true, action: true, scopeKind: true, organizationId: true, eventId: true,
+        targetUserId: true, actorUserId: true, reason: true, expiresAt: true,
+        correlationId: true, occurredAt: true,
+      },
+      orderBy: { occurredAt: 'desc' },
+      take: filtro.limite + 1,
+    });
+
+    return linhas.map((l) => ({
+      actorUserId: l.actorUserId,
+      action: String(l.kind) === 'GRANTED' ? 'conceder' : 'revogar',
+      scopeKind: String(l.scopeKind) as LinhaDaTrilha['scopeKind'],
+      organizationId: l.organizationId,
+      eventId: l.eventId,
+      targetUserId: l.targetUserId,
+      reason: l.reason,
+      result: 'ALLOWED' as const,
+      changes: { acaoConcedida: l.action, expiraEm: l.expiresAt },
       correlationId: l.correlationId,
       occurredAt: l.occurredAt,
     }));
