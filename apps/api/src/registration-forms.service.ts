@@ -77,6 +77,11 @@ export const REGISTRATION_FIELD_CATALOG = [
   { code: 'selected_workshops', label: 'Minicursos / workshops escolhidos', category: 'Informações do evento', type: 'CHECKBOX', options: [{ id: 'configured_by_event', label: 'Atividades configuradas pelo evento' }] },
   { code: 'accessibility', label: 'Necessidades de acessibilidade', category: 'Acessibilidade', type: 'TEXTAREA', sensitive: true },
 
+  { code: 'team', label: 'Equipe ou assessoria esportiva', category: 'Corrida e esportes', type: 'TEXT', help: 'Opcional. Não reserva kit nem camisa.' },
+  { code: 'estimated_pace', label: 'Ritmo estimado', category: 'Corrida e esportes', type: 'TEXT', help: 'Opcional. Ex.: min/km informado pelo atleta.' },
+  { code: 'emergency_contact', label: 'Contato de emergência', category: 'Corrida e esportes', type: 'TEXTAREA', sensitive: true, help: 'Opcional e sensível. Nome e telefone de quem avisar em emergência.' },
+  { code: 'guardian', label: 'Responsável legal quando necessário', category: 'Corrida e esportes', type: 'TEXTAREA', sensitive: true, help: 'Opcional e sensível. Use quando o regulamento exigir responsável.' },
+
   { code: 'event_communications_consent', label: 'Autorizo receber comunicações sobre este evento', category: 'LGPD e autorizações', type: 'CONSENT' },
   { code: 'future_communications_consent', label: 'Autorizo receber comunicações de futuros eventos', category: 'LGPD e autorizações', type: 'CONSENT' },
   { code: 'image_use_consent', label: 'Autorizo o uso de imagem', category: 'LGPD e autorizações', type: 'CONSENT' },

@@ -36,7 +36,8 @@ export type PublishedAthletePrompt = { code: string; label: string; required: bo
 
 const ATHLETE_FORM_CODES = new Set([
   'full_name', 'preferred_name', 'birth_date', 'identity_document', 'email', 'phone',
-  'country', 'city', 'state', 'shirt_size',
+  'country', 'city', 'state', 'team', 'estimated_pace', 'emergency_contact', 'guardian',
+  'shirt_size',
 ]);
 const PROMPT_LABEL = /^[\p{L}\p{N}][\p{L}\p{N} .,'’/()+&:;!?%#@_=°ºª–—-]{0,119}$/u;
 

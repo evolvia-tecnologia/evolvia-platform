@@ -14,11 +14,19 @@ test('a página só anuncia campos de atleta que a ficha publicou', () => {
     { code: 'full_name', label: ' Nome completo ', enabled: true, required: true },
     { code: 'birth_date', label: 'Data de nascimento', enabled: false, required: true },
     { code: 'team', label: 'Equipe', enabled: true },
+    { code: 'estimated_pace', label: 'Ritmo estimado', enabled: true, required: false },
+    { code: 'emergency_contact', label: 'Contato de emergência', enabled: true },
+    { code: 'guardian', label: 'Responsável legal', enabled: true },
     { code: 'shirt_size', label: 'Tamanho da camisa', enabled: true, required: false },
     { code: 'email', label: '<b>E-mail</b>', enabled: true },
+    { code: 'unknown_custom', label: 'Campo estranho', enabled: true },
   ] });
   assert.deepEqual(prompts, [
     { code: 'full_name', label: 'Nome completo', required: true },
+    { code: 'team', label: 'Equipe', required: false },
+    { code: 'estimated_pace', label: 'Ritmo estimado', required: false },
+    { code: 'emergency_contact', label: 'Contato de emergência', required: false },
+    { code: 'guardian', label: 'Responsável legal', required: false },
     { code: 'shirt_size', label: 'Tamanho da camisa', required: false },
   ]);
   assert.deepEqual(readPublishedAthletePrompts(null), []);
