@@ -581,3 +581,38 @@ test('estorno simulado integral e parcial concilia uma vez por pedido em evento 
     assert.equal((await prisma.eventRegistrationCheckout.findUniqueOrThrow({where:{id:paid.id}})).status,'PAID');
   }
 });
+
+test('capacidade de simulação da página exige OWNER ativo e ambas as configurações da organização', async t => {
+  const event = await insertEvent(organizationId);
+  const other = await insertEvent(otherOrganizationId);
+  const simulation = 'EVOLVIA_REFUND_SIMULATION_ORGANIZATION_ID';
+  const sandbox = 'ASAAS_REFUND_SANDBOX_ORGANIZATION_ID';
+  const token = 'ASAAS_REFUND_SANDBOX_TOKEN';
+  const saved = [simulation, sandbox, token].map(key => [key, process.env[key]]);
+  t.after(() => {
+    for (const [key, value] of saved) {
+      if (value === undefined) delete process.env[key]; else process.env[key] = value;
+    }
+  });
+  process.env[simulation] = organizationId;
+  process.env[sandbox] = organizationId;
+  process.env[token] = 'token-sintetico';
+  const list = () => refunds.listRequests(people.owner.id, event.id, { status: 'APPROVED' });
+  assert.deepEqual(await list(), { items: [], nextCursor: null, canSimulateRefund: true });
+  assert.equal((await refunds.listRequests(people.outsider.id, other.id)).canSimulateRefund, false);
+  await rejects(refunds.listRequests(people.outsider.id, event.id), 404);
+  for (const role of ['ADMIN','MANAGER','OWNER']) {
+    const member = await user('cap-' + role);
+    await prisma.organizationMembership.create({data:{organizationId,userId:member.id,role,status:role==='OWNER'?'SUSPENDED':'ACTIVE'}});
+    if (role === 'OWNER') await rejects(refunds.listRequests(member.id, event.id),404);
+    else assert.equal((await refunds.listRequests(member.id,event.id)).canSimulateRefund,false);
+  }
+  for (const key of [simulation,sandbox,token]) {
+    const original=process.env[key];
+    process.env[key]=key===token?'   ':otherOrganizationId;
+    assert.equal((await list()).canSimulateRefund,false);
+    delete process.env[key];
+    assert.equal((await list()).canSimulateRefund,false);
+    process.env[key]=original;
+  }
+});

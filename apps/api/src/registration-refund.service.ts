@@ -372,6 +372,10 @@ export class RegistrationRefundService {
     });
     const page = rows.slice(0, REFUND_PAGE_SIZE);
     return {
+      canSimulateRefund: event.organizerRole === MembershipRole.OWNER
+        && organizationId === process.env.EVOLVIA_REFUND_SIMULATION_ORGANIZATION_ID
+        && organizationId === process.env.ASAAS_REFUND_SANDBOX_ORGANIZATION_ID
+        && Boolean(process.env.ASAAS_REFUND_SANDBOX_TOKEN?.trim()),
       items: page.map((row) => ({
         id: row.id,
         protocol: row.reservation.protocol,
@@ -819,8 +823,8 @@ export class RegistrationRefundService {
       select: { id: true, organizationId: true, startDate: true, timeZone: true, status: true },
     });
     if (!event?.organizationId) throw new NotFoundException('Evento não encontrado.');
-    await this.authorization.requireRole(userId, event.organizationId, ORGANIZER_ROLES);
-    return event;
+    const membership = await this.authorization.requireRole(userId, event.organizationId, ORGANIZER_ROLES);
+    return { ...event, organizerRole: membership.role };
   }
 
   private async sessionReservation(slug: string, authorization: string | undefined) {
