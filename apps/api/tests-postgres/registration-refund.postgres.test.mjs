@@ -520,3 +520,46 @@ test('a referência de sandbox fica no pedido preparado uma vez, com autorizaç�
   assert.equal(await prisma.auditLog.count({where:{entityId:request.id,action:'refund.sandbox_payment_identified'}}),1);
   assert.equal((await refunds.prepare(people.owner.id,event.id,request.id,{amountCents:900})).processingStatus,'SANDBOX_PAYMENT_IDENTIFIED');
 });
+
+test('estorno simulado integral e parcial concilia uma vez por pedido em evento suspenso', async t => {
+  const event = await insertEvent(organizationId);
+  const { lot, category } = await catalog(event);
+  const key = 'EVOLVIA_REFUND_SIMULATION_ORGANIZATION_ID';
+  const beforeValue = process.env[key];
+  t.after(() => { if (beforeValue === undefined) delete process.env[key]; else process.env[key] = beforeValue; });
+  for (const amountCents of [1200, 750]) {
+    const row = await reservation(event, lot, category, { status: 'CONFIRMED', priceCents: 1200, identityHash: digest(), emailHash: digest() });
+    const paid = await checkout(row, 'PAID');
+    const request = await prisma.registrationRefundRequest.create({ data: {
+      organizationId, eventId: event.id, reservationId: row.id, status: 'APPROVED', reason,
+    } });
+    const command = (action, actor = people.owner.id) => refunds.mockRefund(actor,event.id,request.id,action);
+    delete process.env[key];
+    await rejects(command('ISSUE'),404);
+    process.env[key] = organizationId;
+    await rejects(command('ISSUE'),409);
+    await refunds.prepare(people.owner.id,event.id,request.id,{amountCents});
+    await rejects(command('ISSUE'),409);
+    const paymentId = 'pay_' + digest();
+    await prisma.registrationRefundRequest.update({where:{id:request.id},data:{sandboxPaymentId:paymentId}});
+    await prisma.event.update({where:{id:event.id},data:{status:'SUSPENDED'}});
+    await rejects(command('ISSUE',people.operator.id),404);
+    await rejects(command('ISSUE',people.outsider.id),404);
+    await rejects(command('RECONCILE'),409);
+    const sends = await Promise.all(Array.from({length:8},()=>command('ISSUE')));
+    assert.deepEqual(sends[0],{id:request.id, amountCents, simulated:true, moneyReturned:false, mockRefundStatus:'ISSUED'});
+    assert.ok(sends.every(x=>x.mockRefundStatus==='ISSUED'));
+    await prisma.mockRefundReceipt.update({where:{requestId:request.id},data:{amountCents:1}});
+    await rejects(command('RECONCILE'),409);
+    assert.equal((await prisma.mockRefundReceipt.findUniqueOrThrow({where:{requestId:request.id}})).reconciledAt,null);
+    await prisma.mockRefundReceipt.update({where:{requestId:request.id},data:{amountCents}});
+    const confirmations = await Promise.all(Array.from({length:8},()=>command('RECONCILE')));
+    assert.ok(confirmations.every(x=>x.moneyReturned===false && x.mockRefundStatus==='RECONCILED'));
+    assert.deepEqual(await command('ISSUE'),confirmations[0]);
+    for(const action of ['refund.mock_issued','refund.mock_reconciled']) {
+      assert.equal(await prisma.auditLog.count({where:{entityId:request.id,action}}),1);
+    }
+    assert.equal((await refunds.listRequests(people.owner.id,event.id)).items.find(x=>x.id===request.id).mockRefundStatus,'RECONCILED');
+    assert.equal((await prisma.eventRegistrationCheckout.findUniqueOrThrow({where:{id:paid.id}})).status,'PAID');
+  }
+});

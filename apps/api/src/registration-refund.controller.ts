@@ -85,6 +85,16 @@ export class RegistrationRefundOrganizerController {
     return this.refunds.resolveSandboxPayment(request.user!.id, eventId, requestId);
   }
 
+  @Post('requests/:requestId/mock-refund')
+  simulate(@Req() request: AuthenticatedRequest, @Param('eventId') eventId: string, @Param('requestId') requestId: string) {
+    return this.refunds.mockRefund(request.user!.id, eventId, requestId, 'ISSUE');
+  }
+
+  @Post('requests/:requestId/mock-reconciliation')
+  reconcile(@Req() request: AuthenticatedRequest, @Param('eventId') eventId: string, @Param('requestId') requestId: string) {
+    return this.refunds.mockRefund(request.user!.id, eventId, requestId, 'RECONCILE');
+  }
+
   @Post('requests/:requestId/decision')
   decide(
     @Req() request: AuthenticatedRequest,

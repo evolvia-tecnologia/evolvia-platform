@@ -366,7 +366,7 @@ export class RegistrationRefundService {
         decisionNote: true,
         createdAt: true,
         decidedAt: true,
-        preparedAmountCents: true, sandboxPaymentId: true,
+        preparedAmountCents: true, sandboxPaymentId: true, mockReceipt: { select: { reconciledAt: true } },
         reservation: { select: { protocol: true } },
       },
     });
@@ -383,6 +383,7 @@ export class RegistrationRefundService {
         decidedAt: row.decidedAt?.toISOString() ?? null,
         preparedAmountCents: row.preparedAmountCents,
         sandboxPaymentIdentified: row.sandboxPaymentId !== null,
+        mockRefundStatus: row.mockReceipt ? (row.mockReceipt.reconciledAt ? 'RECONCILED' : 'ISSUED') : null,
       })),
       nextCursor: rows.length > REFUND_PAGE_SIZE ? page.at(-1)?.id ?? null : null,
     };
@@ -510,6 +511,58 @@ export class RegistrationRefundService {
         metadata: { amountCents: request.preparedAmountCents },
       } });
       return result;
+    });
+  }
+
+  // Both commands operate exclusively on a local simulated receipt. The payment and
+  // registration remain unchanged; an organization must explicitly opt into simulation.
+  async mockRefund(userId: string, eventId: string, requestId: string, command: 'ISSUE' | 'RECONCILE') {
+    const org = process.env.EVOLVIA_REFUND_SIMULATION_ORGANIZATION_ID;
+    if (!org) throw new NotFoundException('Simulação indisponível.');
+    return this.prisma.$transaction(async tx => {
+      // Serialize every command for this approved request, including a retry after a lost response.
+      const locked = await tx.$queryRaw<Array<{ id: string }>>`
+        SELECT r."id" FROM "RegistrationRefundRequest" r
+        JOIN "OrganizationMembership" m ON m."organizationId" = r."organizationId"
+        WHERE r."id" = ${requestId} AND r."eventId" = ${eventId} AND r."organizationId" = ${org}
+          AND m."userId" = ${userId} AND m."role" = 'OWNER' AND m."status" = 'ACTIVE'
+        FOR UPDATE OF r FOR SHARE OF m
+      `;
+      if (!locked.length) throw new NotFoundException('Pedido não encontrado.');
+      const request = await tx.registrationRefundRequest.findUniqueOrThrow({
+        where: { id: requestId }, select: {
+          status: true, preparedAmountCents: true, sandboxPaymentId: true, mockReceipt: true,
+          preparedCheckout: { select: { status: true } }, preparedOrderCheckout: { select: { status: true } },
+        },
+      });
+      const payment = request.preparedCheckout ?? request.preparedOrderCheckout;
+      const amountCents = request.preparedAmountCents;
+      const paymentId = request.sandboxPaymentId;
+      if (request.status !== 'APPROVED' || !amountCents || !paymentId || payment?.status !== 'PAID') {
+        throw new ConflictException('A simulação exige valor preparado e cobrança paga identificada.');
+      }
+      let receipt = request.mockReceipt;
+      let action: string | undefined;
+      if (receipt && (receipt.paymentId !== paymentId || receipt.amountCents !== amountCents)) {
+        throw new ConflictException('O comprovante simulado diverge do pedido.');
+      }
+      if (command === 'ISSUE' && !receipt) {
+        receipt = await tx.mockRefundReceipt.create({ data: { requestId, paymentId, amountCents } });
+        action = 'refund.mock_issued';
+      }
+      if (!receipt) throw new ConflictException('O pedido ainda não possui comprovante simulado.');
+      if (command === 'RECONCILE' && !receipt.reconciledAt) {
+        receipt = await tx.mockRefundReceipt.update({
+          where: { requestId }, data: { reconciledAt: new Date() },
+        });
+        action = 'refund.mock_reconciled';
+      }
+      if (action) await tx.auditLog.create({ data: {
+        organizationId: org, eventId, actorUserId: userId, action,
+        entityType: 'RegistrationRefundRequest', entityId: requestId, metadata: { amountCents, simulated: true },
+      } });
+      return { id: requestId, amountCents, simulated: true, moneyReturned: false,
+        mockRefundStatus: receipt.reconciledAt ? 'RECONCILED' : 'ISSUED' };
     });
   }
 
