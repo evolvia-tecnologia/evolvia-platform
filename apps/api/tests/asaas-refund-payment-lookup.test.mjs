@@ -70,3 +70,27 @@ test('conta incompatível bloqueia HTTP e falha do provedor não expõe corpo ne
   await assert.rejects(lookupSandboxRefundPayment(scope, account, failure), { message: 'Não foi possível consultar a cobrança na homologação.' });
   assert.equal(calls, 1);
 });
+
+test('entradas ausentes ou inválidas recusam a consulta antes do transporte', async () => {
+  const { lookupSandboxRefundPayment } = await import('../src/asaas-refund-payment-lookup.ts');
+  const unexpected = () => assert.fail('transporte acionado');
+  for (const invalid of [null, undefined, []]) {
+    await assert.rejects(lookupRefundPayment(invalid, unexpected), /Escopo do checkout inválido/);
+    await assert.rejects(lookupSandboxRefundPayment(scope, invalid, unexpected), /Conta de homologação indisponível/);
+  }
+  await assert.rejects(lookupSandboxRefundPayment(scope, { organizationId: scope.organizationId, token: 42 }, unexpected), /Conta de homologação indisponível/);
+});
+
+test('erros de transporte, resposta HTTP e JSON mantêm somente diagnóstico redigido', async () => {
+  const { lookupSandboxRefundPayment } = await import('../src/asaas-refund-payment-lookup.ts');
+  const account = { organizationId: scope.organizationId, token: 'simulado' };
+  for (const [cause, transport] of [
+    ['TRANSPORT', async () => { throw new Error(account.token); }],
+    ['HTTP_503', async () => ({ ok: false, status: 503, body: {} })],
+    ['INVALID_JSON', async () => new Response('{')],
+  ]) {
+    await assert.rejects(lookupSandboxRefundPayment(scope, account, transport), {
+      message: 'Não foi possível consultar a cobrança na homologação.', cause,
+    });
+  }
+});

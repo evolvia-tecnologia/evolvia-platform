@@ -13,6 +13,7 @@ function record(value: unknown): value is Record<string, unknown> {
 }
 
 export async function lookupRefundPayment(checkout: Checkout, list: PaymentList): Promise<string> {
+  if (!record(checkout)) throw new Error('Escopo do checkout inválido.');
   for (const field of [checkout.organizationId, checkout.eventId, checkout.providerCheckoutId]) {
     if (typeof field !== 'string' || !field.trim() || field.trim() !== field || field.length > 200) {
       throw new Error('Escopo do checkout inválido.');
@@ -41,11 +42,13 @@ export function lookupSandboxRefundPayment(
   checkout: Checkout, account: SandboxAccount, transport: typeof fetch = fetch,
 ): Promise<string> {
   return lookupRefundPayment(checkout, async (scope, query) => {
-    if (scope.organizationId !== account.organizationId || !account.token?.trim()) {
+    if (!record(account) || scope.organizationId !== account.organizationId ||
+        typeof account.token !== 'string' || !account.token.trim()) {
       throw new Error('Conta de homologação indisponível para esta organização.');
     }
     const url = new URL('https://api-sandbox.asaas.com/v3/payments');
     url.search = query.toString();
+    let failure = 'TRANSPORT';
     try {
       const response = await transport(url, {
         method: 'GET',
@@ -55,12 +58,14 @@ export function lookupSandboxRefundPayment(
         signal: AbortSignal.timeout(5000),
       });
       if (!response.ok) {
-        await response.body?.cancel();
+        failure = 'HTTP_' + response.status;
+        await response.body?.cancel?.();
         throw new Error();
       }
+      failure = 'INVALID_JSON';
       return await response.json();
     } catch {
-      throw new Error('Não foi possível consultar a cobrança na homologação.');
+      throw new Error('Não foi possível consultar a cobrança na homologação.', { cause: failure });
     }
   });
 }
