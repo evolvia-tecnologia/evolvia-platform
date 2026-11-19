@@ -1,9 +1,13 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { fileURLToPath } from 'node:url';
+import { relative } from 'node:path';
 import {
-  ATOR_DO_BOOTSTRAP, LIMITE_DA_NOTA, MOTIVOS, PREFIXO_DE_ATOR_SISTEMICO,
-  decidirEntrada, ehAtorSistemico, hostDoBanco, literal, montarSql,
+  ATOR_DO_BOOTSTRAP, FORMA_DO_CUID, LIMITE_DA_NOTA, MOTIVOS, PREFIXO_DE_ATOR_SISTEMICO,
+  TAMANHO_DO_CUID, decidirEntrada, ehAtorSistemico, ehUrlDeSocketUnix, hostDoBanco,
+  idEstiloCuid, literal, montarSql,
 } from './provisionar-proprietario-master.policy.mjs';
+import { chamadoDiretamente, lerArgumentos } from './provisionar-proprietario-master.mjs';
 
 const URL_OK = 'postgresql://evolvia:senha@db.homologacao.interno:5432/evolvia?schema=public';
 const HOST_OK = 'db.homologacao.interno';
@@ -185,4 +189,123 @@ test('o pedido explícito remove a guarda de proprietário, e só ela', () => {
 
 test('o SQL não contém senha, hash nem desafio', () => {
   assert.doesNotMatch(sqlBase(), /passwordHash|tokenHash|pendingChallenge|publicKey/u);
+});
+
+// ---------- Achados da revisão independente na #690 ----------
+// Cada teste abaixo nasceu de um apontamento, e cada um falha contra o código
+// anterior ao reparo. A mutação que mata cada um está registrada na PR.
+
+test('o id tem a forma que a coluna exige: cuid, não UUID', () => {
+  // `PlatformMasterIdentity.id` e `PlatformAuditLog.id` são @default(cuid()),
+  // e em Prisma cuid() é gerado no cliente — a coluna não tem DEFAULT no
+  // banco, então o INSERT precisa fornecer o id. Fornecer UUID punha na coluna
+  // um valor com hífen, com 36 caracteres e sem o `c` inicial.
+  for (let i = 0; i < 200; i += 1) {
+    const id = idEstiloCuid();
+    assert.match(id, FORMA_DO_CUID, `fora da forma de cuid: ${id}`);
+    assert.equal(id.length, TAMANHO_DO_CUID);
+    assert.ok(!id.includes('-'), 'cuid não tem hífen; UUID tem');
+  }
+  // O alfabeto tem de ser exercido de verdade, senão a "forma" passaria com
+  // um id constante.
+  const vistos = new Set();
+  for (let i = 0; i < 300; i += 1) vistos.add(idEstiloCuid());
+  assert.ok(vistos.size > 290, `ids repetem demais: ${vistos.size} distintos em 300`);
+});
+
+test('o SQL carrega o id gerado, e não delega ao gen_random_uuid do banco', () => {
+  const sql = sqlBase({ identidadeId: 'c' + 'a'.repeat(24), auditoriaId: 'c' + 'b'.repeat(24) });
+  assert.ok(!sql.includes('gen_random_uuid'),
+    'gen_random_uuid devolve UUID, que não é a forma da coluna');
+  assert.ok(sql.includes(`'c${'a'.repeat(24)}'`), 'o id da identidade tem de chegar ao INSERT');
+  assert.ok(sql.includes(`'c${'b'.repeat(24)}'`), 'o id da trilha tem de chegar ao INSERT');
+});
+
+test('identidade e trilha recebem ids distintos', () => {
+  // Reaproveitar um id entre as duas tabelas não quebra chave, porque são
+  // tabelas diferentes, mas confunde quem correlaciona registro com trilha.
+  const sql = sqlBase();
+  const ids = [...sql.matchAll(/'(c[a-z0-9]{24})'/gu)].map((m) => m[1]);
+  assert.equal(ids.length, 2, `esperava dois ids no SQL, achei ${ids.length}`);
+  assert.notEqual(ids[0], ids[1]);
+});
+
+test('URL de socket Unix recebe motivo próprio, e não "não deu para ler"', () => {
+  // O host vem vazio e hostDoBanco devolve null — o mesmo null de uma URL
+  // ilegível, que é problema diferente. Mandar o operador conferir um
+  // DATABASE_URL correto é o pior conselho possível aqui.
+  for (const url of ['postgresql:///evolvia', 'postgres:///evolvia',
+    'postgresql:///evolvia?host=/var/run/postgresql', 'postgresql://?host=/tmp']) {
+    assert.equal(decidirEntrada(base({ databaseUrl: url })).motivo, 'host_de_socket_unix', `url ${url}`);
+    assert.equal(ehUrlDeSocketUnix(url), true, `url ${url}`);
+  }
+  // URL incompleta não é socket: não nomeia banco nenhum.
+  assert.equal(ehUrlDeSocketUnix('postgresql://'), false);
+  assert.equal(decidirEntrada(base({ databaseUrl: 'postgresql://' })).motivo, 'host_ausente');
+  // Nem esquema alheio, nem lixo, nem URL com host.
+  for (const url of ['http:///x', 'mysql:///x', 'nao-e-url', '', undefined, null, 42, URL_OK]) {
+    assert.equal(ehUrlDeSocketUnix(url), false, `url ${String(url)}`);
+  }
+  // A recusa permanece recusa: socket não tem host para confirmar, e
+  // --confirmar-host é a única guarda contra o banco errado.
+  assert.equal(decidirEntrada(base({ databaseUrl: 'postgresql:///evolvia' })).permitido, false);
+});
+
+test('a trava serializa o nascimento, porque o esquema não serializa', () => {
+  // "PlatformMasterIdentity" tem @@index([role, status]), NÃO @@unique. Sob
+  // READ COMMITTED, duas transações concorrentes para dois usuários DIFERENTES
+  // passam as duas pelo IF EXISTS e inserem as duas: dois OWNER ativos.
+  const sql = sqlBase();
+  assert.match(sql, /PERFORM pg_advisory_xact_lock\(665, 1\);/u);
+  // Ancorado no ENUNCIADO, não na frase: "IF EXISTS" aparece no comentário
+  // acima da trava, e casar com a prosa faria o teste medir a si mesmo.
+  assert.ok(sql.indexOf('pg_advisory_xact_lock') < sql.indexOf('SELECT id INTO alvo_id'),
+    'travar depois de ler o estado não serializa nada');
+  assert.ok(sql.indexOf('pg_advisory_xact_lock')
+    < sql.indexOf('IF EXISTS (SELECT 1 FROM "PlatformMasterIdentity"'),
+    'a guarda de proprietário só é confiável se a trava vier antes dela');
+  assert.ok(sql.indexOf('BEGIN;') < sql.indexOf('pg_advisory_xact_lock'),
+    'a trava tem de estar dentro da transação, senão é liberada antes do INSERT');
+  assert.ok(sql.indexOf('pg_advisory_xact_lock') < sql.indexOf('INSERT INTO "PlatformMasterIdentity"'));
+  // Também vale no modo explícito de segundo proprietário: a trava não é a
+  // guarda, mas continua sendo o que impede duas escritas simultâneas.
+  assert.match(sqlBase({ permitirSegundoProprietario: true }), /pg_advisory_xact_lock/u);
+});
+
+test('a linha de comando aceita as duas formas e não confia em valor ausente', () => {
+  const a = lerArgumentos(['--email', 'a@b.com', '--nota', 'x y', '--confirmar-host', 'h']);
+  assert.deepEqual(a, { email: 'a@b.com', nota: 'x y', hostConfirmado: 'h', permitirSegundoProprietario: false });
+  const b = lerArgumentos(['--email=a@b.com', '--nota=x y', '--confirmar-host=h']);
+  assert.deepEqual(b, a);
+  const c = lerArgumentos(['--email', 'a@b.com', '--permitir-segundo-proprietario']);
+  assert.equal(c.permitirSegundoProprietario, true);
+  assert.equal(lerArgumentos([]).permitirSegundoProprietario, false);
+  // Opção sem valor devolve o BOOLEANO true no parser; booleano não pode
+  // atravessar para onde o resto do módulo espera texto.
+  for (const campo of ['email', 'nota', 'hostConfirmado']) {
+    const r = lerArgumentos([`--${campo === 'hostConfirmado' ? 'confirmar-host' : campo}`]);
+    assert.equal(r[campo], undefined, `${campo} virou ${JSON.stringify(r[campo])}`);
+  }
+  // Argumento desconhecido não derruba o processo: quem recusa é a política.
+  const d = lerArgumentos(['--desconhecido', 'v', '--email', 'a@b.com']);
+  assert.equal(d.email, 'a@b.com');
+  assert.equal(lerArgumentos(['--email']).email, undefined);
+});
+
+test('a decisão de "fui executado diretamente" não depende de montar URL à mão', () => {
+  const url = new URL('./provisionar-proprietario-master.mjs', import.meta.url).href;
+  const caminho = fileURLToPath(url);
+  assert.equal(chamadoDiretamente(url, caminho), true);
+  // Caminho relativo é o caso em que comparar com `file://${argv[1]}` falha
+  // mesmo no Linux: argv[1] não vem absoluto.
+  const relativo = relative(process.cwd(), caminho);
+  assert.notEqual(relativo, caminho, 'o teste precisa de um caminho de fato relativo');
+  assert.equal(chamadoDiretamente(url, relativo), true);
+  // Outro arquivo não é este.
+  assert.equal(chamadoDiretamente(url, `${caminho}.outro`), false);
+  // Entrada inválida nega, em vez de estourar.
+  for (const ruim of [undefined, null, '', 42, {}]) {
+    assert.equal(chamadoDiretamente(url, ruim), false, `aceitou ${String(ruim)}`);
+  }
+  assert.equal(chamadoDiretamente('nao-e-url', caminho), false);
 });
