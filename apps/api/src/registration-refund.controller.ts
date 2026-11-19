@@ -72,6 +72,19 @@ export class RegistrationRefundOrganizerController {
     return this.refunds.listRequests(request.user!.id, eventId, { status, cursor });
   }
 
+  @Post('requests/:requestId/preparation')
+  prepare(
+    @Req() request: AuthenticatedRequest, @Param('eventId') eventId: string,
+    @Param('requestId') requestId: string, @Body() input: unknown,
+  ) {
+    return this.refunds.prepare(request.user!.id, eventId, requestId, input);
+  }
+
+  @Post('requests/:requestId/sandbox-payment-reference')
+  resolveSandboxPayment(@Req() request: AuthenticatedRequest, @Param('eventId') eventId: string, @Param('requestId') requestId: string) {
+    return this.refunds.resolveSandboxPayment(request.user!.id, eventId, requestId);
+  }
+
   @Post('requests/:requestId/decision')
   decide(
     @Req() request: AuthenticatedRequest,

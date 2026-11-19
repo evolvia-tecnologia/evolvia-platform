@@ -413,3 +413,107 @@ test('compra sem regra ou com pendência congelada não ganha elegibilidade depo
     /Na compra, a data de início ainda não estava definida/u,
   );
 });
+
+test('preparação individual reserva centavos uma vez e preserva pagamento e inscrição', async () => {
+  const event = await insertEvent(organizationId);
+  const { lot, category } = await catalog(event);
+  const row = await reservation(event, lot, category, { status: 'CONFIRMED', priceCents: 1200, identityHash: digest(), emailHash: digest() });
+  const paid = await checkout(row, 'PAID');
+  const request = await prisma.registrationRefundRequest.create({ data: {
+    organizationId, eventId: event.id, reservationId: row.id, reason, status: 'APPROVED',
+  } });
+  const prepare = (amountCents, userId = people.owner.id, eventId = event.id) =>
+    refunds.prepare(userId, eventId, request.id, { amountCents });
+  await rejects(prepare(900, people.operator.id), 404);
+  await rejects(prepare(900, people.outsider.id), 404);
+  await rejects(prepare(900, people.owner.id, 'evento-inexistente'), 404);
+  await rejects(prepare(1.5), 400);
+  await rejects(prepare(1201), 409);
+  await prisma.registrationRefundRequest.update({where:{ id:request.id },data:{status:'REQUESTED'}});
+  await rejects(prepare(900), 409);
+  await prisma.registrationRefundRequest.update({where:{ id:request.id },data:{status:'APPROVED'}});
+  const [first, replay] = await Promise.all([prepare(900), prepare(900)]);
+  assert.deepEqual(first, replay);
+  assert.deepEqual(first, { id: request.id, amountCents: 900, moneyReturned: false, processingStatus: 'AWAITING_PAYMENT_REFERENCE' });
+  await rejects(prepare(901), 409);
+  const saved = await prisma.registrationRefundRequest.findUniqueOrThrow({where:{id:request.id}});
+  assert.equal(saved.preparedCheckoutId, paid.id);
+  assert.equal(saved.preparedOrderCheckoutId, null);
+  assert.equal(saved.preparedAmountCents, 900);
+  const listed = await refunds.listRequests(people.owner.id, event.id);
+  assert.equal(listed.items.find(item => item.id === request.id)?.preparedAmountCents, 900);
+  assert.equal(await prisma.auditLog.count({where:{entityId:request.id,action:'refund.prepared'}}),1);
+  assert.equal((await prisma.eventRegistrationCheckout.findUniqueOrThrow({where:{id:paid.id}})).status,'PAID');
+  assert.equal((await prisma.eventRegistrationReservation.findUniqueOrThrow({where:{id:row.id}})).status,'CONFIRMED');
+});
+
+test('pedidos simultâneos de uma compra múltipla compartilham o saldo do checkout', async () => {
+  const event = await insertEvent(organizationId);
+  const { lot, category } = await catalog(event);
+  const scope = { organizationId, eventId: event.id };
+  const order = await prisma.eventRegistrationOrder.create({ data: {
+    ...scope, idempotencyKeyHash: digest(), payloadHash: digest(), subtotalCents: 2000,
+  } });
+  const group = await prisma.eventRegistrationOrderCheckout.create({ data: {
+    ...scope, orderId:order.id, idempotencyKeyHash:digest(), requestHash:digest(),
+    status:'PAID', paidAt:new Date(), expiresAt:new Date(), amountCents:1500,
+  } });
+  const requests = [];
+  for (const position of [0, 1]) {
+    const row = await reservation(event, lot, category, { status:'CONFIRMED', priceCents:1000, identityHash:digest(), emailHash:digest() });
+    await prisma.eventRegistrationOrderEntry.create({ data: {
+      ...scope, orderId:order.id, position, categoryId:category.id, lotId:lot.id,
+      identityHash:row.identityHash, emailHash:row.emailHash, reservationId:row.id, basePriceCents:1000, finalPriceCents:1000,
+    } });
+    requests.push(await prisma.registrationRefundRequest.create({ data: { ...scope, reservationId:row.id, reason, status:'APPROVED' } }));
+  }
+  const results = await Promise.allSettled(requests.map(req => refunds.prepare(people.owner.id,event.id,req.id,{amountCents:1000})));
+  assert.equal(results.filter(r=>r.status==='fulfilled').length,1);
+  const index = results.findIndex(r=>r.status==='rejected');
+  assert.match(results[index].reason.message,/saldo disponível/u);
+  await refunds.prepare(people.owner.id,event.id,requests[index].id,{amountCents:500});
+  const allocated = await prisma.registrationRefundRequest.aggregate({ where:{ ...scope, preparedOrderCheckoutId:group.id },_sum:{preparedAmountCents:true} });
+  assert.equal(allocated._sum.preparedAmountCents,1500);
+});
+
+test('a referência de sandbox fica no pedido preparado uma vez, com autorização e auditoria', async t => {
+  const event = await insertEvent(organizationId);
+  const { lot, category } = await catalog(event);
+  const row = await reservation(event, lot, category, { status: 'CONFIRMED', priceCents: 1200, identityHash: digest(), emailHash: digest() });
+  const paid = await checkout(row, 'PAID');
+  const providerCheckoutId = 'checkout_' + digest();
+  await prisma.eventRegistrationCheckout.update({ where: { id: paid.id }, data: { providerCheckoutId } });
+  const request = await prisma.registrationRefundRequest.create({ data: {
+    organizationId, eventId: event.id, reservationId: row.id, reason, status: 'APPROVED',
+  } });
+  const resolve = (actor = people.owner.id) => refunds.resolveSandboxPayment(actor, event.id, request.id);
+  const orgKey = 'ASAAS_REFUND_SANDBOX_ORGANIZATION_ID';
+  const tokenKey = 'ASAAS_REFUND_SANDBOX_TOKEN';
+  const prior = [process.env[orgKey], process.env[tokenKey]];
+  t.after(() => [orgKey, tokenKey].forEach((key, i) => {
+    if (prior[i] === undefined) delete process.env[key]; else process.env[key] = prior[i];
+  }));
+  process.env[orgKey] = 'outra-organizacao';
+  process.env[tokenKey] = 'fixture';
+  const paymentId = 'pay_' + digest();
+  const transport = t.mock.method(globalThis, 'fetch', async url => {
+    assert.equal(url.origin, 'https://api-sandbox.asaas.com');
+    assert.equal(url.searchParams.get('checkoutSession'), providerCheckoutId);
+    return Response.json({ totalCount: 1, hasMore: false, data: [{ id: paymentId, checkoutSession: providerCheckoutId }] });
+  });
+  await rejects(resolve(), 409);
+  await refunds.prepare(people.owner.id, event.id, request.id, { amountCents: 900 });
+  await rejects(resolve(people.operator.id), 404);
+  await rejects(resolve(), 503);
+  assert.equal(transport.mock.callCount(), 0);
+  process.env[orgKey] = organizationId;
+  const results = await Promise.all([resolve(), resolve()]);
+  assert.deepEqual(results[0], { id: request.id, processingStatus: 'SANDBOX_PAYMENT_IDENTIFIED', moneyReturned: false });
+  assert.deepEqual(results[0], results[1]);
+  const count = transport.mock.callCount();
+  assert.deepEqual(await resolve(), results[0]);
+  assert.equal(transport.mock.callCount(), count);
+  assert.equal((await prisma.registrationRefundRequest.findUniqueOrThrow({where:{id:request.id}})).sandboxPaymentId, paymentId);
+  assert.equal(await prisma.auditLog.count({where:{entityId:request.id,action:'refund.sandbox_payment_identified'}}),1);
+  assert.equal((await refunds.prepare(people.owner.id,event.id,request.id,{amountCents:900})).processingStatus,'SANDBOX_PAYMENT_IDENTIFIED');
+});
