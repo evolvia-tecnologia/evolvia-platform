@@ -12,9 +12,6 @@ const stagingTlsBootstrapPath = fileURLToPath(
 const stagingNginxApplyPath = fileURLToPath(
   new URL('../../../infra/nginx/apply-staging-nginx.sh', import.meta.url),
 );
-const devRedirectBootstrapPath = fileURLToPath(
-  new URL('../../../infra/certbot/bootstrap-dev-redirect.sh', import.meta.url),
-);
 
 const [
   httpsProxy,
@@ -24,8 +21,6 @@ const [
   stagingTlsBootstrap,
   stagingNginxApply,
   deployScript,
-  devRedirectProxy,
-  devRedirectBootstrap,
 ] = await Promise.all([
   readFile(new URL('../../../infra/nginx/evolvia-https.conf', import.meta.url), 'utf8'),
   readFile(new URL('../../../infra/nginx/evolvia.conf', import.meta.url), 'utf8'),
@@ -34,8 +29,6 @@ const [
   readFile(new URL('../../../infra/certbot/bootstrap-staging-tls.sh', import.meta.url), 'utf8'),
   readFile(new URL('../../../infra/nginx/apply-staging-nginx.sh', import.meta.url), 'utf8'),
   readFile(new URL('../../../deploy.sh', import.meta.url), 'utf8'),
-  readFile(new URL('../../../infra/nginx/evolvia-dev-redirect.conf', import.meta.url), 'utf8'),
-  readFile(new URL('../../../infra/certbot/bootstrap-dev-redirect.sh', import.meta.url), 'utf8'),
 ]);
 
 test('proxy HTTPS publica cabeçalhos defensivos sem expor versões', () => {
@@ -124,6 +117,8 @@ test('promoção do Nginx usa o deploy autorizado com backup, validação e roll
     assert.ok(deployScript.includes(contract), contract);
   }
 
+  // LEGACY_LINK aqui é /etc/nginx/sites-enabled/evolvia, o nome antigo do site
+  // canônico. Não tem relação com o alias dev.evolviatecnologia.com.
   for (const contract of [
     'trap rollback ERR',
     'nginx -t',
@@ -151,50 +146,17 @@ test('bootstrap administrativo mantém sintaxe Bash válida', async () => {
   assert.equal(stderr, '');
 });
 
-test('domínio dev legado redireciona com TLS para a homologação canônica', async () => {
-  for (const contract of [
-    'server_name dev.evolviatecnologia.com;',
-    'ssl_certificate /etc/letsencrypt/live/dev.evolviatecnologia.com/fullchain.pem;',
-    'ssl_certificate_key /etc/letsencrypt/live/dev.evolviatecnologia.com/privkey.pem;',
-    'return 308 https://homologacao.evolviatecnologia.com$request_uri;',
-    'server_tokens off;',
-    'Strict-Transport-Security "max-age=31536000" always;',
-    'X-Content-Type-Options "nosniff" always;',
-    'Referrer-Policy "no-referrer" always;',
-    'X-Frame-Options "DENY" always;',
-  ]) {
-    assert.ok(devRedirectProxy.includes(contract), contract);
-  }
-
-  for (const contract of [
-    'trap rollback ERR',
-    'CERTBOT_EMAIL',
-    '--register-unsafely-without-email',
-    'CERTBOT_CONTACT_ARGS',
-    'certbot certonly',
-    'nginx -t',
-    'systemctl reload nginx',
-    'BACKUP_SITE',
-    'HAD_LINK',
-    'PREVIOUS_LINK_TARGET',
-    'readlink "$TARGET_LINK"',
-    'HTTP_HEADERS',
-    'HTTPS_HEADERS',
-    'server: nginx/',
-  ]) {
-    assert.ok(devRedirectBootstrap.includes(contract), contract);
-  }
-
-  // Com root /var/www/certbot, o Nginx resolve o URI completo dentro do webroot.
-  assert.match(devRedirectBootstrap, /CHALLENGE_PATH="\$\{WEBROOT\}\/\.well-known\/acme-challenge\/\$\{CHALLENGE\}"/u);
-  assert.match(devRedirectBootstrap, /install -d -m 0755 "\$\{WEBROOT\}\/\.well-known\/acme-challenge"/u);
-
-  const { stderr } = await execFileAsync('bash', ['-n', devRedirectBootstrapPath]);
-  assert.equal(stderr, '');
-});
-
-test('deploy ativa o redirecionamento dev e preserva opt-out operacional explícito', () => {
-  assert.match(deployScript, /EVOLVIA_DEV_REDIRECT_BOOTSTRAP:-1/u);
-  assert.match(deployScript, /sudo env CERTBOT_EMAIL=/u);
-  assert.match(deployScript, /bash infra\/certbot\/bootstrap-dev-redirect\.sh/u);
+test('deploy não volta a depender do alias legado desativado', () => {
+  assert.ok(
+    !deployScript.includes('bootstrap-dev-redirect'),
+    'O deploy não pode voltar a invocar o bootstrap do alias legado.',
+  );
+  assert.ok(
+    !deployScript.includes('DEV_REDIRECT_BOOTSTRAP'),
+    'O deploy não pode voltar a expor a chave de bootstrap do alias legado.',
+  );
+  assert.ok(
+    !deployScript.includes('dev.evolviatecnologia.com'),
+    'O deploy não pode voltar a mencionar o domínio legado.',
+  );
 });
