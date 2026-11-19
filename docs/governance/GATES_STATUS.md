@@ -1,5 +1,26 @@
 # Estado dos Gates — 27/10/2026
 
+## Reconciliação de 19/11/2026
+
+Implementação **94,3%**; conclusão comprovada **71,0%**; **87/93** unidades integradas; **0/11 Gates encerrados**.
+
+Base integrada `865bf03f2315642612c1e251559701bca87a993e`. G2.10 e G10.10 têm integração, CI e publicação demonstrados. O aceite autenticado segue pendente. Ambos os jobs registraram a prontidão da API e do banco e depois reprovaram o cabeçalho Server. [Compra múltipla](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/42683330025/job/129390430705) · [Permissões de operador](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/42715129263/job/129500945850).
+
+| Gate | Nome | Implementação | Conclusão | Marcos |
+| --- | --- | --- | --- | --- |
+| 1 | Divulgação do evento | 100,0% | 78,1% | 25/32 |
+| 2 | Inscrição | 78,6% | 58,9% | 33/56 |
+| 3 | Área reservada do inscrito | 100,0% | 75,0% | 24/32 |
+| 4 | Configuração científica | 100,0% | 75,0% | 24/32 |
+| 5 | Submissão pelo autor | 87,5% | 65,6% | 21/32 |
+| 6 | Avaliação científica | 87,5% | 65,6% | 21/32 |
+| 7 | Decisão científica | 83,3% | 62,5% | 15/24 |
+| 8 | Arquivo final, pôster e ePoster | 100,0% | 75,0% | 18/24 |
+| 9 | Programação científica | 100,0% | 75,0% | 24/32 |
+| 10 | Operação do evento | 100,0% | 75,0% | 39/52 |
+| 11 | Pós-evento | 100,0% | 75,0% | 18/24 |
+
+
 ## Evidência de publicação em 17/11/2026
 
 O [job de publicação](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/44146606412/job/134271238197) registrou implantação de `c4512c2d`, prontidão e HTTPS 200. O gate público reprovou por exposição da versão do proxy. O redirecionamento HTTP 308 para o domínio canônico passou. A matriz conserva o histórico do cálculo abaixo. O campo `lastConfirmedDeployment` registra a implantação anunciada pelo gateway. A identificação independente do SHA servido e o aceite funcional seguem pendentes.

@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
   "baseline": "Gates v1 — 93 unidades e pesos preservados; reconciliação do Git em 08/10/2026",
-  "sourceSha": "d0493a743690fad325c4c64646dd12a7ad345ae7",
-  "ciRun": 40475151905,
-  "deployJob": 122112460724,
+  "sourceSha": "865bf03f2315642612c1e251559701bca87a993e",
+  "ciRun": null,
+  "deployJob": null,
   "gateStatus": "0/11 encerrados; sem Go de produção",
   "publicAcceptance": {
     "passed": 1,
@@ -251,14 +251,15 @@
         {
           "id": "G2.10",
           "criterion": "Compra com várias entradas e ficha por comprador",
-          "integrated": false,
-          "ci": false,
-          "deployed": false,
+          "integrated": true,
+          "ci": true,
+          "deployed": true,
           "accepted": false,
-          "evidence": "operacao-do-evento.md, fatia 10",
-          "next": "Implementar sem duplicar identidade",
-          "implementationState": "Pendente",
-          "ciSourceSha": null
+          "evidence": "PR #471. CI pós-merge aprovou qualidade, migration/integração e ARM64. O job registrou o SHA implantado e a prontidão de API e PostgreSQL antes da falha no cabeçalho Server. https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/42683330025/job/129390430705",
+          "next": "Validar a compra múltipla na jornada autenticada em homologação.",
+          "implementationState": "Integrado",
+          "ciSourceSha": "838d2ad839acb10a92e41f1e15d5e3f4e2f87016",
+          "deployedSourceSha": "838d2ad839acb10a92e41f1e15d5e3f4e2f87016"
         },
         {
           "id": "G2.11",
@@ -310,10 +311,10 @@
           "ciSourceSha": null
         }
       ],
-      "points": 30,
+      "points": 33,
       "total": 56,
-      "percent": 53.57142857142857,
-      "implementationPercent": 71.42857142857143
+      "percent": 58.92857142857143,
+      "implementationPercent": 78.57142857142857
     },
     {
       "id": 3,
@@ -854,7 +855,7 @@
       "points": 15,
       "total": 24,
       "percent": 62.5,
-      "implementationPercent": 83.33333333333333
+      "implementationPercent": 83.33333333333334
     },
     {
       "id": 8,
@@ -1182,14 +1183,15 @@
         {
           "id": "G10.10",
           "criterion": "Atribuição granular do operador por evento/função",
-          "integrated": false,
-          "ci": false,
-          "deployed": false,
+          "integrated": true,
+          "ci": true,
+          "deployed": true,
           "accepted": false,
-          "evidence": "Posto básico integrado; ACL granular do operador ainda no #368, com conflitos.",
-          "next": "Reconciliar com posto integrado; não recriar",
-          "implementationState": "Bloqueado",
-          "ciSourceSha": null
+          "evidence": "PR #642. CI pós-merge aprovou qualidade, migration/integração e ARM64. O job registrou o SHA implantado e a prontidão de API e PostgreSQL antes da falha no cabeçalho Server. https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/42715129263/job/129500945850",
+          "next": "Validar em homologação operador com acesso concedido e acesso revogado por evento.",
+          "implementationState": "Integrado",
+          "ciSourceSha": "707781c635106d3f974bb5e678a8c3e913357372",
+          "deployedSourceSha": "707781c635106d3f974bb5e678a8c3e913357372"
         },
         {
           "id": "G10.11",
@@ -1231,10 +1233,10 @@
           "deployedSourceSha": "badd9ff097c7b3856a2f4141d39a5fccc19065d5"
         }
       ],
-      "points": 36,
+      "points": 39,
       "total": 52,
-      "percent": 69.23076923076923,
-      "implementationPercent": 92.3076923076923
+      "percent": 75,
+      "implementationPercent": 100
     },
     {
       "id": 11,
@@ -1325,23 +1327,23 @@
       "implementationPercent": 100
     }
   ],
-  "globalPercent": 69.97065434565435,
-  "globalImplementationPercent": 92.91541791541792,
-  "ciSourceSha": "877ee94e4236580f99376f9399c1513b70b3c2af",
-  "sourceTreeSha": "55b5bcbb3e1758c835fa027e972f0428b322d5bd",
-  "auditedAtUtc": "2026-10-27T13:11:00Z",
-  "deploymentOfCurrentSourceConfirmed": true,
-  "deployRun": 40479956349,
+  "globalPercent": 70.98214285714286,
+  "globalImplementationPercent": 94.26406926406926,
+  "ciSourceSha": null,
+  "sourceTreeSha": "24dacfd558543ad3d6643759c7a9c55c4ef425fa",
+  "auditedAtUtc": "2026-11-19T11:12:33.964Z",
+  "deploymentOfCurrentSourceConfirmed": false,
+  "deployRun": null,
   "previousSnapshot": {
     "sourceSha": "4337c99cd83cec1939b3744910032165c370cd85",
     "auditedAtUtc": "2026-10-26T05:33:26Z",
     "ciRun": 40272157015,
     "deployJob": 121414197364
   },
-  "integratedCriteria": 85,
+  "integratedCriteria": 87,
   "criteriaCount": 93,
-  "methodNote": "Reconciliação27/10: critérios/marcos I/T/D/F, denominadores93/11 e pesos preservados. Refinamentos605/551/606 não concluem novos critérios. G6.8 ainda requer avisos/operação completos; conexão/refresh PowerBI e aceite humano não comprovados.",
-  "integrationCiRun": 40475151905,
+  "methodNote": "Reconciliação de 19/11. G2.10 e G10.10 recebem I/T/D por evidência dos próprios merges. Aceite funcional pendente. A integração #688 não encerra critérios.",
+  "integrationCiRun": null,
   "technicalValidation": {
     "sourceSha": "877ee94e4236580f99376f9399c1513b70b3c2af",
     "ciRun": 40475151905,
@@ -1408,7 +1410,10 @@
     604,
     605,
     551,
-    606
+    606,
+    471,
+    642,
+    688
   ],
   "openPullRequests": [
     {

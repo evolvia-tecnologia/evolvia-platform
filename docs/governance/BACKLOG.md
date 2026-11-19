@@ -1,5 +1,12 @@
 # Backlog e ordem de execução — Modo Lançamento
 
+## Reconciliação de 19/11/2026
+
+Implementação **94,3%**; conclusão comprovada **71,0%**; **87/93** unidades integradas; **0/11 Gates encerrados**.
+
+Base integrada `865bf03f2315642612c1e251559701bca87a993e`. G2.10 e G10.10 têm integração, CI e publicação demonstrados. O aceite autenticado segue pendente. Ambos os jobs registraram a prontidão da API e do banco e depois reprovaram o cabeçalho Server. [Compra múltipla](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/42683330025/job/129390430705) · [Permissões de operador](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/42715129263/job/129500945850).
+
+
 ## Prioridade operacional em 17/11/2026
 
 Work coordena a recuperação [#108](https://github.com/evolvia-tecnologia/evolvia-platform/issues/108) e o corte conjunto com a suíte [#686](https://github.com/evolvia-tecnologia/evolvia-platform/pull/686). O operador autorizado deve inspecionar a configuração carregada, aplicar o corte validado com backup e rollback e repetir a prova externa de versão do proxy. Para habilitar o aceite das jornadas, correlacionar o SHA solicitado, o informado pelo gateway e o identificado no serviço ativo. A execução anterior está no [job de publicação](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/44146606412/job/134271238197).

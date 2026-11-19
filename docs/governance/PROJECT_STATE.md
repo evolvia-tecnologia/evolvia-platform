@@ -8,6 +8,13 @@ delivery_mode: "Modo Lançamento — EVO-015"
 active_phase: "Operação de inscrição e aceitação pública em homologação"
 ---
 
+## Reconciliação de 19/11/2026
+
+Implementação **94,3%**; conclusão comprovada **71,0%**; **87/93** unidades integradas; **0/11 Gates encerrados**.
+
+Base integrada `865bf03f2315642612c1e251559701bca87a993e`. G2.10 e G10.10 têm integração, CI e publicação demonstrados. O aceite autenticado segue pendente. Ambos os jobs registraram a prontidão da API e do banco e depois reprovaram o cabeçalho Server. [Compra múltipla](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/42683330025/job/129390430705) · [Permissões de operador](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/42715129263/job/129500945850).
+
+
 ## Homologação em 17/11/2026, 15h34 de São Paulo
 
 O gateway anunciou a implantação de `c4512c2deb2e406f888b6572c2ad3c4b9813c2ad` às 18h34min32s UTC. O runner observou readiness da API e do PostgreSQL, HTTPS 200, HTTP 308 com destino canônico, HSTS, nosniff, Referrer-Policy, SAMEORIGIN e ausência de X-Powered-By. A versão exposta em `Server: nginx/1.24.0 (Ubuntu)` reprovou o gate. O diagnóstico posterior do alias removido retornou 127 em etapa tolerante a falha. A resposta pública medida não identifica o SHA servido. A implantação de 06/11 e o registro de 27/10 são históricos. [job de publicação](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/44146606412/job/134271238197).

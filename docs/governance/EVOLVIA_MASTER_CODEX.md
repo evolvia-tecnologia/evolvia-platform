@@ -1,5 +1,12 @@
 # Evolvia Master Codex
 
+## Reconciliação de 19/11/2026
+
+Implementação **94,3%**; conclusão comprovada **71,0%**; **87/93** unidades integradas; **0/11 Gates encerrados**.
+
+Base integrada `865bf03f2315642612c1e251559701bca87a993e`. G2.10 e G10.10 têm integração, CI e publicação demonstrados. O aceite autenticado segue pendente. Ambos os jobs registraram a prontidão da API e do banco e depois reprovaram o cabeçalho Server. [Compra múltipla](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/42683330025/job/129390430705) · [Permissões de operador](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/42715129263/job/129500945850).
+
+
 ## Registro operacional de 17/11/2026
 
 O gateway anunciou `c4512c2d` às 15h34 de São Paulo. O domínio canônico apresentou readiness da API e do PostgreSQL, HTTPS 200 e redirecionamento 308. O cabeçalho Server expôs a versão do Nginx. Work mantém o aceite operacional condicionado à recuperação [#108](https://github.com/evolvia-tecnologia/evolvia-platform/issues/108) e à prova independente do SHA servido. [job de publicação](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/44146606412/job/134271238197).
