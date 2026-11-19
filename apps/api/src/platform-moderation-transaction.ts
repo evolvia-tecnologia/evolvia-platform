@@ -40,8 +40,8 @@
  *
  * A supressão é nomeada em `statusPreservadoPorSerTerminal`, e não silenciosa:
  * a política continua devolvendo `SUSPENDED`, e um plano que a ignorasse sem
- * dizer seria a divergseria a divergência entre dois módulos que este arquivo
- * existe para evitar.
+ * dizer seria a divergência entre dois módulos que este arquivo existe para
+ * evitar.
  *
  * A segunda razão de existir
  * --------------------------
