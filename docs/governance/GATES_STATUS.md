@@ -1,5 +1,10 @@
 # Estado dos Gates — 27/10/2026
 
+## Publicação da Área Master em 19/11
+
+O gateway registrou `b642c2660460f00c4c5af070bebae518f187146b`, com #675 integrada. Às 15h09 de São Paulo o domínio respondeu HTTPS 200, a API e o PostgreSQL estavam prontos e HTTP redirecionou com 308. O gate público reprovou pela versão do Nginx no cabeçalho Server. O acesso autenticado do proprietário continua pendente da #690 e da validação WebAuthn. Os marcos e percentuais da matriz permanecem os da reconciliação abaixo. [Job de publicação](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/44581399025/job/135771644292).
+
+
 ## Reconciliação de 19/11/2026
 
 Implementação **94,3%**; conclusão comprovada **71,0%**; **87/93** unidades integradas; **0/11 Gates encerrados**.

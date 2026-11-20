@@ -2006,13 +2006,13 @@
     }
   ],
   "lastConfirmedDeployment": {
-    "sourceSha": "c4512c2deb2e406f888b6572c2ad3c4b9813c2ad",
-    "run": 44146606412,
-    "job": 134271238197,
-    "commitAtUtc": "2026-11-17T18:34:32Z",
-    "readinessAtUtc": "2026-11-17T18:34:34Z",
+    "sourceSha": "b642c2660460f00c4c5af070bebae518f187146b",
+    "run": 44581399025,
+    "job": 135771644292,
+    "commitAtUtc": "2026-11-19T18:09:26Z",
+    "readinessAtUtc": "2026-11-19T18:09:27Z",
     "httpsStatus": 200,
     "publicGatePassed": false,
-    "note": "SHA anunciado pelo gateway. API/PostgreSQL prontos, HTTPS 200 e HTTP 308 canônico. Gate reprovado pela versão do Nginx em Server. Identificação independente do SHA servido pendente."
+    "note": "Gateway anunciou o SHA da #675 integrada. Readiness, HTTPS 200 e redirecionamento 308 comprovados. O cabeçalho Server expôs a versão do Nginx. Provisionamento, WebAuthn do titular e aceite funcional seguem pendentes."
   }
 }
