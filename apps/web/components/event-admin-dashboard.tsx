@@ -11,6 +11,7 @@ import {
   replaceWorkspaceEvent,
   visibleWorkspacePayload,
 } from '../lib/event-flow';
+import { eventStatusLabel } from '../lib/event-status-labels';
 import EvaScreenSupport from './eva-screen-support';
 import EventSubjectAreas from './event-subject-areas';
 import PublicationEditor from './publication-editor';
@@ -51,17 +52,6 @@ type EventAdminPayload = {
     capabilities?: string[];
     subjectAreas?: string[];
   };
-};
-
-const statusLabels: Record<string, string> = {
-  DRAFT: 'Rascunho',
-  SETUP: 'Em configuração',
-  HOMOLOGATION: 'Em homologação',
-  READY_TO_PUBLISH: 'Pronto para publicar',
-  PUBLISHED: 'Publicado',
-  SUSPENDED: 'Suspenso',
-  FINISHED: 'Finalizado',
-  CANCELLED: 'Cancelado',
 };
 
 const eventJourney = [
@@ -219,7 +209,7 @@ export default function EventAdminDashboard({ eventId, section }: { eventId: str
 
   const capabilities = payload.answers.capabilities ?? [];
   const isScientific = payload.event.profileCode === 'SCIENTIFIC_EVENT' || capabilities.includes('scientific_submission');
-  const eventStatus = statusLabels[payload.event.status] ?? payload.event.status;
+  const eventStatus = eventStatusLabel(payload.event.status);
 
   return <EventWorkspace eventId={safeEventId} section={section} payload={payload}>
 
