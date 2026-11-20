@@ -1,5 +1,10 @@
 # Estado dos Gates — 27/10/2026
 
+## Evidência conferida em 20/11
+
+A publicação de `6ca50702` registrou API e PostgreSQL prontos e HTTPS 200 às 22h25 de 19/11 em São Paulo. A versão exposta do Nginx manteve a #108 aberta. Esse deploy não acrescenta aceite funcional aos critérios. [Job de publicação](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/44651288686/job/136012440839).
+
+
 ## Publicação da Área Master em 19/11
 
 O gateway registrou `b642c2660460f00c4c5af070bebae518f187146b`, com #675 integrada. Às 15h09 de São Paulo o domínio respondeu HTTPS 200, a API e o PostgreSQL estavam prontos e HTTP redirecionou com 308. O gate público reprovou pela versão do Nginx no cabeçalho Server. O acesso autenticado do proprietário continua pendente da #690 e da validação WebAuthn. Os marcos e percentuais da matriz permanecem os da reconciliação abaixo. [Job de publicação](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/44581399025/job/135771644292).
