@@ -27,12 +27,23 @@ export function isPublicTicketEvent(
   return TICKET_EVENT_TYPES.some((type) => type === eventType);
 }
 
+function offerHasFreeAndPaid(categories: ReadonlyArray<{ priceLabel: string }> | null | undefined): boolean {
+  if (!categories?.length) return false;
+  const free = categories.some((category) => category.priceLabel === 'Gratuita');
+  const paid = categories.some((category) => category.priceLabel.startsWith('R$') || category.priceLabel.startsWith('A partir de R$'));
+  return free && paid;
+}
+
 export function publicRegistrationCtaLabel(
   mode: PublicRegistrationMode,
   profileCode: string | null | undefined,
   eventType: string | null | undefined,
+  categories?: ReadonlyArray<{ priceLabel: string }> | null,
 ): string {
   if (mode === 'INVITATION') return 'Tenho um convite';
+  if (offerHasFreeAndPaid(categories)) {
+    return isPublicTicketEvent(profileCode, eventType) ? 'Escolher ingresso' : 'Inscrever-se';
+  }
   if (mode === 'PAID') {
     return isPublicTicketEvent(profileCode, eventType) ? 'Comprar ingresso' : 'Comprar inscrição';
   }

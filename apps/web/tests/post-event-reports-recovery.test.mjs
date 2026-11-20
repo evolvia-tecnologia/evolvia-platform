@@ -24,6 +24,7 @@ async function harness(payload){
   '../lib/event-report-links':reportLinks,
   '../lib/post-event-report':legacy,'../lib/post-event-report-options':options,
   './post-event-reports.module.css':url('export default new Proxy({}, {get:(_,key)=>key});'),
+  './eva-screen-support':url('export default () => null;'),
   './post-event-overview':url('export default ()=>null;'),
   './post-event-report-catalog':url('export default ()=>null;'),
  };

@@ -31,7 +31,7 @@ function loadComponents(api) {
       if (name === 'next/link') return ({ children, ...props }) => React.createElement('a', props, children);
       if (name === 'next/navigation') return { useRouter: () => router, usePathname: () => '/eventos/evento-qa/painel' };
       if (name === '../lib/api') return { api, ApiError, getToken: () => 'qa-session' };
-      if (['./accessibility-panel', './event-subject-areas', './publication-editor', './integrations-hub'].includes(name)) return () => null;
+      if (['./accessibility-panel', './event-subject-areas', './publication-editor', './integrations-hub', './eva-screen-support'].includes(name)) return () => null;
       if (name.startsWith('.')) {
         const base = resolve(dirname(path), name);
         return load(base + (name === './event-workspace' ? '.tsx' : '.ts'));

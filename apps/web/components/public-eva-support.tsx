@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import { formatEventDate } from '../lib/event-time-zone';
 import {
   formatEstimatedAudience,
@@ -149,11 +149,36 @@ function answerFor(topic: EvaTopic, event: PublicEvaSupportProps): EvaAnswer {
 export default function PublicEvaSupport(event: PublicEvaSupportProps) {
   const [selectedTopic, setSelectedTopic] = useState<EvaTopic | null>(null);
   const answerRef = useRef<HTMLElement>(null);
+  const topicRefs = useRef<Partial<Record<EvaTopic, HTMLButtonElement | null>>>({});
+  const pendingTopicFocus = useRef<EvaTopic | null>(null);
   const answer = selectedTopic ? answerFor(selectedTopic, event) : null;
 
   useEffect(() => {
-    if (answer) answerRef.current?.focus();
+    if (!answer) return;
+    if (pendingTopicFocus.current) {
+      const topic = pendingTopicFocus.current;
+      pendingTopicFocus.current = null;
+      topicRefs.current[topic]?.focus?.();
+      return;
+    }
+    answerRef.current?.focus?.();
   }, [selectedTopic, answer]);
+
+  function moveTopic(keyboardEvent: ReactKeyboardEvent<HTMLDivElement>) {
+    const order = topics.map((topic) => topic.id);
+    const index = selectedTopic ? order.indexOf(selectedTopic) : -1;
+    const last = order.length - 1;
+    const next = keyboardEvent.key === 'Home' ? 0
+      : keyboardEvent.key === 'End' ? last
+        : keyboardEvent.key === 'ArrowDown' || keyboardEvent.key === 'ArrowRight' ? (index < 0 ? 0 : (index + 1) % order.length)
+          : keyboardEvent.key === 'ArrowUp' || keyboardEvent.key === 'ArrowLeft' ? (index < 0 ? last : (index - 1 + order.length) % order.length)
+            : -1;
+    if (next < 0) return;
+    keyboardEvent.preventDefault();
+    const topic = order[next];
+    pendingTopicFocus.current = topic;
+    setSelectedTopic(topic);
+  }
 
   return <aside className={styles.evaSupport} aria-labelledby="eva-support-title">
     <div className={styles.evaIntro}>
@@ -164,10 +189,12 @@ export default function PublicEvaSupport(event: PublicEvaSupportProps) {
     </div>
 
     <div>
-      <div className={styles.evaTopics} role="group" aria-label="Dúvidas que a EVA pode orientar">
-        {topics.map((topic) => <button
+      <div className={styles.evaTopics} role="group" aria-label="Dúvidas que a EVA pode orientar" onKeyDown={moveTopic}>
+        {topics.map((topic, index) => <button
           type="button"
           key={topic.id}
+          ref={(node) => { topicRefs.current[topic.id] = node; }}
+          tabIndex={selectedTopic === null ? (index === 0 ? 0 : -1) : (selectedTopic === topic.id ? 0 : -1)}
           aria-pressed={selectedTopic === topic.id}
           onClick={() => setSelectedTopic(topic.id)}
         >

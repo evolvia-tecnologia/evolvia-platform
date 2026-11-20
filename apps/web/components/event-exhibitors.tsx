@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { ApiError, api } from '../lib/api';
 import { refreshAfterExhibitorAction } from '../lib/exhibitor-admin-action';
+import EvaScreenSupport from './eva-screen-support';
 import styles from './event-exhibitors.module.css';
 
 type Tab = 'home' | 'include' | 'registrations' | 'credentials' | 'products' | 'files' | 'forms' | 'financial' | 'export' | 'messages' | 'preview';
@@ -807,6 +808,7 @@ function EventExhibitorsPanel({ eventId }: { eventId: string }) {
       </li>)}
     </ul>}
     </div></fieldset>
+    <EvaScreenSupport guide="exhibitorCentral" />
   </section>;
 }
 
