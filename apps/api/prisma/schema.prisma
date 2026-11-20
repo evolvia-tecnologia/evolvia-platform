@@ -988,6 +988,7 @@ model EventRegistrationCategoryProof {
 }
 
 model EventRegistrationPaymentReceipt {
+  fiscalDraft FiscalReceiptDraft?
   id             String                       @id @default(cuid())
   organizationId String
   eventId        String
@@ -2352,4 +2353,15 @@ model EventCommunicationDraft {
 
   @@unique([id, eventId, organizationId])
   @@index([organizationId, eventId, updatedAt])
+}
+
+model FiscalReceiptDraft {
+  receiptId            String @id
+  receipt              EventRegistrationPaymentReceipt @relation(fields: [receiptId], references: [id], onDelete: Restrict)
+  idempotencyKey       String @db.Char(64)
+  municipalityIbgeCode String @db.VarChar(7)
+  serviceCode          String @db.VarChar(20)
+  issuerId             String @db.VarChar(128)
+  recipientId          String @db.VarChar(128)
+  createdAt            DateTime @default(now())
 }
