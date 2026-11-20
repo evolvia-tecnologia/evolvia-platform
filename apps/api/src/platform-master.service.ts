@@ -1,0 +1,499 @@
+import { BadRequestException, Injectable, NotFoundException, ServiceUnavailableException, UnauthorizedException } from '@nestjs/common';
+import { createHash, randomBytes } from 'node:crypto';
+import { PrismaService } from './prisma.service.ts';
+import { PlatformMasterRepository } from './platform-master.repository.ts';
+import type { ClienteTransacional } from './platform-master.repository.ts';
+import { PlatformWebAuthnService } from './platform-webauthn.ts';
+import { abrirCerimonia, consumirDesafio } from './platform-ceremony-policy.ts';
+import { contadorAceito, validadeDaSessao } from './platform-session-policy.ts';
+import { MudancaRevertida, executarAuditado } from './platform-audit-transaction.ts';
+import { resumoDaConcessao, validarPedidoDeConcessao } from './platform-grant-request.ts';
+import { montarVisaoGeral } from './platform-overview-policy.ts';
+import { validarFiltroDaVisaoGeral } from './platform-overview-request.ts';
+import { montarRelatorio, restricaoDoEscopo, validarFiltroDoRelatorio } from './platform-audit-report.ts';
+import { montarCatalogo, validarPedidoDoCatalogo } from './platform-catalog-request.ts';
+import { recusaDeValidacao } from './platform-master-validation.ts';
+import type { EscopoDoRelatorio } from './platform-audit-report.ts';
+import type { Vinculo } from './platform-ceremony-policy.ts';
+import type { PedidoDeConcessao } from './platform-grant-request.ts';
+import type { Alvo } from './platform-grant-policy.ts';
+
+const TAMANHO_DO_TOKEN = 32;
+const hash = (valor: string): string => createHash('sha256').update(valor).digest('hex');
+
+/** O alcance de uma linha, na forma das colunas de `PlatformGrant`. */
+interface Alcance {
+  readonly scopeKind: 'GLOBAL' | 'ORGANIZACAO' | 'EVENTO';
+  readonly organizationId: string;
+  readonly eventId: string;
+}
+
+/** Uma linha de concessão, que é também o `where` da revogação. */
+interface LinhaDeConcessao extends Alcance {
+  readonly targetUserId: string;
+  readonly action: string;
+}
+
+export interface ContextoMaster {
+  readonly identityId: string;
+  readonly sessionId: string;
+  readonly tokenHash: string;
+}
+
+/**
+ * Operações da Área Master (#665).
+ *
+ * As decisões não estão aqui: cerimônia em `platform-ceremony-policy`, frescor
+ * de sessão em `platform-session-policy`, permissão em `platform-grant-policy`
+ * (aplicada pelo guard), obrigatoriedade da auditoria em
+ * `platform-audit-transaction`, conversão da credencial em
+ * `platform-credential-codec`. Todos puros e com teste de mutação. Este arquivo
+ * encadeia, e é o encadeamento que o teste HTTP com PostgreSQL mede.
+ *
+ * O desafio cru nunca é guardado: a coluna tem o digest vinculado à sessão. Por
+ * isso o cliente devolve o desafio que recebeu, a política confirma que é o que
+ * abrimos e vinculamos, e só então a biblioteca confere a assinatura sobre ele.
+ * Sem esse eco, o servidor não teria o que passar como `expectedChallenge`.
+ *
+ * Pedido inválido sai por `recusaDeValidacao`, no contrato de erro da
+ * plataforma. Lançar `{ erros }` cru fazia o filtro global descartar a lista
+ * de problemas e responder uma frase genérica — ver o comentário em
+ * `platform-master-validation.ts`.
+ *
+ * As rotas de concessão entregam `problemas`, que levam o CAMPO recusado até o
+ * `field` da resposta; as de catálogo e relatório ainda entregam `erros`, que é
+ * só a frase. A assimetria é transitória e deliberada: os validadores daquelas
+ * ainda não nomeiam o campo, e `recusaDeValidacao` aceita as duas formas para
+ * que a migração aconteça um validador por vez, sem que nenhuma rota pare de
+ * funcionar nem passe a afirmar um campo que ninguém informou.
+ */
+@Injectable()
+export class PlatformMasterService {
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly repositorio: PlatformMasterRepository,
+    private readonly webauthn: PlatformWebAuthnService,
+  ) {}
+
+  /** Identidade Master de quem está autenticado, ou 404. */
+  private async exigirIdentidade(userId: string) {
+    const identidade = await this.repositorio.identidade(userId);
+    if (!identidade) throw new NotFoundException('Recurso não encontrado.');
+    return identidade;
+  }
+
+  // ----------------------------------------------------------- autenticação
+
+  /** Abre a cerimônia de autenticação. Ainda não existe sessão para vincular. */
+  async desafioDeAutenticacao(userId: string) {
+    const identidade = await this.exigirIdentidade(userId);
+    const credenciais = await this.repositorio.credenciais(identidade.id);
+    if (credenciais.length === 0) {
+      throw new BadRequestException('Nenhuma chave de segurança registrada para este acesso.');
+    }
+    const opcoes = await this.webauthn.opcoesDeAutenticacao(credenciais);
+    const abertura = abrirCerimonia(
+      { status: String(identidade.status) as 'ACTIVE' | 'SUSPENDED' },
+      'AUTHENTICATION',
+      opcoes.challenge,
+      { tipo: 'SEM_SESSAO' },
+    );
+    await this.repositorio.gravarDesafio(identidade.id, abertura.gravar);
+    return opcoes;
+  }
+
+  /**
+   * Conclui a autenticação e devolve o token da sessão UMA vez.
+   *
+   * O token cru não é gravado em lugar nenhum: a coluna guarda o sha256 dele,
+   * que tem exatamente os 64 caracteres de `tokenHash`. Quem perder o token
+   * abre outra sessão; não há como recuperá-lo, e isso é a intenção.
+   */
+  async concluirAutenticacao(userId: string, desafioApresentado: string, resposta: unknown) {
+    const identidade = await this.exigirIdentidade(userId);
+    const leitura = consumirDesafio(identidade, 'AUTHENTICATION', desafioApresentado, { tipo: 'SEM_SESSAO' });
+    if (!leitura.ok) throw new UnauthorizedException(leitura.porque);
+
+    // Consumo atômico: em duas requisições concorrentes com o mesmo desafio,
+    // só uma encontra a linha para limpar. A outra cai aqui.
+    const gravado = identidade.pendingChallenge;
+    if (!gravado || !(await this.repositorio.consumirDesafio(identidade.id, gravado))) {
+      throw new UnauthorizedException('Não foi possível concluir. Comece novamente.');
+    }
+
+    const credencialId = this.idDaResposta(resposta);
+    const credencial = credencialId ? await this.repositorio.credencial(identidade.id, credencialId) : null;
+    if (!credencial) throw new UnauthorizedException('Não foi possível concluir. Comece novamente.');
+
+    const verificada = await this.webauthn.verificarAutenticacao(resposta, desafioApresentado, credencial);
+    if (!verificada) throw new UnauthorizedException('Não foi possível concluir. Comece novamente.');
+
+    // Defesa em profundidade contra autenticador clonado: a biblioteca também
+    // olha o contador, e `contadorAceito` carrega a exceção da especificação
+    // para autenticador que não implementa contador.
+    if (!contadorAceito(credencial.counter, verificada.novoContador)) {
+      throw new UnauthorizedException('Não foi possível concluir. Comece novamente.');
+    }
+
+    const agora = Date.now();
+    const token = randomBytes(TAMANHO_DO_TOKEN).toString('base64url');
+    const sessionId = await this.repositorio.criarSessao({
+      identityId: identidade.id,
+      tokenHash: hash(token),
+      secondFactorAt: new Date(agora).toISOString(),
+      expiresAt: validadeDaSessao(agora),
+    });
+    await this.repositorio.avancarContador(credencial.id, credencial.counter, verificada.novoContador);
+    return { token, sessionId, expiraEm: validadeDaSessao(agora) };
+  }
+
+  /** Encerra a sessão. A próxima operação com o mesmo token é recusada. */
+  async encerrarSessao(contexto: ContextoMaster): Promise<void> {
+    await this.repositorio.revogarSessao(contexto.sessionId);
+  }
+
+  // --------------------------------------------------------------- registro
+
+  /** Abre a cerimônia de registro, vinculada à sessão Master em curso. */
+  async desafioDeRegistro(userId: string, contexto: ContextoMaster, nomeDeUsuario: string) {
+    const identidade = await this.exigirIdentidade(userId);
+    const jaRegistradas = await this.repositorio.credenciais(identidade.id);
+    const opcoes = await this.webauthn.opcoesDeRegistro(nomeDeUsuario, jaRegistradas);
+    const abertura = abrirCerimonia(
+      { status: String(identidade.status) as 'ACTIVE' | 'SUSPENDED' },
+      'REGISTRATION',
+      opcoes.challenge,
+      this.vinculoDaSessao(contexto),
+    );
+    await this.repositorio.gravarDesafio(identidade.id, abertura.gravar);
+    return opcoes;
+  }
+
+  /**
+   * Registra a chave de segurança.
+   *
+   * Vai por `executarAuditado`: acrescentar autenticador à Área Master é
+   * mudança privilegiada, e se a auditoria não gravar, o registro é desfeito na
+   * mesma transação — a decisão da #665 vale aqui como vale para conceder.
+   */
+  async concluirRegistro(
+    userId: string,
+    contexto: ContextoMaster,
+    desafioApresentado: string,
+    resposta: unknown,
+    rotulo: string | null,
+  ) {
+    const identidade = await this.exigirIdentidade(userId);
+    const leitura = consumirDesafio(
+      identidade, 'REGISTRATION', desafioApresentado, this.vinculoDaSessao(contexto),
+    );
+    if (!leitura.ok) throw new UnauthorizedException(leitura.porque);
+
+    const gravado = identidade.pendingChallenge;
+    if (!gravado || !(await this.repositorio.consumirDesafio(identidade.id, gravado))) {
+      throw new UnauthorizedException('Não foi possível concluir. Comece novamente.');
+    }
+
+    const verificado = await this.webauthn.verificarRegistro(resposta, desafioApresentado);
+    if (!verificado) throw new UnauthorizedException('Não foi possível concluir. Comece novamente.');
+
+    await this.auditado(
+      {
+        actorUserId: userId,
+        action: 'registrar_autenticador',
+        scopeKind: 'GLOBAL',
+        targetUserId: userId,
+        reason: 'Registro de chave de segurança da Área Master.',
+        correlationId: `reg-${contexto.sessionId}`,
+        changes: { credentialId: verificado.credentialId, backedUp: verificado.backedUp },
+      },
+      async (tx) => {
+        await tx.cliente.platformWebAuthnCredential.create({
+          // Pelo construtor do repositório, que passa pelo codec. Converter
+          // aqui à mão criaria um segundo caminho para a mesma coluna, sem as
+          // guardas de alfabeto e de limite.
+          data: this.repositorio.dadosDaCredencial({
+            identityId: identidade.id,
+            credentialId: verificado.credentialId,
+            publicKey: verificado.publicKey,
+            counter: verificado.counter,
+            rotulo,
+            backedUp: verificado.backedUp,
+            transportes: verificado.transportes,
+          }),
+        });
+      },
+    );
+    return { credentialId: verificado.credentialId, backedUp: verificado.backedUp };
+  }
+
+  // -------------------------------------------------------------- concessões
+
+  /** O resumo que a tela mostra ANTES de confirmar, montado no servidor. */
+  async revisarConcessao(corpo: unknown) {
+    const leitura = validarPedidoDeConcessao(corpo);
+    if (!leitura.ok) throw recusaDeValidacao(leitura.problemas);
+    const nomes = await this.nomesDasPessoas(leitura.pedido.pessoas);
+    return { pedido: leitura.pedido, resumo: resumoDaConcessao(leitura.pedido, nomes) };
+  }
+
+  /**
+   * Concede. Só o proprietário chega aqui: o guard aplica `decidir`.
+   *
+   * **Atualiza antes de inserir, e a ordem não é indiferente.** A chave única da
+   * concessão é (pessoa, ação, escopo), sem a validade. Com `createMany` e
+   * `skipDuplicates` sozinhos, uma linha EXPIRADA fazia o insert ser descartado
+   * e o `expiresAt` antigo permanecia — e `concessaoVigente` trata expirada como
+   * ausente. O proprietário renovava, a resposta dizia que havia concedido, a
+   * trilha gravava GRANTED, e a pessoa continuava barrada. Medido contra
+   * PostgreSQL: 1 linha, ainda expirada.
+   *
+   * `skipDuplicates` continua no insert porque é ele que absorve a corrida com
+   * outra requisição que tenha criado a mesma linha entre o update e o insert.
+   *
+   * `updateMany` com o `where` das cinco colunas, e não `upsert`, para não
+   * depender do nome que o Prisma gera para a chave composta.
+   */
+  async conceder(actorUserId: string, contexto: ContextoMaster, corpo: unknown) {
+    const leitura = validarPedidoDeConcessao(corpo);
+    if (!leitura.ok) throw recusaDeValidacao(leitura.problemas);
+    const pedido = leitura.pedido;
+    const linhas = this.linhasDaConcessao(pedido);
+    const validade = pedido.expiraEm ? new Date(pedido.expiraEm) : null;
+
+    let renovadas = 0;
+    let criadas = 0;
+    await this.auditado(
+      {
+        actorUserId,
+        action: 'conceder',
+        scopeKind: this.escopoDoPedido(pedido),
+        organizationId: pedido.escopo.tipo === 'ORGANIZACAO' ? pedido.escopo.organizationId : '',
+        reason: pedido.motivo,
+        correlationId: `grant-${contexto.sessionId}`,
+        changes: { pessoas: pedido.pessoas.length, acoes: pedido.acoes, escopo: pedido.escopo.tipo },
+      },
+      async (tx) => {
+        const cliente: ClienteTransacional = tx.cliente;
+        for (const linha of linhas) {
+          // `grantedAt` renovado junto: ele passa a dizer quando a validade
+          // ATUAL foi concedida. O histórico de cada ação continua em
+          // `PlatformGrantEvent`; manter a data da primeira concessão aqui
+          // mostraria informação errada na tela de revisão.
+          const { count } = await cliente.platformGrant.updateMany({
+            where: linha,
+            data: { grantedByUserId: actorUserId, grantedAt: new Date(), expiresAt: validade },
+          });
+          renovadas += count;
+        }
+        const inseridas = await cliente.platformGrant.createMany({
+          data: linhas.map((l) => ({ ...l, grantedByUserId: actorUserId, expiresAt: validade })),
+          skipDuplicates: true,
+        });
+        criadas = inseridas.count;
+        await cliente.platformGrantEvent.createMany({
+          data: linhas.map((l) => ({
+            ...l,
+            kind: 'GRANTED',
+            actorUserId,
+            reason: pedido.motivo,
+            expiresAt: validade,
+            correlationId: `grant-${contexto.sessionId}`,
+          })),
+        });
+      },
+    );
+    // Conta o que de fato aconteceu. Antes respondia `linhas.length`, que era
+    // verdade só quando nada existia antes.
+    return { concedidas: renovadas + criadas, renovadas, criadas, resumo: resumoDaConcessao(pedido) };
+  }
+
+  /**
+   * Revoga.
+   *
+   * A linha sai da projeção, e é isso que faz a revogação valer na operação
+   * seguinte mesmo com a sessão aberta: o guard reconsulta as concessões em toda
+   * requisição, então não há token a invalidar nem cache a esperar.
+   */
+  async revogar(actorUserId: string, contexto: ContextoMaster, corpo: unknown) {
+    const leitura = validarPedidoDeConcessao(corpo);
+    if (!leitura.ok) throw recusaDeValidacao(leitura.problemas);
+    const pedido = leitura.pedido;
+    const linhas = this.linhasDaConcessao(pedido);
+
+    let removidas = 0;
+    await this.auditado(
+      {
+        actorUserId,
+        action: 'revogar',
+        scopeKind: this.escopoDoPedido(pedido),
+        organizationId: pedido.escopo.tipo === 'ORGANIZACAO' ? pedido.escopo.organizationId : '',
+        reason: pedido.motivo,
+        correlationId: `revoke-${contexto.sessionId}`,
+        changes: { pessoas: pedido.pessoas.length, acoes: pedido.acoes, escopo: pedido.escopo.tipo },
+      },
+      async (tx) => {
+        const cliente: ClienteTransacional = tx.cliente;
+        for (const linha of linhas) {
+          const { count } = await cliente.platformGrant.deleteMany({ where: linha });
+          removidas += count;
+        }
+        await cliente.platformGrantEvent.createMany({
+          data: linhas.map((l) => ({
+            ...l,
+            kind: 'REVOKED',
+            actorUserId,
+            reason: pedido.motivo,
+            expiresAt: null,
+            correlationId: `revoke-${contexto.sessionId}`,
+          })),
+        });
+      },
+    );
+    return { revogadas: removidas };
+  }
+
+  /**
+   * A visão geral, contada sobre os dados persistidos.
+   *
+   * O recorte vai para o banco e para a política: o banco estreita por
+   * igualdade em coluna escalar, a política aplica período e área. Ela recebe o
+   * MESMO filtro, então o que o banco devolve é sempre um superconjunto do que
+   * ela seleciona — e os totais não passam a depender de duas regras parecidas.
+   *
+   * O alvo desta rota é a plataforma inteira, então o guard só deixa passar
+   * quem tem alcance global. Concessão de um evento não abre o painel geral:
+   * mostrar totais da plataforma a quem só pode ver um evento seria vazamento
+   * pela soma.
+   */
+  async visaoGeral(corpo: unknown) {
+    const leitura = validarFiltroDaVisaoGeral(corpo);
+    if (!leitura.ok) throw recusaDeValidacao(leitura.problemas);
+    const eventos = await this.repositorio.eventosParaVisaoGeral(leitura.filtro);
+    return montarVisaoGeral(eventos, leitura.filtro);
+  }
+
+  /**
+   * O catálogo pesquisável de eventos.
+   *
+   * Mesmo alvo da visão geral — a plataforma — e por isso mesmo alcance
+   * exigido: quem só cuida de um evento não recebe a lista de todos. O recorte
+   * vai ao banco pelo MESMO `where` da visão geral, e o filtro fino roda na
+   * política, que é a mesma função nos dois casos. É isso que impede o painel
+   * de dizer um número e a lista de mostrar outro.
+   */
+  async catalogo(corpo: unknown) {
+    const leitura = validarPedidoDoCatalogo(corpo);
+    if (!leitura.ok) throw recusaDeValidacao(leitura.erros);
+    const eventos = await this.repositorio.eventosParaCatalogo(leitura.pedido.filtro);
+    return montarCatalogo(eventos, leitura.pedido);
+  }
+
+  /**
+   * O relatório da trilha, no alcance que o guard autorizou.
+   *
+   * O escopo vem do `alvo` que o guard guardou na requisição, e não de uma
+   * segunda leitura dos parâmetros: é o mesmo objeto que foi conferido. Essa
+   * identidade é o que garante que a autorização e o relatório falem do mesmo
+   * recurso.
+   *
+   * O filtro do corpo só estreita. Não existe campo de escopo nele, então não
+   * há como pedir outro evento por aqui — e se alguém acrescentar um, o teste
+   * de escopo é o que falha primeiro.
+   */
+  async relatorioDeAuditoria(alvo: Alvo, corpo: unknown) {
+    const leitura = validarFiltroDoRelatorio(corpo);
+    if (!leitura.ok) throw recusaDeValidacao(leitura.erros);
+    const escopo = this.escopoDoAlvo(alvo);
+    const linhas = await this.repositorio.trilhaDeAuditoria(restricaoDoEscopo(escopo), leitura.filtro);
+    return montarRelatorio(linhas, escopo, leitura.filtro);
+  }
+
+  private escopoDoAlvo(alvo: Alvo): EscopoDoRelatorio {
+    if (alvo.tipo === 'EVENTO') return { tipo: 'EVENTO', eventId: alvo.eventId };
+    if (alvo.tipo === 'ORGANIZACAO') return { tipo: 'ORGANIZACAO', organizationId: alvo.organizationId };
+    return { tipo: 'PLATAFORMA' };
+  }
+
+  /** Consulta de apoio de um evento, sob a ação `consultar`. */
+  async consultarEvento(eventId: string) {
+    const evento = await this.prisma.event.findUnique({
+      where: { id: eventId },
+      select: { id: true, name: true, status: true, startDate: true, endDate: true, organizationId: true },
+    });
+    if (!evento) throw new NotFoundException('Recurso não encontrado.');
+    return evento;
+  }
+
+  /**
+   * Transforma a reversão em resposta que a pessoa entende.
+   *
+   * Sem isto, `MudancaRevertida` sobe como 500 e quem tentou conceder não
+   * descobre que nada foi gravado — justamente o caso em que saber importa.
+   * 503 porque o impedimento é temporário: a ação pode ser repetida quando a
+   * auditoria voltar, e repetir é seguro porque nada ficou pela metade.
+   */
+  private async auditado<T>(
+    dados: Parameters<typeof executarAuditado>[1],
+    mudanca: (tx: { cliente: ClienteTransacional }) => Promise<T>,
+  ): Promise<T> {
+    try {
+      return await executarAuditado(this.repositorio.banco(), dados, mudanca);
+    } catch (erro) {
+      if (erro instanceof MudancaRevertida) {
+        throw new ServiceUnavailableException(
+          'A ação foi desfeita porque não foi possível registrar a auditoria. Nada foi alterado; tente novamente.',
+        );
+      }
+      throw erro;
+    }
+  }
+
+  // ------------------------------------------------------------- auxiliares
+
+  private vinculoDaSessao(contexto: ContextoMaster): Vinculo {
+    return { tipo: 'SESSAO', tokenHash: contexto.tokenHash };
+  }
+
+  private idDaResposta(resposta: unknown): string | null {
+    const id = (resposta as { id?: unknown } | null | undefined)?.id;
+    return typeof id === 'string' && id.length > 0 ? id : null;
+  }
+
+  /** Uma linha de concessão por pessoa × ação × alcance. */
+  private linhasDaConcessao(pedido: PedidoDeConcessao): LinhaDeConcessao[] {
+    const alcances: Alcance[] =
+      pedido.escopo.tipo === 'GLOBAL'
+        ? [{ scopeKind: 'GLOBAL', organizationId: '', eventId: '' }]
+        : pedido.escopo.tipo === 'ORGANIZACAO'
+          ? [{ scopeKind: 'ORGANIZACAO', organizationId: pedido.escopo.organizationId, eventId: '' }]
+          : pedido.escopo.eventIds.map((eventId) => ({ scopeKind: 'EVENTO' as const, organizationId: '', eventId }));
+
+    const linhas: LinhaDeConcessao[] = [];
+    for (const targetUserId of pedido.pessoas) {
+      for (const action of pedido.acoes) {
+        for (const alcance of alcances) {
+          linhas.push({ targetUserId, action, ...alcance });
+        }
+      }
+    }
+    return linhas;
+  }
+
+  private escopoDoPedido(pedido: PedidoDeConcessao): 'GLOBAL' | 'ORGANIZACAO' | 'EVENTO' {
+    if (pedido.escopo.tipo === 'GLOBAL') return 'GLOBAL';
+    if (pedido.escopo.tipo === 'ORGANIZACAO') return 'ORGANIZACAO';
+    return 'EVENTO';
+  }
+
+  private async nomesDasPessoas(ids: readonly string[]): Promise<Record<string, string>> {
+    if (ids.length === 0) return {};
+    const pessoas = await this.prisma.user.findMany({
+      where: { id: { in: [...ids] } },
+      select: { id: true, name: true },
+    });
+    const nomes: Record<string, string> = {};
+    for (const pessoa of pessoas) if (pessoa.name) nomes[pessoa.id] = pessoa.name;
+    return nomes;
+  }
+}

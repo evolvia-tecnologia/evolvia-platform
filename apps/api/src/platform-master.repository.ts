@@ -1,0 +1,585 @@
+import { Injectable } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
+import { PrismaService } from './prisma.service.ts';
+import { guardarChavePublica, guardarIdDaCredencial, guardarRotulo, guardarTransportes, lerChavePublica, lerTransportes } from './platform-credential-codec.ts';
+import type { Banco, RegistroGravado } from './platform-audit-transaction.ts';
+import type { Concessao } from './platform-grant-policy.ts';
+import type { IdentidadeMaster, SessaoGravada } from './platform-session-policy.ts';
+import type { TipoDeCerimonia } from './platform-ceremony-policy.ts';
+import type { EventoParaVisaoGeral, FormatoDoEvento, SituacaoDoEvento } from './platform-overview-policy.ts';
+import type { EventoDoCatalogo } from './platform-catalog-request.ts';
+import type { FiltroDoRelatorio, LinhaDaTrilha } from './platform-audit-report.ts';
+
+/**
+ * O cliente de dentro da transação.
+ *
+ * É `Prisma.TransactionClient`, o tipo que o próprio Prisma entrega a
+ * `$transaction`, e não um `Omit` do `PrismaService`. Eu havia escrito
+ * `Omit<PrismaService, '$transaction'>` e o CI reprovou com TS2740: o
+ * `PrismaService` estende `PrismaClient` E implementa os hooks de ciclo de
+ * vida, então aquele `Omit` continuava exigindo `onModuleInit`,
+ * `onModuleDestroy`, `$connect`, `$disconnect`, `$on`, `$use` e `$extends` —
+ * nenhum deles existe dentro da transação, e com razão: ninguém deve conectar,
+ * desconectar ou abrir outra transação de dentro de uma.
+ *
+ * O ponto de nomear este tipo segue o mesmo: cast amplo aqui esconderia o erro
+ * de passar o cliente de fora e perder o rollback, que é a garantia inteira
+ * desta frente.
+ */
+export type ClienteTransacional = Prisma.TransactionClient;
+
+/**
+ * O recorte compartilhado pela visão geral e pelo catálogo.
+ *
+ * Só igualdade escalar. Período e área ficam com a política, porque o que o
+ * banco devolve tem de ser um SUPERCONJUNTO do que ela seleciona.
+ */
+export interface RecorteDeEventos {
+  organizationIds?: readonly string[];
+  profileCodes?: readonly string[];
+  formatos?: readonly FormatoDoEvento[];
+  situacoes?: readonly SituacaoDoEvento[];
+}
+
+/** O que a cerimônia precisa gravar na identidade. */
+export interface DesafioParaGravar {
+  readonly pendingChallenge: string;
+  readonly pendingChallengeKind: TipoDeCerimonia;
+  readonly pendingChallengeExpires: string;
+}
+
+export interface CredencialParaVerificar {
+  readonly id: string;
+  readonly publicKey: Uint8Array;
+  readonly counter: number;
+  readonly transports: string[];
+}
+
+export interface IdentidadeComSessao {
+  readonly identityId: string;
+  readonly userId: string;
+  readonly identidade: IdentidadeMaster;
+  readonly sessao: SessaoGravada;
+  readonly sessionId: string;
+}
+
+/**
+ * Adaptador Prisma da Área Master (#665).
+ *
+ * Fino de propósito, como o `OperatorCapabilityRepository`: quem decide está em
+ * `platform-session-policy`, `platform-ceremony-policy`, `platform-grant-policy`
+ * e `platform-audit-transaction`, todos puros e testados. Aqui só se lê e se
+ * escreve. A razão é a mesma de lá: o Node não parseia decorators, então este
+ * arquivo não pode ser conferido na sessão que o escreveu, e por isso carrega o
+ * mínimo possível de decisão.
+ *
+ * A chave pública nunca entra nem sai crua: passa por
+ * `platform-credential-codec`, porque a coluna é texto e a biblioteca trabalha
+ * com bytes.
+ */
+@Injectable()
+export class PlatformMasterRepository {
+  constructor(private readonly prisma: PrismaService) {}
+
+  /** A identidade Master de uma pessoa, ou `null` se ela não tem uma. */
+  async identidade(userId: string) {
+    return this.prisma.platformMasterIdentity.findUnique({
+      where: { userId },
+      select: {
+        id: true, userId: true, role: true, status: true,
+        pendingChallenge: true, pendingChallengeKind: true, pendingChallengeExpires: true,
+      },
+    });
+  }
+
+  /**
+   * Identidade e sessão a partir do hash do token.
+   *
+   * Duas consultas e não um join porque a sessão é achada pelo hash único e a
+   * identidade pelo id dela — e porque assim a leitura serve igual dentro de
+   * uma transação. Devolve `null` quando qualquer das duas falta; quem chama
+   * responde sem distinguir, para não contar se o token existe.
+   */
+  async porTokenDeSessao(tokenHash: string): Promise<IdentidadeComSessao | null> {
+    const sessao = await this.prisma.platformMasterSession.findUnique({
+      where: { tokenHash },
+      select: { id: true, identityId: true, secondFactorAt: true, stepUpAt: true, expiresAt: true, revokedAt: true },
+    });
+    if (!sessao) return null;
+
+    const identidade = await this.prisma.platformMasterIdentity.findUnique({
+      where: { id: sessao.identityId },
+      select: { id: true, userId: true, role: true, status: true },
+    });
+    if (!identidade) return null;
+
+    return {
+      identityId: identidade.id,
+      userId: identidade.userId,
+      sessionId: sessao.id,
+      identidade: {
+        role: String(identidade.role) as IdentidadeMaster['role'],
+        status: String(identidade.status) as IdentidadeMaster['status'],
+      },
+      sessao: {
+        secondFactorAt: sessao.secondFactorAt,
+        stepUpAt: sessao.stepUpAt,
+        expiresAt: sessao.expiresAt,
+        revokedAt: sessao.revokedAt,
+      },
+    };
+  }
+
+  /** Grava o desafio da cerimônia, substituindo qualquer um anterior. */
+  async gravarDesafio(identityId: string, desafio: DesafioParaGravar): Promise<void> {
+    await this.prisma.platformMasterIdentity.update({
+      where: { id: identityId },
+      data: {
+        pendingChallenge: desafio.pendingChallenge,
+        pendingChallengeKind: desafio.pendingChallengeKind,
+        pendingChallengeExpires: new Date(desafio.pendingChallengeExpires),
+      },
+    });
+  }
+
+  /**
+   * Apaga o desafio, e só se ele ainda for aquele.
+   *
+   * O `where` inclui o valor porque é isto que torna o consumo atômico: duas
+   * requisições concorrentes com o mesmo desafio disputam a mesma linha, e a
+   * segunda não encontra nada para atualizar. `count` zero significa que outra
+   * já consumiu, e quem chama trata como desafio inválido — não como erro.
+   */
+  async consumirDesafio(identityId: string, desafioGravado: string): Promise<boolean> {
+    const { count } = await this.prisma.platformMasterIdentity.updateMany({
+      where: { id: identityId, pendingChallenge: desafioGravado },
+      data: { pendingChallenge: null, pendingChallengeKind: null, pendingChallengeExpires: null },
+    });
+    return count === 1;
+  }
+
+  /** Credenciais da identidade, já na forma que a biblioteca espera. */
+  async credenciais(identityId: string): Promise<CredencialParaVerificar[]> {
+    const linhas = await this.prisma.platformWebAuthnCredential.findMany({
+      where: { identityId },
+      select: { credentialId: true, publicKey: true, counter: true, transports: true },
+      orderBy: { createdAt: 'asc' },
+    });
+    return linhas.map((l) => ({
+      id: l.credentialId,
+      publicKey: lerChavePublica(l.publicKey),
+      counter: l.counter,
+      transports: lerTransportes(l.transports),
+    }));
+  }
+
+  /** Uma credencial específica desta identidade, ou `null`. */
+  async credencial(identityId: string, credentialId: string): Promise<CredencialParaVerificar | null> {
+    const linha = await this.prisma.platformWebAuthnCredential.findUnique({
+      where: { credentialId },
+      select: { identityId: true, credentialId: true, publicKey: true, counter: true, transports: true },
+    });
+    if (!linha || linha.identityId !== identityId) return null;
+    return {
+      id: linha.credentialId,
+      publicKey: lerChavePublica(linha.publicKey),
+      counter: linha.counter,
+      transports: lerTransportes(linha.transports),
+    };
+  }
+
+  /**
+   * Monta a linha da credencial para gravar.
+   *
+   * Existe como método próprio porque a gravação acontece DENTRO da transação
+   * auditada, pelo cliente transacional, e não por `this.prisma`. Sem isto, o
+   * serviço refaria a conversão à mão e haveria dois caminhos diferentes para a
+   * mesma coluna — que é exatamente como uma chave pública se perde. Aqui há um
+   * caminho só, e ele passa pelo codec com todas as guardas.
+   */
+  dadosDaCredencial(dados: {
+    identityId: string;
+    credentialId: string;
+    publicKey: Uint8Array;
+    counter: number;
+    rotulo: string | null;
+    backedUp: boolean;
+    transportes: readonly string[] | null | undefined;
+  }) {
+    return {
+      identityId: dados.identityId,
+      credentialId: guardarIdDaCredencial(dados.credentialId),
+      publicKey: guardarChavePublica(dados.publicKey),
+      counter: dados.counter,
+      label: guardarRotulo(dados.rotulo),
+      backedUp: dados.backedUp,
+      transports: guardarTransportes(dados.transportes),
+    };
+  }
+
+  /** Registra a credencial fora de transação. Usa o MESMO construtor acima. */
+  async registrarCredencial(dados: Parameters<PlatformMasterRepository['dadosDaCredencial']>[0]): Promise<void> {
+    await this.prisma.platformWebAuthnCredential.create({ data: this.dadosDaCredencial(dados) });
+  }
+
+  /**
+   * Avança o contador da credencial, e só para frente.
+   *
+   * O `where` exige que o contador gravado continue menor: em duas
+   * autenticações concorrentes, a que chegar com o valor menor não retrocede o
+   * contador da outra. Contador que não avança é detectado antes, por
+   * `contadorAceito`; esta guarda é contra a corrida, não contra o clone.
+   */
+  async avancarContador(credentialId: string, de: number, para: number): Promise<void> {
+    await this.prisma.platformWebAuthnCredential.updateMany({
+      where: { credentialId, counter: { lte: de } },
+      data: { counter: para, lastUsedAt: new Date() },
+    });
+  }
+
+  /** Abre a sessão Master. O token cru fica com quem chamou; aqui só o hash. */
+  async criarSessao(dados: {
+    identityId: string;
+    tokenHash: string;
+    secondFactorAt: string;
+    expiresAt: string;
+  }): Promise<string> {
+    const criada = await this.prisma.platformMasterSession.create({
+      data: {
+        identityId: dados.identityId,
+        tokenHash: dados.tokenHash,
+        secondFactorAt: new Date(dados.secondFactorAt),
+        stepUpAt: new Date(dados.secondFactorAt),
+        expiresAt: new Date(dados.expiresAt),
+      },
+      select: { id: true },
+    });
+    return criada.id;
+  }
+
+  /**
+   * Encerra a sessão.
+   *
+   * `updateMany` com `revokedAt: null` no filtro para que encerrar duas vezes
+   * seja idempotente e não sobrescreva o instante da primeira revogação — que é
+   * o que a trilha de auditoria vai citar.
+   */
+  async revogarSessao(sessionId: string): Promise<void> {
+    await this.prisma.platformMasterSession.updateMany({
+      where: { id: sessionId, revokedAt: null },
+      data: { revokedAt: new Date() },
+    });
+  }
+
+  /** Concessões vigentes de uma pessoa, na forma que a política consome. */
+  async concessoes(targetUserId: string): Promise<Concessao[]> {
+    const linhas = await this.prisma.platformGrant.findMany({
+      where: { targetUserId },
+      select: { action: true, scopeKind: true, organizationId: true, eventId: true, expiresAt: true },
+    });
+    return linhas.map((l) => ({
+      acao: l.action,
+      escopo: this.escopoDaLinha(l.scopeKind, l.organizationId, l.eventId),
+      expiraEm: l.expiresAt,
+      revogadaEm: null,
+    }));
+  }
+
+  private escopoDaLinha(scopeKind: unknown, organizationId: string, eventId: string): Concessao['escopo'] {
+    const tipo = String(scopeKind);
+    if (tipo === 'ORGANIZACAO') return { tipo: 'ORGANIZACAO', organizationId };
+    if (tipo === 'EVENTO') return { tipo: 'EVENTO', eventId };
+    return { tipo: 'GLOBAL' };
+  }
+
+  /** A organização persistida de um evento, ou `null` se ele não existe. */
+  async organizacaoDoEvento(eventId: string): Promise<string | null> {
+    const evento = await this.prisma.event.findUnique({
+      where: { id: eventId },
+      select: { organizationId: true },
+    });
+    return evento?.organizationId ?? null;
+  }
+
+  /**
+   * O `where` do recorte, usado pela visão geral E pelo catálogo.
+   *
+   * Uma função só, de propósito. Duas consultas montando o mesmo recorte é o
+   * mesmo risco de divergência que o resto desta frente evita: bastaria uma
+   * delas ganhar uma cláusula para o painel e a lista passarem a contar sobre
+   * bases diferentes. Só o `select` difere entre as duas — a lista mostra nome
+   * e organização, a contagem não precisa.
+   */
+  private whereDoRecorte(recorte: RecorteDeEventos): Record<string, unknown> {
+    const where: Record<string, unknown> = {};
+    if (recorte.organizationIds?.length) where.organizationId = { in: [...recorte.organizationIds] };
+    if (recorte.profileCodes?.length) where.profileCode = { in: [...recorte.profileCodes] };
+    if (recorte.formatos?.length) where.format = { in: [...recorte.formatos] };
+    if (recorte.situacoes?.length) where.status = { in: [...recorte.situacoes] };
+    return where;
+  }
+
+  /**
+   * Os eventos que a visão geral conta.
+   *
+   * O `where` só estreita por igualdade em coluna escalar — organização,
+   * perfil, formato e situação. Período e área ficam com a política, de
+   * propósito: o que o banco devolve tem de ser um SUPERCONJUNTO do que a
+   * política seleciona, senão os totais passam a depender de duas regras
+   * parecidas mas não idênticas, e a primeira divergência de borda vira número
+   * errado sem ninguém notar.
+   *
+   * Isto lê todos os eventos que passam no recorte. É varredura, e é aceitável
+   * enquanto a plataforma tem poucos eventos; quando crescer, a conta vira
+   * agregação em SQL. O contrato da política — o número É a lista — é o que
+   * vai permitir conferir essa troca.
+   */
+  async eventosParaVisaoGeral(recorte: RecorteDeEventos): Promise<EventoParaVisaoGeral[]> {
+    const linhas = await this.prisma.event.findMany({
+      where: this.whereDoRecorte(recorte) as never,
+      select: {
+        id: true, organizationId: true, profileCode: true, format: true,
+        status: true, subjectAreas: true, createdAt: true, startDate: true, endDate: true,
+      },
+    });
+    return linhas.map((l) => ({
+      id: l.id,
+      organizationId: l.organizationId,
+      profileCode: l.profileCode === null ? null : String(l.profileCode),
+      format: String(l.format) as FormatoDoEvento,
+      status: String(l.status) as SituacaoDoEvento,
+      subjectAreas: l.subjectAreas,
+      createdAt: l.createdAt,
+      startDate: l.startDate,
+      endDate: l.endDate,
+    }));
+  }
+
+  /**
+   * Os eventos do catálogo: o MESMO recorte, mais o que a pessoa lê na linha.
+   *
+   * `organization` entra pela relação e só pelo nome. Nome é o que a linha
+   * mostra; trazer a organização inteira seria carregar dado fiscal e de
+   * contato para desenhar uma lista.
+   *
+   * `removido` não é lido aqui porque a tabela de moderação ainda não existe —
+   * está sob lock de schema do Work. O catálogo já trata campo ausente como
+   * não removido, então quando a tabela chegar basta o `include` e uma linha
+   * no `map`.
+   */
+  async eventosParaCatalogo(recorte: RecorteDeEventos): Promise<EventoDoCatalogo[]> {
+    const linhas = await this.prisma.event.findMany({
+      where: this.whereDoRecorte(recorte) as never,
+      select: {
+        id: true, organizationId: true, profileCode: true, format: true,
+        status: true, subjectAreas: true, createdAt: true, startDate: true, endDate: true,
+        name: true, slug: true, eventType: true, updatedAt: true,
+        organization: { select: { name: true } },
+      },
+    });
+    return linhas.map((l) => ({
+      id: l.id,
+      organizationId: l.organizationId,
+      profileCode: l.profileCode === null ? null : String(l.profileCode),
+      format: String(l.format) as FormatoDoEvento,
+      status: String(l.status) as SituacaoDoEvento,
+      subjectAreas: l.subjectAreas,
+      createdAt: l.createdAt,
+      startDate: l.startDate,
+      endDate: l.endDate,
+      name: l.name,
+      slug: l.slug,
+      eventType: l.eventType,
+      updatedAt: l.updatedAt,
+      organizationName: l.organization?.name ?? null,
+    }));
+  }
+
+  /**
+   * As linhas da trilha, já estreitadas pelo escopo e pelo filtro.
+   *
+   * Lê DUAS tabelas, e isto é o ponto do método.
+   *
+   * `PlatformAuditLog` guarda uma linha por OPERAÇÃO privilegiada, porque
+   * `executarAuditado` grava uma e só uma — é a garantia de que a mudança e o
+   * seu registro vivem na mesma transação. Mas uma concessão alcança N pessoas
+   * × M eventos, e isso não cabe nas colunas escalares `eventId` e
+   * `targetUserId`: elas saem vazias. Resultado, antes desta mudança: o
+   * relatório de um evento nunca mostrava mudança de acesso, e o filtro por
+   * destinatário não as encontrava nem no relatório global.
+   *
+   * `PlatformGrantEvent` já tem os identificadores, uma linha por (pessoa,
+   * ação, alcance), gravada na mesma transação. Então a leitura passa a
+   * incluí-la, em vez de duplicar aquela informação dentro de
+   * `PlatformAuditLog` — duas fontes para o mesmo fato é como elas divergem.
+   *
+   * No relatório GLOBAL as duas granularidades aparecem: a linha da operação
+   * (a decisão, com as contagens em `changes`) e as linhas por destinatário (o
+   * efeito). Compartilham o `correlationId`, então quem lê consegue amarrá-las.
+   * No relatório por evento não há duplicação: a linha de operação tem
+   * `eventId` vazio e `dentroDoEscopo` a exclui.
+   *
+   * A restrição do escopo vem de `restricaoDoEscopo`, derivada do alvo que o
+   * guard autorizou — nunca do corpo. Mesmo assim, quem monta o relatório
+   * aplica `dentroDoEscopo` sobre o que voltar: estas cláusulas são otimização,
+   * e a fronteira de segurança é a função pura. Duas camadas de propósito,
+   * porque esquecer um `where` é o tipo de erro que não aparece em teste de
+   * unidade.
+   *
+   * `take` é `limite + 1` em CADA fonte para que o relatório consiga dizer que
+   * truncou sem uma segunda consulta. Os `limite + 1` mais recentes da união
+   * estão contidos na união dos `limite + 1` mais recentes de cada lado, então
+   * a ordenação e o corte feitos por `montarRelatorio` continuam corretos.
+   */
+  async trilhaDeAuditoria(
+    restricao: { organizationId?: string; eventId?: string },
+    filtro: FiltroDoRelatorio,
+  ): Promise<LinhaDaTrilha[]> {
+    const where: Record<string, unknown> = {};
+    if (restricao.eventId) where.eventId = restricao.eventId;
+    if (restricao.organizationId) where.organizationId = restricao.organizationId;
+    if (filtro.acoes.length > 0) where.action = { in: [...filtro.acoes] };
+    if (filtro.resultados.length > 0) where.result = { in: [...filtro.resultados] };
+    if (filtro.actorUserId) where.actorUserId = filtro.actorUserId;
+    if (filtro.targetUserId) where.targetUserId = filtro.targetUserId;
+    const periodo = filtro.de || filtro.ate
+      ? {
+        ...(filtro.de ? { gte: new Date(filtro.de) } : {}),
+        ...(filtro.ate ? { lte: new Date(filtro.ate) } : {}),
+      }
+      : null;
+    if (periodo) where.occurredAt = periodo;
+
+    const [operacoes, concessoes] = await Promise.all([
+      this.prisma.platformAuditLog.findMany({
+        where: where as never,
+        select: {
+          actorUserId: true, action: true, scopeKind: true, organizationId: true, eventId: true,
+          targetUserId: true, reason: true, result: true, changes: true, correlationId: true, occurredAt: true,
+        },
+        orderBy: { occurredAt: 'desc' },
+        take: filtro.limite + 1,
+      }),
+      this.historicoDeConcessoes(restricao, filtro, periodo),
+    ]);
+
+    const daOperacao: LinhaDaTrilha[] = operacoes.map((l) => ({
+      actorUserId: l.actorUserId,
+      action: l.action,
+      scopeKind: String(l.scopeKind) as LinhaDaTrilha['scopeKind'],
+      organizationId: l.organizationId,
+      eventId: l.eventId,
+      targetUserId: l.targetUserId,
+      reason: l.reason,
+      result: String(l.result) as LinhaDaTrilha['result'],
+      changes: l.changes,
+      correlationId: l.correlationId,
+      occurredAt: l.occurredAt,
+    }));
+
+    return [...daOperacao, ...concessoes];
+  }
+
+  /**
+   * O histórico de concessão, já na forma da trilha.
+   *
+   * A tradução do filtro é estreita de propósito, nunca larga:
+   *
+   *  - `acoes` vira `kind`. Se o filtro pedir apenas ações que não existem no
+   *    histórico, a consulta é DISPENSADA em vez de devolver tudo — traduzir
+   *    para "sem filtro" seria alargar o pedido, e num relatório de auditoria
+   *    isso mostra o que não foi pedido.
+   *  - `resultados` sem `ALLOWED` dispensa igual: concessão gravada é concessão
+   *    que aconteceu, então toda linha daqui é `ALLOWED`. Não há `DENIED` nem
+   *    `FAILED` para mostrar, e inventar um seria afirmar o que não ocorreu.
+   *
+   * A ação CONCEDIDA (`consultar`, `suspender`…) vai em `changes`, porque a
+   * coluna `action` do relatório descreve a operação administrativa — conceder
+   * ou revogar — e misturar as duas no mesmo campo faria o filtro por ação
+   * responder coisas diferentes dependendo da fonte.
+   */
+  private async historicoDeConcessoes(
+    restricao: { organizationId?: string; eventId?: string },
+    filtro: FiltroDoRelatorio,
+    periodo: Record<string, Date> | null,
+  ): Promise<LinhaDaTrilha[]> {
+    const porAcao: Record<string, 'GRANTED' | 'REVOKED'> = { conceder: 'GRANTED', revogar: 'REVOKED' };
+    const tipos = filtro.acoes.length === 0
+      ? ['GRANTED', 'REVOKED']
+      : [...new Set(filtro.acoes.map((acao) => porAcao[acao]).filter((kind): kind is 'GRANTED' | 'REVOKED' => Boolean(kind)))];
+    if (tipos.length === 0) return [];
+    if (filtro.resultados.length > 0 && !filtro.resultados.includes('ALLOWED')) return [];
+
+    const where: Record<string, unknown> = { kind: { in: tipos } };
+    if (restricao.eventId) where.eventId = restricao.eventId;
+    if (restricao.organizationId) where.organizationId = restricao.organizationId;
+    if (filtro.actorUserId) where.actorUserId = filtro.actorUserId;
+    if (filtro.targetUserId) where.targetUserId = filtro.targetUserId;
+    if (periodo) where.occurredAt = periodo;
+
+    const linhas = await this.prisma.platformGrantEvent.findMany({
+      where: where as never,
+      select: {
+        kind: true, action: true, scopeKind: true, organizationId: true, eventId: true,
+        targetUserId: true, actorUserId: true, reason: true, expiresAt: true,
+        correlationId: true, occurredAt: true,
+      },
+      orderBy: { occurredAt: 'desc' },
+      take: filtro.limite + 1,
+    });
+
+    return linhas.map((l) => ({
+      actorUserId: l.actorUserId,
+      action: String(l.kind) === 'GRANTED' ? 'conceder' : 'revogar',
+      scopeKind: String(l.scopeKind) as LinhaDaTrilha['scopeKind'],
+      organizationId: l.organizationId,
+      eventId: l.eventId,
+      targetUserId: l.targetUserId,
+      reason: l.reason,
+      result: 'ALLOWED' as const,
+      changes: { acaoConcedida: l.action, expiraEm: l.expiresAt },
+      correlationId: l.correlationId,
+      occurredAt: l.occurredAt,
+    }));
+  }
+
+  /**
+   * O `Banco` que `executarAuditado` consome.
+   *
+   * `emTransacao` entrega o cliente transacional em `cliente`, e é por ele que a
+   * mudança privilegiada tem de passar — se passar pelo cliente de fora, não
+   * participa do rollback e a garantia da #665 deixa de valer.
+   */
+  banco(): Banco<ClienteTransacional> {
+    return {
+      emTransacao: (fn) =>
+        this.prisma.$transaction((tx) =>
+          fn({
+            cliente: tx,
+            gravarAuditoria: (registro: RegistroGravado) =>
+              tx.platformAuditLog.create({ data: this.paraColunas(registro) }),
+          }),
+        ),
+      gravarAuditoriaSolta: (registro: RegistroGravado) =>
+        this.prisma.platformAuditLog.create({ data: this.paraColunas(registro) }),
+    };
+  }
+
+  /**
+   * Traduz o registro para as colunas, e só o `changes` precisa de tradução.
+   *
+   * A coluna é `Json?`, e Prisma distingue três coisas que em JavaScript são
+   * todas `null`: ausência de valor (SQL NULL), o literal JSON `null` gravado
+   * dentro do documento, e não mexer na coluna. Passar `null` cru é o TS2322
+   * que o CI acusou, e escolher errado entre `DbNull` e `JsonNull` muda o que
+   * uma consulta de auditoria encontra depois.
+   *
+   * Aqui `null` significa "esta ação não registrou alteração nenhuma", que é
+   * ausência de valor — portanto `DbNull`, SQL NULL. `JsonNull` diria que a
+   * ação registrou, como conteúdo, o valor nulo; não é o caso.
+   */
+  private paraColunas(registro: RegistroGravado) {
+    const { changes, ...colunas } = registro;
+    return { ...colunas, changes: changes === null ? Prisma.DbNull : changes };
+  }
+}
