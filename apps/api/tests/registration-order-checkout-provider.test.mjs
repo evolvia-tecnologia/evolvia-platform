@@ -17,6 +17,7 @@ test('G2.10: grouped checkout claims one provider call and rejects a concurrent 
   let claims = 0;
   const audits = [];
   const prisma = {
+    platformEventModeration: { findUnique: async () => null },
     $queryRaw: async (sql, ...params) => {
       const query = sql.join('?');
       if (query.includes('to_regclass')) return [{ ready: true }];
@@ -138,6 +139,7 @@ test('G2.10: safe provider rejection compensates both reservations atomically, a
       auditLog: { create: async () => {} },
     };
     const prisma = {
+      platformEventModeration: { findUnique: async () => null },
     $queryRaw: async (sql, ...params) => {
       const query = sql.join('?');
       if (query.includes('to_regclass')) return [{ ready: true }];
@@ -393,6 +395,7 @@ test('G2.11: falta de aceite persistido bloqueia antes do intent e da chamada As
   let providerCalls = 0;
   let claims = 0;
   const prisma = {
+    platformEventModeration: { findUnique: async () => null },
     event: { findUnique: async () => ({
       id: 'event_1', organizationId: 'tenant_1', status: 'PUBLISHED', name: 'Congresso',
     }) },
@@ -411,6 +414,12 @@ test('G2.11: falta de aceite persistido bloqueia antes do intent e da chamada As
   );
   await assert.rejects(() => service.create('congresso', 'order_1', 'group-checkout-key-0001'),
     (error) => error.getStatus?.() === 409 && /política de reembolso/u.test(error.message));
+  prisma.platformEventModeration.findUnique = async ({ where }) => {
+    assert.equal(where.eventId, 'event_1');
+    return { state: 'SUSPENSO' };
+  };
+  await assert.rejects(() => service.create('congresso', 'order_1', 'group-checkout-key-0001'),
+    (error) => error.getStatus?.() === 404 && /Pedido não encontrado/u.test(error.message));
   assert.equal(prepares, 0);
   assert.equal(providerCalls, 0);
   assert.equal(claims, 0);

@@ -34,6 +34,7 @@ function fixture({ capacity = 2, occupied = 0, replay = null } = {}) {
   const writes = { orders: [], reservations: [], entries: [], audits: [] };
   const reads = { categories: 0, lots: 0, reservationGroups: [], waitlistGroups: [] };
   const tx = {
+    platformEventModeration: { findUnique: async () => null },
     $queryRaw: async (strings, ...values) => {
       const query = strings.join('?');
       if (query.includes('to_regclass')) return [{ ready: true }];
