@@ -50,6 +50,9 @@ test('busca por objetivo e detalhes locais reduzem texto sem prometer conexão',
   assert.match(hub, /disabled=\{busy \|\| rows === null\}/u);
   assert.doesNotMatch(hub, /setNotice\('Preparação registrada/u);
   assert.match(hub, /Registrar preparação/u);
+  assert.match(hub, /Atualizar preparação/u);
+  assert.match(hub, /Consultando preparações deste evento/u);
+  assert.match(hub, /Preparação concluída\. Nenhum dado é enviado ao provedor/u);
   assert.match(hub, /Nenhum dado é enviado ao provedor/u);
   assert.match(hub, /integrations\/preparations/u);
   assert.match(hub, /Criar endpoint/u);

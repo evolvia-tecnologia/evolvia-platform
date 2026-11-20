@@ -296,7 +296,7 @@ test('falha parcial de preparação mantém as outras conexões e a reconsulta n
     failPreparations = false;
     await act(async () => button(renderer, 'Tentar carregar novamente').props.onClick());
     assert.match(view(renderer), /Preparação registrada para Conta do evento/);
-    assert.equal(button(renderer, 'Registrar preparação').props.disabled, false);
+    assert.equal(button(renderer, 'Atualizar preparação').props.disabled, false);
     assert.match(view(renderer), /1 chave\(s\) de leitura ativa\(s\)/);
     assert.equal(calls.filter(call => call.options?.method === 'POST').length, 0);
   } finally { await close(renderer); }

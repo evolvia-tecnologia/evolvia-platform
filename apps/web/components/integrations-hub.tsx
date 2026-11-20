@@ -245,11 +245,12 @@ function PreparationDesk({ eventId, code }: { eventId: string; code: string }) {
     finally { setBusy(false); }
   }
 
-  return <section className={styles.foundation} aria-label="Preparação deste conector">
+  return <section className={styles.foundation} aria-label="Preparação deste conector" aria-busy={rows === null && !error}>
     <p>O nome da conta fica só neste evento. Isto não instala o conector nem autoriza envio.</p>
     {error && <p className={styles.error} role="alert">{error}</p>}
+    {rows === null && !error && <p role="status">Consultando preparações deste evento…</p>}
     {rows === null && error && <button type="button" disabled={busy} onClick={() => { setError(''); setLoadAttempt((value) => value + 1); }}>Tentar carregar novamente</button>}
-    {notice && <p role="status">{notice}</p>}
+    {notice && <p role="status" aria-live="polite">{notice}</p>}
     {current && <p role="status">Preparação registrada para {current.accountLabel}. Nenhum dado é enviado ao provedor.</p>}
     <form onSubmit={(event) => {
       event.preventDefault();
@@ -260,6 +261,9 @@ function PreparationDesk({ eventId, code }: { eventId: string; code: string }) {
           body: JSON.stringify({ code, accountLabel }),
         });
         setAccountLabel('');
+        setNotice(current
+          ? 'Preparação atualizada. Nenhum dado é enviado ao provedor.'
+          : 'Preparação concluída. Nenhum dado é enviado ao provedor.');
         setRows((existing) => {
           if (!existing) return null;
           const next = existing.filter((row) => row.code !== created.code);
@@ -270,7 +274,7 @@ function PreparationDesk({ eventId, code }: { eventId: string; code: string }) {
       <label htmlFor={`preparation-account-${code}`}>Nome da conta na organização
         <input id={`preparation-account-${code}`} value={accountLabel} onChange={(event) => setAccountLabel(event.target.value)} maxLength={80} autoComplete="off" required />
       </label>
-      <button type="submit" disabled={busy || rows === null}>Registrar preparação</button>
+      <button type="submit" disabled={busy || rows === null}>{current ? 'Atualizar preparação' : 'Registrar preparação'}</button>
     </form>
     {current && <button type="button" disabled={busy} onClick={() => void run(async () => {
       await api(`/events/${eventId}/integrations/preparations/${encodeURIComponent(code)}/withdraw`, { method: 'POST', body: '{}' });
