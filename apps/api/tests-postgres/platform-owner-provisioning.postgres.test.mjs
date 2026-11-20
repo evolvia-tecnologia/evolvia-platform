@@ -259,6 +259,64 @@ test('o MESMO usuário duas vezes: COM a trava o replay é idempotente', { timeo
   assert.equal(await linhasDaTrilha(schema), 1, 'a execução idempotente gravou trilha de uma mudança que não houve');
 });
 
+/**
+ * A chave que o banco apontou numa violação de unicidade, ou `null` se o erro
+ * não foi violação de unicidade nenhuma.
+ *
+ * Esta asserção já afirmou o NOME da restrição, e foi isso que a derrubou no CI
+ * 44731311856 — único erro de 253 casos PostgreSQL. O
+ * `PrismaClientKnownRequestError` P2010 entrega o SQLSTATE e o DETAIL do
+ * PostgreSQL, não a mensagem primária: chega `Code: 23505` mais
+ * `Key ("userId")=(...) already exists`, e o nome da restrição que a regex
+ * exigia não vem. O banco barrou o que devia; a asserção é que olhava para o
+ * lugar errado.
+ *
+ * E o nome não serviria nem fora do Prisma. Medido em PostgreSQL 16.15: o
+ * `CREATE TABLE ... (LIKE ... INCLUDING ALL)` deste arquivo NÃO preserva o nome
+ * do índice único — `PlatformMasterIdentity_userId_key` reaparece no schema
+ * isolado como `PlatformMasterIdentity_userId_idx`, porque `LIKE` copia o índice
+ * e deixa o banco escolher o nome. Nome de índice copiado é detalhe de quem
+ * copiou; coluna em conflito é fato do dado.
+ *
+ * O DETAIL cita a coluna como o PostgreSQL a escreveria, e a diferença entre os
+ * dois erros possíveis aqui está justamente nela — medido, não suposto:
+ *
+ *     unicidade de userId -> DETAIL:  Key ("userId")=(c2048...) already exists.
+ *     chave primária      -> DETAIL:  Key (id)=(c8yky...) already exists.
+ *
+ * Com aspas no primeiro porque `userId` precisa delas e sem aspas no segundo
+ * porque `id` não. Normalizar as aspas e comparar a coluna, então, aceita a
+ * violação que este caso existe para provar e recusa a colisão de chave
+ * primária — que é o defeito concreto que a versão anterior deste caso tinha, e
+ * o motivo de ele não medir a unicidade que nomeava.
+ *
+ * O nome da restrição fica como segunda via, para quando o erro chegar sem o
+ * embrulho do Prisma: `psql` imprime a mensagem primária junto do DETAIL, e o
+ * harness local que mediu os quatro casos vê exatamente essa forma. As duas vias
+ * respondem a mesma pergunta — qual coluna colidiu — e nenhuma delas afirma CI.
+ *
+ * Exigir a unicidade antes de ler a coluna não é zelo decorativo, e isto também
+ * foi medido: a violação de chave ESTRANGEIRA em `userId` traz
+ * `DETAIL:  Key (userId)=(...) is not present in table "User".` — mesmo campo,
+ * outro defeito, e sem aspas porque esse caminho do PostgreSQL não cita
+ * identificador. Sem o SQLSTATE 23505 à frente, falta de linha em `User` passaria
+ * por prova de unicidade. Daí também a normalização das aspas: o caminho da
+ * unicidade cita o identificador quando ele precisa (`Key ("userId")=`), o da
+ * chave estrangeira não, e a coluna é a mesma nos dois.
+ */
+const SQLSTATE_DE_UNICIDADE = /(?<![0-9])23505(?![0-9])/u;
+const TEXTO_DE_UNICIDADE = /duplicate key value violates unique constraint/u;
+const CHAVE_DO_DETALHE = /Key \((?<colunas>[^)]+)\)=/u;
+const COLUNA_NO_NOME_DO_INDICE = /unique constraint "PlatformMasterIdentity_(?<coluna>[A-Za-z]+)_(?:key|idx)"/u;
+
+function chaveDaViolacaoDeUnicidade(texto) {
+  const ehUnicidade = SQLSTATE_DE_UNICIDADE.test(texto) || TEXTO_DE_UNICIDADE.test(texto);
+  if (!ehUnicidade) return null;
+  const detalhe = CHAVE_DO_DETALHE.exec(texto);
+  if (detalhe) return detalhe.groups.colunas.replaceAll('"', '').trim();
+  return COLUNA_NO_NOME_DO_INDICE.exec(texto)?.groups?.coluna ?? null;
+}
+
 test('SEM a trava, o replay do MESMO usuário cai na unicidade de userId', { timeout: 120000 }, async () => {
   // O mecanismo que o caso anterior ATRIBUÍA a si e não exercia: sem a trava as
   // duas transações passam pela guarda e as duas tentam inserir, e aí sim
@@ -279,10 +337,10 @@ test('SEM a trava, o replay do MESMO usuário cai na unicidade de userId', { tim
 
   assert.equal(venceram(resultados), 1, 'sem a trava o replay deveria dar exatamente uma vencedora');
   const recusada = resultados.find((r) => r.status === 'rejected');
-  assert.match(
-    String(recusada.reason?.message ?? recusada.reason),
-    /unique constraint "PlatformMasterIdentity_userId/u,
-    'a perdedora falhou por outro motivo: não foi a unicidade de userId que a barrou',
+  const erro = String(recusada.reason?.message ?? recusada.reason);
+  assert.equal(
+    chaveDaViolacaoDeUnicidade(erro), 'userId',
+    `a perdedora não foi barrada pela unicidade de userId. Erro recebido: ${erro}`,
   );
   assert.equal(
     await proprietariosAtivos(schema), 1,
