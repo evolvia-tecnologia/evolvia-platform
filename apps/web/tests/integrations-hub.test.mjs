@@ -53,11 +53,15 @@ test('busca por objetivo e detalhes locais reduzem texto sem prometer conexão',
   assert.match(hub, /Atualizar preparação/u);
   assert.match(hub, /Consultando preparações deste evento/u);
   assert.match(hub, /Preparação concluída\. Nenhum dado é enviado ao provedor/u);
+  assert.match(hub, /Confirmar retirada/u);
   assert.match(hub, /Nenhum dado é enviado ao provedor/u);
   assert.match(hub, /integrations\/preparations/u);
   assert.match(hub, /Criar endpoint/u);
   assert.match(hub, /Emitir chave/u);
   assert.match(hub, /Copiar trecho/u);
+  assert.match(hub, /Copiar segredo/u);
+  assert.match(hub, /Copiar chave/u);
+  assert.match(hub, /refreshToken/u);
   assert.match(hub, /Desativar/u);
   assert.match(hub, /Revogar/u);
   assert.match(hub, /readOnly/u);
