@@ -38,7 +38,10 @@
     "deepmerge-ts": "8.0.0",
     "multer": "2.5.0",
     "proxy-addr": "2.0.8",
-    "body-parser": "2.4.0"
+    "body-parser": "2.4.0",
+    "@prisma/config": {
+      "effect": "3.22.1"
+    }
   },
   "engines": {
     "node": ">=22 <23",
