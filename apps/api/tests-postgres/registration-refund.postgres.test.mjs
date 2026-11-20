@@ -510,6 +510,10 @@ test('a referência de sandbox fica no pedido preparado uma vez, com autorizaç�
   await rejects(resolve(), 503);
   assert.equal(transport.mock.callCount(), 0);
   process.env[orgKey] = organizationId;
+  process.env[tokenKey] = '   ';
+  await rejects(resolve(), 503);
+  assert.equal(transport.mock.callCount(), 0);
+  process.env[tokenKey] = 'fixture';
   transport.mock.mockImplementationOnce(async () => new Response('detalhe reservado', { status: 503 }));
   await assert.rejects(resolve(), error => {
     assert.equal(error.getStatus(), 503);

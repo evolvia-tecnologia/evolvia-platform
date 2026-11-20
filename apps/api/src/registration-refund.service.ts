@@ -493,7 +493,7 @@ export class RegistrationRefundService {
     const organizationId = request.organizationId;
     const accountOrg = process.env.ASAAS_REFUND_SANDBOX_ORGANIZATION_ID;
     const token = process.env.ASAAS_REFUND_SANDBOX_TOKEN;
-    if (accountOrg !== organizationId || !token) throw new ServiceUnavailableException('Conta de homologação indisponível para esta organização.');
+    if (accountOrg !== organizationId || !token?.trim()) throw new ServiceUnavailableException('Conta de homologação indisponível para esta organização.');
     let paymentId: string;
     try {
       paymentId = await lookupSandboxRefundPayment(
