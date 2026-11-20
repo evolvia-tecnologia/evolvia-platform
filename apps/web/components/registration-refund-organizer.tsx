@@ -38,6 +38,7 @@ export default function RegistrationRefundOrganizer({ eventId }: { eventId: stri
 function RefundPanel({ eventId }: { eventId: string }) {
   const [policy, setPolicy] = useState<Policy | null>(null);
   const [windowCode, setWindowCode] = useState<WindowCode>('NONE');
+  const [listLoaded, setListLoaded] = useState(false);
   const [items, setItems] = useState<Item[]>([]);
   const [requestFilter, setRequestFilter] = useState<RequestFilter>('');
   const [nextCursor, setNextCursor] = useState<string | null>(null);
@@ -59,20 +60,31 @@ function RefundPanel({ eventId }: { eventId: string }) {
     const params = new URLSearchParams();
     if (requestFilter) params.set('status', requestFilter);
     const query = params.toString();
-    Promise.all([
+    setListLoaded(false);
+    setPolicy(null);
+    Promise.allSettled([
       api<Policy>(`/events/${encodeURIComponent(eventId)}/refunds/policy`),
       api<RequestPage>(`/events/${encodeURIComponent(eventId)}/refunds/requests${query ? `?${query}` : ''}`),
     ])
-      .then(([nextPolicy, nextRequests]) => {
+      .then(([policyResult, requestsResult]) => {
         if (!active) return;
-        setPolicy(nextPolicy);
-        if (nextPolicy.window) setWindowCode(nextPolicy.window);
-        setItems(nextRequests.items);
-        setCanSimulate(nextRequests.canSimulateRefund === true);
-        setNextCursor(nextRequests.nextCursor);
-        setError('');
+        const messages: string[] = [];
+        if (policyResult.status === 'fulfilled') {
+          setPolicy(policyResult.value);
+          setWindowCode(policyResult.value.window ?? 'NONE');
+        } else {
+          messages.push('Não foi possível carregar a regra de reembolso.');
+        }
+        if (requestsResult.status === 'fulfilled') {
+          setItems(requestsResult.value.items);
+          setCanSimulate(requestsResult.value.canSimulateRefund === true);
+          setNextCursor(requestsResult.value.nextCursor);
+          setListLoaded(true);
+        } else {
+          messages.push('Não foi possível carregar os pedidos de reembolso.');
+        }
+        setError(messages.join(' '));
       })
-      .catch((reason: unknown) => { if (active) setError(reason instanceof Error ? reason.message : 'Não foi possível abrir os reembolsos.'); })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
   }, [eventId, requestFilter]);
@@ -97,6 +109,7 @@ function RefundPanel({ eventId }: { eventId: string }) {
 
   async function save(event: FormEvent) {
     event.preventDefault();
+    if (!policy || loading || saving) return;
     setSaving(true);
     setError('');
     setNotice('');
@@ -187,7 +200,7 @@ function RefundPanel({ eventId }: { eventId: string }) {
             {OPTIONS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
           </select>
         </label>
-        <button type="submit" disabled={loading || saving}>{saving ? 'Publicando…' : 'Publicar regra'}</button>
+        <button type="submit" disabled={!policy || loading || saving}>{saving ? 'Publicando…' : 'Publicar regra'}</button>
       </div>
     </form>
     {policy && <p className={styles.note}>{policy.message}</p>}
@@ -201,7 +214,7 @@ function RefundPanel({ eventId }: { eventId: string }) {
         </select>
       </label>
     </div>
-    {!loading && items.length === 0 && <p role="status">Nenhum pedido de reembolso.</p>}
+    {listLoaded && !loading && items.length === 0 && <p role="status">Nenhum pedido de reembolso.</p>}
     {items.length > 0 && <table className={styles.table}>
       <caption>Pedidos de reembolso</caption>
       <thead>

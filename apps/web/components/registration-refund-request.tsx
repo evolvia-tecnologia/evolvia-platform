@@ -8,6 +8,10 @@ type RequestView = { statusLabel: string; reason: string; decisionNote: string |
 type View = { paid: boolean; current: Eligibility; accepted: (Eligibility & { acceptedAt: string; version: number }) | null; request: RequestView | null };
 
 export default function RegistrationRefundRequest({ slug, token }: { slug: string; token: string }) {
+  return <ParticipantRefund key={JSON.stringify([slug, token])} slug={slug} token={token} />;
+}
+
+function ParticipantRefund({ slug, token }: { slug: string; token: string }) {
   const [view, setView] = useState<View | null>(null);
   const [reason, setReason] = useState('');
   const [loading, setLoading] = useState(true);
