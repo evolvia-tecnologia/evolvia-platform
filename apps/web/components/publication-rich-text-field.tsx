@@ -1,10 +1,11 @@
 'use client';
 
-import { useRef } from 'react';
+import { useState } from 'react';
+import dynamic from 'next/dynamic';
 import PublicRichText from './public-rich-text';
 import styles from './publication-rich-text-field.module.css';
 
-import { applyFormat, type FormatMode } from '../lib/publication-rich-text-format';
+const PublicationCkEditor = dynamic(() => import('./publication-ckeditor'), { ssr: false });
 
 export default function PublicationRichTextField({
   id,
@@ -35,66 +36,59 @@ export default function PublicationRichTextField({
   optional?: boolean;
   onFocus?: () => void;
 }) {
-  const inputRef = useRef<HTMLTextAreaElement>(null);
   const helpId = `${id}-help`;
   const errorId = `${id}-error`;
   const previewId = `${id}-preview`;
-
-  function format(mode: FormatMode) {
-    const field = inputRef.current;
-    if (!field || disabled) return;
-    const result = applyFormat(value, field.selectionStart, field.selectionEnd, mode);
-    if (!result || result.next.length > maxLength) return;
-    onChange(result.next);
-    requestAnimationFrame(() => {
-      field.focus();
-      field.setSelectionRange(result.from, result.to);
-    });
-  }
+  const labelId = `${id}-label`;
+  const [bootError, setBootError] = useState('');
+  const describedBy = `${helpId}${error || bootError ? ` ${errorId}` : ''} ${previewId}`.trim();
+  const shownError = error || bootError;
 
   return <div className={styles.field}>
-    <span className={styles.label} id={`${id}-label`}>
+    <span className={styles.label} id={labelId}>
       {label}
       {required && <strong aria-hidden="true"> *</strong>}
       {optional && <em className={styles.optional}> opcional</em>}
     </span>
     <small id={helpId} className={styles.help}>{help}</small>
-    <div className={styles.toolbar} role="toolbar" aria-label={`Formatação de ${label}`} aria-controls={id}>
-      <button type="button" disabled={disabled} onMouseDown={(event) => event.preventDefault()} onClick={() => format('heading')}>Título</button>
-      <button type="button" disabled={disabled} onMouseDown={(event) => event.preventDefault()} onClick={() => format('bold')}>Negrito</button>
-      <button type="button" disabled={disabled} onMouseDown={(event) => event.preventDefault()} onClick={() => format('italic')}>Itálico</button>
-      <button type="button" disabled={disabled} onMouseDown={(event) => event.preventDefault()} onClick={() => format('list')}>Lista</button>
-      <button type="button" disabled={disabled} onMouseDown={(event) => event.preventDefault()} onClick={() => format('link')}>Link</button>
-      <button type="button" disabled={disabled} onMouseDown={(event) => event.preventDefault()} onClick={() => format('alignLeft')}>Esquerda</button>
-      <button type="button" disabled={disabled} onMouseDown={(event) => event.preventDefault()} onClick={() => format('alignCenter')}>Centro</button>
-      <button type="button" disabled={disabled} onMouseDown={(event) => event.preventDefault()} onClick={() => format('alignRight')}>Direita</button>
-      <button type="button" disabled={disabled} onMouseDown={(event) => event.preventDefault()} onClick={() => format('font:sans')}>Sans</button>
-      <button type="button" disabled={disabled} onMouseDown={(event) => event.preventDefault()} onClick={() => format('font:serif')}>Serif</button>
-      <button type="button" disabled={disabled} onMouseDown={(event) => event.preventDefault()} onClick={() => format('size:14')}>P</button>
-      <button type="button" disabled={disabled} onMouseDown={(event) => event.preventDefault()} onClick={() => format('size:16')}>M</button>
-      <button type="button" disabled={disabled} onMouseDown={(event) => event.preventDefault()} onClick={() => format('size:20')}>G</button>
-      <button type="button" disabled={disabled} onMouseDown={(event) => event.preventDefault()} onClick={() => format('color:navy')}>Azul marinho</button>
-      <button type="button" disabled={disabled} onMouseDown={(event) => event.preventDefault()} onClick={() => format('color:blue')}>Azul</button>
-      <button type="button" disabled={disabled} onMouseDown={(event) => event.preventDefault()} onClick={() => format('color:muted')}>Cinza</button>
-    </div>
-    <textarea
-      ref={inputRef}
+    <div
       id={id}
-      className={styles.input}
-      value={value}
-      onChange={(event) => onChange(event.target.value)}
-      onFocus={() => onFocus?.()}
-      onBlur={(event) => onBlur?.(event.currentTarget.value)}
-      maxLength={maxLength}
-      rows={rows}
-      disabled={disabled}
-      required={required}
-      aria-labelledby={`${id}-label`}
-      aria-invalid={Boolean(error)}
-      aria-describedby={`${helpId}${error ? ` ${errorId}` : ''} ${previewId}`}
-    />
+      className={styles.editor}
+      style={{ minHeight: `${Math.max(rows, 4) * 28}px` }}
+    >
+      {bootError ? (
+        <textarea
+          className={styles.input}
+          value={value}
+          disabled={disabled}
+          required={required}
+          maxLength={maxLength}
+          rows={rows}
+          aria-labelledby={labelId}
+          aria-describedby={describedBy}
+          aria-invalid={Boolean(shownError)}
+          onChange={(event) => onChange(event.target.value)}
+          onBlur={(event) => onBlur?.(event.target.value)}
+          onFocus={onFocus}
+        />
+      ) : (
+        <PublicationCkEditor
+          value={value}
+          onChange={onChange}
+          onBlur={onBlur}
+          onFocus={onFocus}
+          onBootError={setBootError}
+          maxLength={maxLength}
+          disabled={disabled}
+          labelledBy={labelId}
+          describedBy={describedBy}
+          invalid={Boolean(shownError)}
+          required={required}
+        />
+      )}
+    </div>
     <span className={styles.counter}>{value.length}/{maxLength}</span>
-    {error && <small id={errorId} className={styles.error}>{error}</small>}
+    {shownError && <small id={errorId} className={styles.error} role="alert">{shownError}</small>}
     <div className={styles.preview} id={previewId} aria-label="Prévia da formatação">
       <p className={styles.previewTitle}>Assim aparece na página</p>
       {value.trim()

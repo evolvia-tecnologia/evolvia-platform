@@ -54,6 +54,41 @@
   cursor: not-allowed;
 }
 
+.editor {
+  min-width: 0;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+
+.editor :global(.ck.ck-toolbar) {
+  flex-wrap: wrap;
+  border: 0;
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-surface-subtle);
+}
+
+.editor :global(.ck.ck-button) {
+  min-height: var(--space-44);
+  min-width: var(--space-44);
+}
+
+.editor :global(.ck.ck-editor__editable) {
+  min-height: inherit;
+  border: 0;
+  background: var(--color-surface);
+  color: var(--color-text);
+  line-height: var(--line-height-body);
+}
+
+.editor :global(.ck.ck-editor__editable:focus),
+.editor :global(.ck.ck-button:focus-visible) {
+  outline: 3px solid var(--color-focus-on-light);
+  outline-offset: 2px;
+  box-shadow: none;
+}
+
 .input {
   width: 100%;
   border: 1px solid var(--color-border-strong);
@@ -138,6 +173,7 @@
 
 @media (forced-colors: active) {
   .toolbar button,
+  .editor,
   .input,
   .preview {
     border-color: CanvasText;
