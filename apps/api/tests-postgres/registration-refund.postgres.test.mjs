@@ -543,8 +543,16 @@ test('estorno simulado integral e parcial concilia uma vez por pedido em evento 
   const event = await insertEvent(organizationId);
   const { lot, category } = await catalog(event);
   const key = 'EVOLVIA_REFUND_SIMULATION_ORGANIZATION_ID';
-  const beforeValue = process.env[key];
-  t.after(() => { if (beforeValue === undefined) delete process.env[key]; else process.env[key] = beforeValue; });
+  const sandbox = 'ASAAS_REFUND_SANDBOX_ORGANIZATION_ID';
+  const token = 'ASAAS_REFUND_SANDBOX_TOKEN';
+  const previous = [key, sandbox, token].map(name => [name, process.env[name]]);
+  t.after(() => {
+    for (const [name, value] of previous) {
+      if (value === undefined) delete process.env[name]; else process.env[name] = value;
+    }
+  });
+  process.env[sandbox] = organizationId;
+  process.env[token] = 'simulado';
   for (const amountCents of [1200, 750]) {
     const row = await reservation(event, lot, category, { status: 'CONFIRMED', priceCents: 1200, identityHash: digest(), emailHash: digest() });
     const paid = await checkout(row, 'PAID');
@@ -565,6 +573,10 @@ test('estorno simulado integral e parcial concilia uma vez por pedido em evento 
     await rejects(command('ISSUE',people.operator.id),404);
     await rejects(command('ISSUE',people.outsider.id),404);
     await rejects(command('RECONCILE'),409);
+    process.env[sandbox] = otherOrganizationId;
+    await rejects(command('ISSUE'),404);
+    process.env[sandbox] = organizationId;
+    assert.equal(await prisma.mockRefundReceipt.count({where:{requestId:request.id}}),0);
     const sends = await Promise.all(Array.from({length:8},()=>command('ISSUE')));
     assert.deepEqual(sends[0],{id:request.id, amountCents, simulated:true, moneyReturned:false, mockRefundStatus:'ISSUED'});
     assert.ok(sends.every(x=>x.mockRefundStatus==='ISSUED'));
@@ -572,6 +584,10 @@ test('estorno simulado integral e parcial concilia uma vez por pedido em evento 
     await rejects(command('RECONCILE'),409);
     assert.equal((await prisma.mockRefundReceipt.findUniqueOrThrow({where:{requestId:request.id}})).reconciledAt,null);
     await prisma.mockRefundReceipt.update({where:{requestId:request.id},data:{amountCents}});
+    process.env[token] = ' ';
+    await rejects(command('RECONCILE'),404);
+    assert.equal((await prisma.mockRefundReceipt.findUniqueOrThrow({where:{requestId:request.id}})).reconciledAt,null);
+    process.env[token] = 'simulado';
     const confirmations = await Promise.all(Array.from({length:8},()=>command('RECONCILE')));
     assert.ok(confirmations.every(x=>x.moneyReturned===false && x.mockRefundStatus==='RECONCILED'));
     assert.deepEqual(await command('ISSUE'),confirmations[0]);

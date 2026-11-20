@@ -22,6 +22,14 @@ const REFUND_EVENT_STATUS = { in: [EventStatus.PUBLISHED, EventStatus.SUSPENDED,
 
 const ORGANIZER_ROLES = [MembershipRole.OWNER, MembershipRole.ADMIN, MembershipRole.MANAGER];
 
+function simulationOrganization(): string | undefined {
+  const org = process.env.EVOLVIA_REFUND_SIMULATION_ORGANIZATION_ID;
+  if (org && org === process.env.ASAAS_REFUND_SANDBOX_ORGANIZATION_ID && process.env.ASAAS_REFUND_SANDBOX_TOKEN?.trim()) {
+    return org;
+  }
+  return undefined;
+}
+
 function policyError(error: unknown): never {
   if (error instanceof RegistrationRefundPolicyError) throw new BadRequestException(error.message);
   throw error;
@@ -373,9 +381,7 @@ export class RegistrationRefundService {
     const page = rows.slice(0, REFUND_PAGE_SIZE);
     return {
       canSimulateRefund: event.organizerRole === MembershipRole.OWNER
-        && organizationId === process.env.EVOLVIA_REFUND_SIMULATION_ORGANIZATION_ID
-        && organizationId === process.env.ASAAS_REFUND_SANDBOX_ORGANIZATION_ID
-        && Boolean(process.env.ASAAS_REFUND_SANDBOX_TOKEN?.trim()),
+        && organizationId === simulationOrganization(),
       items: page.map((row) => ({
         id: row.id,
         protocol: row.reservation.protocol,
@@ -525,7 +531,7 @@ export class RegistrationRefundService {
   // Both commands operate exclusively on a local simulated receipt. The payment and
   // registration remain unchanged; an organization must explicitly opt into simulation.
   async mockRefund(userId: string, eventId: string, requestId: string, command: 'ISSUE' | 'RECONCILE', now = new Date()) {
-    const org = process.env.EVOLVIA_REFUND_SIMULATION_ORGANIZATION_ID;
+    const org = simulationOrganization();
     if (!org) throw new NotFoundException('Simulação indisponível.');
     return this.prisma.$transaction(async tx => {
       // Serialize every command for this approved request, including a retry after a lost response.
