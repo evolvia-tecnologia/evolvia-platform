@@ -479,7 +479,7 @@ export class RegistrationRefundService {
     if (!request) throw new NotFoundException('Pedido não encontrado.');
     const checkout = request.preparedCheckout ?? request.preparedOrderCheckout;
     if (request.status !== 'APPROVED' || !request.preparedAmountCents ||
-        checkout?.provider !== 'ASAAS' || checkout.status !== 'PAID' || !checkout.providerCheckoutId) {
+        checkout?.provider !== 'ASAAS' || checkout?.status !== 'PAID' || !checkout?.providerCheckoutId) {
       throw new ConflictException('O pedido precisa de preparação e de um checkout Asaas pago e identificado.');
     }
     const result = { id: requestId, processingStatus: 'SANDBOX_PAYMENT_IDENTIFIED' as const, moneyReturned: false };
@@ -524,7 +524,7 @@ export class RegistrationRefundService {
 
   // Both commands operate exclusively on a local simulated receipt. The payment and
   // registration remain unchanged; an organization must explicitly opt into simulation.
-  async mockRefund(userId: string, eventId: string, requestId: string, command: 'ISSUE' | 'RECONCILE') {
+  async mockRefund(userId: string, eventId: string, requestId: string, command: 'ISSUE' | 'RECONCILE', now = new Date()) {
     const org = process.env.EVOLVIA_REFUND_SIMULATION_ORGANIZATION_ID;
     if (!org) throw new NotFoundException('Simulação indisponível.');
     return this.prisma.$transaction(async tx => {
@@ -561,7 +561,7 @@ export class RegistrationRefundService {
       if (!receipt) throw new ConflictException('O pedido ainda não possui comprovante simulado.');
       if (command === 'RECONCILE' && !receipt.reconciledAt) {
         receipt = await tx.mockRefundReceipt.update({
-          where: { requestId }, data: { reconciledAt: new Date() },
+          where: { requestId }, data: { reconciledAt: now },
         });
         action = 'refund.mock_reconciled';
       }

@@ -94,3 +94,16 @@ test('erros de transporte, resposta HTTP e JSON mantêm somente diagnóstico red
     });
   }
 });
+
+test('erro HTTP descarta o corpo quando possível e nunca materializa seu conteúdo', async () => {
+  const { lookupSandboxRefundPayment } = await import('../src/asaas-refund-payment-lookup.ts');
+  const account = { organizationId: scope.organizationId, token: 'simulado' };
+  let cancelled = 0;
+  let reads = 0;
+  for (const body of [undefined, {}, { cancel: async () => { cancelled++; } }]) {
+    const transport = async () => ({ ok: false, status: 503, body, text: async () => { reads++; } });
+    await assert.rejects(lookupSandboxRefundPayment(scope, account, transport), { cause: 'HTTP_503' });
+  }
+  assert.equal(cancelled, 1);
+  assert.equal(reads, 0);
+});

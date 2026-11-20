@@ -551,7 +551,8 @@ test('estorno simulado integral e parcial concilia uma vez por pedido em evento 
     const request = await prisma.registrationRefundRequest.create({ data: {
       organizationId, eventId: event.id, reservationId: row.id, status: 'APPROVED', reason,
     } });
-    const command = (action, actor = people.owner.id) => refunds.mockRefund(actor,event.id,request.id,action);
+    const reconciledAt = new Date('2026-11-19T19:15:00Z');
+    const command = (action, actor = people.owner.id, now = reconciledAt) => refunds.mockRefund(actor,event.id,request.id,action,now);
     delete process.env[key];
     await rejects(command('ISSUE'),404);
     process.env[key] = organizationId;
@@ -574,6 +575,9 @@ test('estorno simulado integral e parcial concilia uma vez por pedido em evento 
     const confirmations = await Promise.all(Array.from({length:8},()=>command('RECONCILE')));
     assert.ok(confirmations.every(x=>x.moneyReturned===false && x.mockRefundStatus==='RECONCILED'));
     assert.deepEqual(await command('ISSUE'),confirmations[0]);
+    await command('RECONCILE', people.owner.id, new Date('2026-11-20T19:15:00Z'));
+    const stored = await prisma.mockRefundReceipt.findUniqueOrThrow({where:{requestId:request.id}});
+    assert.equal(stored.reconciledAt.toISOString(), reconciledAt.toISOString());
     for(const action of ['refund.mock_issued','refund.mock_reconciled']) {
       assert.equal(await prisma.auditLog.count({where:{entityId:request.id,action}}),1);
     }
