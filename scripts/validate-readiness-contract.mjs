@@ -87,6 +87,16 @@ assert.ok(
   !nginxHttp.includes(LEGACY_DOMAIN) && !nginxHttps.includes(LEGACY_DOMAIN),
   'As configurações Nginx canônicas não podem voltar a servir o domínio legado.',
 );
+assert.doesNotMatch(
+  workflow,
+  /diagnose-dev-tls/iu,
+  'O workflow não pode voltar a executar o diagnóstico do alias legado.',
+);
+assert.doesNotMatch(
+  workflow,
+  /\balias[\s_:-]+dev\b/iu,
+  'O workflow não pode voltar a exigir a comprovação do alias legado.',
+);
 
 // Varredura do inventário rastreado pelo git: o mesmo conjunto que `git grep`
 // percorre. Existe porque corrigir uma referência por execução de CI prova
@@ -118,17 +128,8 @@ const EXTENSOES_EXECUTAVEIS = new Set([
   '.yml',
 ]);
 
-// Exceções deliberadas. As três primeiras contêm os tokens dentro das próprias
+// Exceções deliberadas. Contêm os tokens dentro das próprias
 // invariantes negativas ou no registro de desativação.
-//
-// validacao-v02.yml é exceção TEMPORÁRIA: o passo "Comprovar certificado e
-// redirecionamento do alias dev" ainda o referencia, e sem esta isenção a
-// varredura reprovaria por construção, à espera de outro agente. Ao remover o
-// passo, retirar esta entrada no MESMO commit — e então as duas invariantes
-// abaixo passam a valer:
-//
-//   assert.ok(!workflow.includes('bash infra/certbot/diagnose-dev-tls.sh'), '...');
-//   assert.ok(!workflow.includes('Comprovar certificado e redirecionamento do alias dev'), '...');
 //
 // Nenhum arquivo de segurança está isento para contornar ocorrência: a única
 // residual do repositório foi corrigida na origem, em
@@ -137,7 +138,6 @@ const ISENTOS = new Set([
   'scripts/validate-readiness-contract.mjs',
   'apps/web/tests/security-headers.test.mjs',
   'docs/operacao-ssl-homologacao.md',
-  '.github/workflows/validacao-v02.yml',
 ]);
 
 const rastreados = execFileSync('git', ['ls-files', '-z'], {
