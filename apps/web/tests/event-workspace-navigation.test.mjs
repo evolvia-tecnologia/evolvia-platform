@@ -11,10 +11,23 @@ const modules = {
   'next/navigation': url('let currentPath = "/eventos/demo/painel/check-in"; export const useRouter = () => ({replace(){}}); export const usePathname = () => currentPath; export const setPathname = (value) => { currentPath = value; };'),
   '../lib/api': url('export class ApiError extends Error{};export const getToken=()=>null;export const api=()=>{throw new Error("Unexpected request");};'),
   '../lib/event-flow': url(compile('../lib/event-flow.ts')),
+  '../lib/event-status-labels': url(compile('../lib/event-status-labels.ts')),
   './event-admin-dashboard.module.css': url('export default new Proxy({},{get:(_,key)=>key});'),
   './accessibility-panel': url('export default function AccessibilityPanel(){return null;}'),
 };
-const source = compile('../components/event-workspace.tsx').replace(/from ['"]([^'"]+)['"]/g, (_, name) => 'from ' + JSON.stringify(modules[name] ?? name));
+function rewriteImports(source) {
+  const unknown = [];
+  const rewritten = source.replace(/from ['"]([^'"]+)['"]/g, (_, name) => {
+    if (!Object.hasOwn(modules, name)) unknown.push(name);
+    return 'from ' + JSON.stringify(modules[name]);
+  });
+  const names = [...new Set(unknown)];
+  if (names.length > 0) {
+    throw new Error(`O harness de navegação do workspace não conhece o import ${names.map(name => JSON.stringify(name)).join(', ')}.`);
+  }
+  return rewritten;
+}
+const source = rewriteImports(compile('../components/event-workspace.tsx'));
 const {default: Workspace} = await import(url(source));
 const text = node => Array.isArray(node) ? node.map(text).join('') : node && typeof node === 'object' ? text(node.props?.children) : String(node ?? '');
 const nodes = node => Array.isArray(node) ? node.flatMap(nodes) : node && typeof node === 'object' ? [node, ...nodes(node.props?.children)] : [];
@@ -23,6 +36,12 @@ function navigation(scientific, section='check-in', capabilities=[], format='IN_
   const nav = nodes(tree).find(node=>node.props?.['aria-label']==='Navegação do evento');
   return nodes(nav).filter(node=>node.type==='a');
 }
+test('import desconhecido no harness nomeia o módulo', () => {
+  assert.throws(
+    () => rewriteImports("import { x } from '../lib/modulo-novo';\nimport { y } from '../lib/modulo-novo';"),
+    /O harness de navegação do workspace não conhece o import "\.\.\/lib\/modulo-novo"\./u,
+  );
+});
 test('menu renderizado segue preparação, científico, operação e integrações',()=>{
   const links=navigation(true,'check-in',[],'HYBRID');
   assert.deepEqual(links.map(link=>link.props.href),[

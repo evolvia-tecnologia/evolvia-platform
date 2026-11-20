@@ -1,4 +1,5 @@
-import { BadRequestException, ConflictException, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
+import { lookupSandboxRefundPayment } from './asaas-refund-payment-lookup';
+import { BadRequestException, ConflictException, Injectable, NotFoundException, UnauthorizedException, ServiceUnavailableException } from '@nestjs/common';
 import { EventStatus, MembershipRole, Prisma, RegistrationCheckoutStatus, RegistrationRefundRequestStatus, RegistrationReservationStatus } from '@prisma/client';
 import { AuthorizationService } from './authorization.service';
 import { participantHash, normalizeParticipantToken } from './participant-area-policy';
@@ -16,7 +17,18 @@ import {
   type RefundWindow,
 } from './registration-refund-policy';
 
+// Private refund routes remain available for prior purchases after suspension or closure.
+const REFUND_EVENT_STATUS = { in: [EventStatus.PUBLISHED, EventStatus.SUSPENDED, EventStatus.CANCELLED, EventStatus.FINISHED] };
+
 const ORGANIZER_ROLES = [MembershipRole.OWNER, MembershipRole.ADMIN, MembershipRole.MANAGER];
+
+function simulationOrganization(): string | undefined {
+  const org = process.env.EVOLVIA_REFUND_SIMULATION_ORGANIZATION_ID;
+  if (org && org === process.env.ASAAS_REFUND_SANDBOX_ORGANIZATION_ID && process.env.ASAAS_REFUND_SANDBOX_TOKEN?.trim()) {
+    return org;
+  }
+  return undefined;
+}
 
 function policyError(error: unknown): never {
   if (error instanceof RegistrationRefundPolicyError) throw new BadRequestException(error.message);
@@ -242,7 +254,7 @@ export class RegistrationRefundService {
     scope: {
       emailHash: string;
       identityHash: { in: string[] };
-      event: { slug: string; status: EventStatus };
+      event: { slug: string; status: typeof REFUND_EVENT_STATUS };
     },
   ) {
     const select = { id: true, eventId: true, organizationId: true, protocol: true } as const;
@@ -295,7 +307,7 @@ export class RegistrationRefundService {
     const reservation = await this.paidAccountReservation({
       emailHash,
       identityHash: { in: links.map((link) => link.identityHash) },
-      event: { slug: slug.trim().toLowerCase(), status: EventStatus.PUBLISHED },
+      event: { slug: slug.trim().toLowerCase(), status: REFUND_EVENT_STATUS },
     });
     if (!reservation) throw new NotFoundException('Inscrição paga não encontrada.');
     return this.createRequest(reservation, input, userId, now);
@@ -310,7 +322,7 @@ export class RegistrationRefundService {
     const scope = {
       emailHash,
       identityHash: { in: links.map((link) => link.identityHash) },
-      event: { slug: slug.trim().toLowerCase(), status: EventStatus.PUBLISHED },
+      event: { slug: slug.trim().toLowerCase(), status: REFUND_EVENT_STATUS },
     };
     const paidReservation = await this.paidAccountReservation(scope);
     const reservation = paidReservation ?? await this.prisma.eventRegistrationReservation.findFirst({
@@ -362,12 +374,14 @@ export class RegistrationRefundService {
         decisionNote: true,
         createdAt: true,
         decidedAt: true,
-        preparedAmountCents: true,
+        preparedAmountCents: true, sandboxPaymentId: true, mockReceipt: { select: { reconciledAt: true } },
         reservation: { select: { protocol: true } },
       },
     });
     const page = rows.slice(0, REFUND_PAGE_SIZE);
     return {
+      canSimulateRefund: event.organizerRole === MembershipRole.OWNER
+        && organizationId === simulationOrganization(),
       items: page.map((row) => ({
         id: row.id,
         protocol: row.reservation.protocol,
@@ -378,6 +392,8 @@ export class RegistrationRefundService {
         createdAt: row.createdAt.toISOString(),
         decidedAt: row.decidedAt?.toISOString() ?? null,
         preparedAmountCents: row.preparedAmountCents,
+        sandboxPaymentIdentified: row.sandboxPaymentId !== null,
+        mockRefundStatus: row.mockReceipt ? (row.mockReceipt.reconciledAt ? 'RECONCILED' : 'ISSUED') : null,
       })),
       nextCursor: rows.length > REFUND_PAGE_SIZE ? page.at(-1)?.id ?? null : null,
     };
@@ -408,10 +424,10 @@ export class RegistrationRefundService {
     const request = await tx.registrationRefundRequest.findFirst({
       where: {
         id: requestId, eventId,
-        reservation: { event: { organization: { memberships: { some: { userId, role: 'OWNER', status: 'ACTIVE' } } } } },
+        reservation: { event: { organization: { memberships: { some: { userId, role: MembershipRole.OWNER, status: 'ACTIVE' } } } } },
       },
       select: {
-        organizationId: true, status: true, preparedAmountCents: true,
+        organizationId: true, status: true, preparedAmountCents: true, sandboxPaymentId: true,
         reservation: { select: {
           status: true, finalPriceCents: true, checkout: { select: paymentFields },
           orderEntry: { select: { finalPriceCents: true, order: { select: { checkout: { select: paymentFields } } } } },
@@ -423,7 +439,7 @@ export class RegistrationRefundService {
     const result = { id: requestId, amountCents, moneyReturned: false, processingStatus: 'AWAITING_PAYMENT_REFERENCE' as const };
     if (request.preparedAmountCents !== null) {
       if (request.preparedAmountCents !== amountCents) throw new ConflictException('Este pedido já tem outro valor preparado.');
-      return result;
+      return request.sandboxPaymentId ? { ...result, processingStatus: 'SANDBOX_PAYMENT_IDENTIFIED' as const } : result;
     }
     const { reservation } = request;
     const entry = reservation.orderEntry;
@@ -451,6 +467,117 @@ export class RegistrationRefundService {
       metadata: { amountCents, paymentKind: entry ? 'ORDER' : 'RESERVATION' },
     } });
     return result;
+  }
+
+  async resolveSandboxPayment(userId: string, eventId: string, requestId: string) {
+    const authorized = {
+      id: requestId, eventId,
+      reservation: { event: { organization: { memberships: { some: { userId, role: MembershipRole.OWNER, status: 'ACTIVE' as const } } } } },
+    };
+    const fields = { id: true, provider: true, providerCheckoutId: true, status: true } as const;
+    const request = await this.prisma.registrationRefundRequest.findFirst({
+      where: authorized,
+      select: {
+        organizationId: true, status: true, preparedAmountCents: true, sandboxPaymentId: true,
+        preparedCheckout: { select: fields }, preparedOrderCheckout: { select: fields },
+      },
+    });
+    if (!request) throw new NotFoundException('Pedido não encontrado.');
+    const checkout = request.preparedCheckout ?? request.preparedOrderCheckout;
+    if (request.status !== 'APPROVED' || !request.preparedAmountCents ||
+        checkout?.provider !== 'ASAAS' || checkout?.status !== 'PAID' || !checkout?.providerCheckoutId) {
+      throw new ConflictException('O pedido precisa de preparação e de um checkout Asaas pago e identificado.');
+    }
+    const result = { id: requestId, processingStatus: 'SANDBOX_PAYMENT_IDENTIFIED' as const, moneyReturned: false };
+    if (request.sandboxPaymentId) return result;
+    const organizationId = request.organizationId;
+    const accountOrg = process.env.ASAAS_REFUND_SANDBOX_ORGANIZATION_ID;
+    const token = process.env.ASAAS_REFUND_SANDBOX_TOKEN;
+    if (accountOrg !== organizationId || !token?.trim()) throw new ServiceUnavailableException('Conta de homologação indisponível para esta organização.');
+    let paymentId: string;
+    try {
+      paymentId = await lookupSandboxRefundPayment(
+        { organizationId, eventId, providerCheckoutId: checkout.providerCheckoutId },
+        { organizationId: accountOrg, token },
+      );
+    } catch (error) {
+      // The adapter owns the transport and emits only these diagnostic categories.
+      const code = error instanceof Error ? error.cause : undefined;
+      const cause = typeof code === 'string' && /^(TRANSPORT|INVALID_JSON|HTTP_[1-5][0-9]{2})$/u.test(code)
+        ? code : 'UNVERIFIED_PAYMENT';
+      throw new ServiceUnavailableException('Não foi possível identificar a cobrança na homologação.', { cause });
+    }
+    const source = { id: checkout.id, provider: 'ASAAS', status: 'PAID' as const, providerCheckoutId: checkout.providerCheckoutId };
+    const scope = {
+      ...authorized, organizationId, status: 'APPROVED' as const, preparedAmountCents: request.preparedAmountCents,
+      ...(request.preparedCheckout ? { preparedCheckout: source } : { preparedOrderCheckout: source }),
+    };
+    return this.prisma.$transaction(async tx => {
+      const saved = await tx.registrationRefundRequest.updateMany({
+        where: { ...scope, sandboxPaymentId: null }, data: { sandboxPaymentId: paymentId },
+      });
+      if (!saved.count) {
+        if (await tx.registrationRefundRequest.findFirst({ where: { ...scope, sandboxPaymentId: paymentId }, select: { id: true } })) return result;
+        throw new ConflictException('O pedido ou a referência mudou durante a consulta.');
+      }
+      await tx.auditLog.create({ data: { organizationId, eventId, actorUserId: userId, entityId: requestId,
+        entityType: 'RegistrationRefundRequest', action: 'refund.sandbox_payment_identified',
+        metadata: { amountCents: request.preparedAmountCents },
+      } });
+      return result;
+    });
+  }
+
+  // Both commands operate exclusively on a local simulated receipt. The payment and
+  // registration remain unchanged; an organization must explicitly opt into simulation.
+  async mockRefund(userId: string, eventId: string, requestId: string, command: 'ISSUE' | 'RECONCILE', now = new Date()) {
+    const org = simulationOrganization();
+    if (!org) throw new NotFoundException('Simulação indisponível.');
+    return this.prisma.$transaction(async tx => {
+      // Serialize every command for this approved request, including a retry after a lost response.
+      const locked = await tx.$queryRaw<Array<{ id: string }>>`
+        SELECT r."id" FROM "RegistrationRefundRequest" r
+        JOIN "OrganizationMembership" m ON m."organizationId" = r."organizationId"
+        WHERE r."id" = ${requestId} AND r."eventId" = ${eventId} AND r."organizationId" = ${org}
+          AND m."userId" = ${userId} AND m."role" = 'OWNER' AND m."status" = 'ACTIVE'
+        FOR UPDATE OF r FOR SHARE OF m
+      `;
+      if (!locked.length) throw new NotFoundException('Pedido não encontrado.');
+      const request = await tx.registrationRefundRequest.findUniqueOrThrow({
+        where: { id: requestId }, select: {
+          status: true, preparedAmountCents: true, sandboxPaymentId: true, mockReceipt: true,
+          preparedCheckout: { select: { status: true } }, preparedOrderCheckout: { select: { status: true } },
+        },
+      });
+      const payment = request.preparedCheckout ?? request.preparedOrderCheckout;
+      const amountCents = request.preparedAmountCents;
+      const paymentId = request.sandboxPaymentId;
+      if (request.status !== 'APPROVED' || !amountCents || !paymentId || payment?.status !== 'PAID') {
+        throw new ConflictException('A simulação exige valor preparado e cobrança paga identificada.');
+      }
+      let receipt = request.mockReceipt;
+      let action: string | undefined;
+      if (receipt && (receipt.paymentId !== paymentId || receipt.amountCents !== amountCents)) {
+        throw new ConflictException('O comprovante simulado diverge do pedido.');
+      }
+      if (command === 'ISSUE' && !receipt) {
+        receipt = await tx.mockRefundReceipt.create({ data: { requestId, paymentId, amountCents } });
+        action = 'refund.mock_issued';
+      }
+      if (!receipt) throw new ConflictException('O pedido ainda não possui comprovante simulado.');
+      if (command === 'RECONCILE' && !receipt.reconciledAt) {
+        receipt = await tx.mockRefundReceipt.update({
+          where: { requestId }, data: { reconciledAt: now },
+        });
+        action = 'refund.mock_reconciled';
+      }
+      if (action) await tx.auditLog.create({ data: {
+        organizationId: org, eventId, actorUserId: userId, action,
+        entityType: 'RegistrationRefundRequest', entityId: requestId, metadata: { amountCents, simulated: true },
+      } });
+      return { id: requestId, amountCents, simulated: true, moneyReturned: false,
+        mockRefundStatus: receipt.reconciledAt ? 'RECONCILED' : 'ISSUED' };
+    });
   }
 
   async decide(userId: string, eventId: string, requestId: string, input: unknown, now = new Date()) {
@@ -702,8 +829,8 @@ export class RegistrationRefundService {
       select: { id: true, organizationId: true, startDate: true, timeZone: true, status: true },
     });
     if (!event?.organizationId) throw new NotFoundException('Evento não encontrado.');
-    await this.authorization.requireRole(userId, event.organizationId, ORGANIZER_ROLES);
-    return event;
+    const membership = await this.authorization.requireRole(userId, event.organizationId, ORGANIZER_ROLES);
+    return { ...event, organizerRole: membership.role };
   }
 
   private async sessionReservation(slug: string, authorization: string | undefined) {
@@ -715,7 +842,7 @@ export class RegistrationRefundService {
         tokenHash: participantHash(token),
         revokedAt: null,
         expiresAt: { gt: new Date() },
-        reservation: { event: { slug: slug.trim().toLowerCase(), status: EventStatus.PUBLISHED } },
+        reservation: { event: { slug: slug.trim().toLowerCase(), status: REFUND_EVENT_STATUS } },
       },
       select: { reservationId: true, eventId: true, organizationId: true, reservation: { select: { protocol: true } } },
     });

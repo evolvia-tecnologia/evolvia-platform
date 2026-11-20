@@ -3,17 +3,8 @@
 import Link from 'next/link';
 import { FormEvent, useRef, useState } from 'react';
 import { api } from '../lib/api';
+import { EVENT_STATUS_LABELS, type EventStatusCode } from '../lib/event-status-labels';
 import styles from './publication-release-gate.module.css';
-
-type EventStatus =
-  | 'DRAFT'
-  | 'SETUP'
-  | 'HOMOLOGATION'
-  | 'READY_TO_PUBLISH'
-  | 'PUBLISHED'
-  | 'SUSPENDED'
-  | 'FINISHED'
-  | 'CANCELLED';
 
 type TargetStatus = 'SETUP' | 'HOMOLOGATION' | 'READY_TO_PUBLISH' | 'PUBLISHED';
 
@@ -28,17 +19,6 @@ type LifecyclePermissions = {
   canReturnToSetup: boolean;
   canApproveHomologation: boolean;
   canPublish: boolean;
-};
-
-const STATUS_LABELS: Record<EventStatus, string> = {
-  DRAFT: 'Rascunho',
-  SETUP: 'Em configuração',
-  HOMOLOGATION: 'Em homologação',
-  READY_TO_PUBLISH: 'Pronto para publicar',
-  PUBLISHED: 'Publicado',
-  SUSPENDED: 'Suspenso',
-  FINISHED: 'Finalizado',
-  CANCELLED: 'Cancelado',
 };
 
 const SUCCESS_MESSAGES: Record<TargetStatus, string> = {
@@ -72,7 +52,7 @@ export default function PublicationReleaseGate({
   const [confirmation, setConfirmation] = useState('');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
-  const normalizedStatus = status in STATUS_LABELS ? status as EventStatus : 'DRAFT';
+  const normalizedStatus = status in EVENT_STATUS_LABELS ? status as EventStatusCode : 'DRAFT';
   const blocked = hasUnsavedChanges || busyTarget !== null;
 
   const transition = async (targetStatus: TargetStatus, explicitConfirmation?: string) => {
@@ -118,7 +98,7 @@ export default function PublicationReleaseGate({
         <h2 id="publication-release-title">Homologação e publicação</h2>
         <p>A EVA mostra o que falta, mas somente uma pessoa autorizada pode avançar cada etapa.</p>
       </div>
-      <span className={styles.status}>Estado: {STATUS_LABELS[normalizedStatus]}</span>
+      <span className={styles.status}>Estado: {EVENT_STATUS_LABELS[normalizedStatus]}</span>
     </div>
 
     <ol className={styles.timeline} aria-label="Etapas da publicação">
