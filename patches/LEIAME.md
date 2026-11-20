@@ -25,43 +25,62 @@ git apply patches/<nome>.patch
 
 # 3. Confirme o resultado.
 git hash-object apps/api/src/<arquivo>
-#    tem de bater com o "blob de resultado"
+#    compare com o "blob de resultado", quando houver
 ```
 
 Se o passo 1 não bater, **não force**: o arquivo mudou desde a geração do patch
-e quem o escreveu precisa regerar sobre a base nova. `git apply` sem
-`--3way` recusa por conta própria, e isso é a proteção funcionando.
+e quem o escreveu precisa regerar sobre a base nova. `git apply` sem `--3way`
+recusa por conta própria, e isso é a proteção funcionando.
 
-## Patches abertos
+## Duas classes de patch, e a diferença importa
 
-| patch | arquivo | blob de origem | blob de resultado | referência |
-|---|---|---|---|---|
-| `691-fiacao-inscricao.patch` | `apps/api/src/registration-reservations.service.ts` | `31974e10ff31d89d04a69eacd6f4e3972816f536` | `88ca8208ac7a201bb53c584f2a5a348b63e0d7cd` | #691 |
+**Com blob de resultado.** O autor reconstruiu o arquivo inteiro em disco,
+aplicou o patch e registrou o hash do resultado. A conferência é de ponta a
+ponta.
 
-### `691-fiacao-inscricao.patch`
+**Sem blob de resultado.** O autor validou que o patch APLICA — âncoras
+conferidas por asserção, diff gerado por script, aplicação testada contra um
+arquivo simulado — mas não reconstruiu o arquivo todo, porque retranscrever um
+arquivo crítico à mão é o risco que este diretório existe para evitar. A
+garantia do lado de quem aplica é o próprio `git apply`, que recusa qualquer
+divergência de contexto sem alterar nada, mais o diffstat esperado. **Devolva o
+`git hash-object` resultante** para o autor registrar.
 
-Liga o ponto de consumo `nova_inscricao` da moderação (#691). Quatro hunks, e
-**nenhuma linha existente é alterada ou removida** — só acréscimos:
+## Patches
 
-1. um import de `platform-moderation-enforcement`;
-2. o método privado `exigirSemBloqueioDeModeracao(tx, eventId)`;
-3. uma chamada em `reserveOrder`, dentro da transação;
-4. uma chamada em `reserve`, dentro da transação.
+| patch | arquivo | blob de origem | blob de resultado | diffstat | referência |
+|---|---|---|---|---|---|
+| `691-fiacao-inscricao.patch` | `registration-reservations.service.ts` | `31974e10ff31d89d04a69eacd6f4e3972816f536` | `88ca8208ac7a201bb53c584f2a5a348b63e0d7cd` | +35/-0 | #691 — **aplicado** em `7a7d75dc` |
+| `691-fiacao-pagamento.patch` | `registration-order-checkout.service.ts` | `4ef8d13bd7e9c84fd3b2addc0823e9828c16bc71` | a confirmar na aplicação | +35/-0 | #691 |
 
-As duas chamadas ficam logo após a conferência de `EventStatus.PUBLISHED` e
-antes de qualquer leitura de catálogo ou escrita. Dentro da transação de
-propósito: fora dela haveria janela entre perguntar e reservar, e uma suspensão
-aplicada nesse intervalo deixaria passar exatamente a inscrição que ela existe
-para impedir.
+### `691-fiacao-inscricao.patch` — aplicado
 
-A recusa reusa a frase de evento indisponível que o método já usa, para que a
-apresentação pública não conte que há moderação em curso.
+Ligou o ponto de consumo `nova_inscricao`. Aplicado em `7a7d75dc` com +35/-0 num
+arquivo só, que confere com o esperado.
 
-Verificado antes de entregar: `git apply --check` passa sobre o blob de origem,
-e aplicar reproduz exatamente o blob de resultado. Não é um diff descrito de
-memória.
+Quatro hunks, nenhuma linha existente alterada: import, método privado
+`exigirSemBloqueioDeModeracao(tx, eventId)`, e duas chamadas — `reserveOrder` e
+`reserve` — ambas DENTRO da transação, logo após a conferência de
+`EventStatus.PUBLISHED`.
 
-**Depois de aplicar**, o ponto correspondente em `PONTOS_DE_CONSUMO`
-(`platform-moderation-enforcement.ts`) deixa de ser pendência, e a prova em
-PostgreSQL da recusa de inscrição nova pode entrar em
-`apps/api/tests-postgres/`.
+### `691-fiacao-pagamento.patch`
+
+Liga o ponto `novo_pagamento`. Três hunks, nenhuma linha existente alterada.
+
+**O lugar da conferência é a decisão deste patch.** Ela fica entre dois limites
+que não podem ser invertidos:
+
+- **depois** dos retornos antecipados que devolvem checkout ACTIVE ou PAID
+  existente, porque cobrança em andamento precisa continuar legível e
+  conciliável — suspender um evento não apaga a cobrança de quem já está
+  pagando, e o webhook do provedor também não passa por aqui;
+- **antes** de `intent.prepare`, que cria a linha de checkout — conferir depois
+  dela deixaria uma linha CREATING órfã para um evento que nunca vai cobrar.
+
+A conferência **não é transacional**, e não dá para ser: a chamada ao provedor
+acontece fora de transação. A janela existe e está declarada no próprio
+comentário do código. O que a estreita é `nova_inscricao`, já aplicado: evento
+suspenso não acumula pedido novo.
+
+Validado por aplicação contra arquivo simulado; blob de resultado a confirmar
+quem aplicar.

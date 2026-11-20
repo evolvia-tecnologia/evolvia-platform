@@ -1,0 +1,57 @@
+--- a/apps/api/src/registration-order-checkout.service.ts
++++ b/apps/api/src/registration-order-checkout.service.ts
+@@ -13,6 +13,7 @@
+ import type { ConfirmedRegistrationNotice } from './integration-foundation.policy';
+ import { PaidEventCommissionError, asaasOrganizerSplit, negotiatedCommissionPercent, normalizeFeeBearer, quotePlatformCommission, registrationCountry, type CommissionQuote } from './paid-event-commission.policy';
+ import { PrismaService } from './prisma.service';
++import { podeOperar } from './platform-moderation-enforcement';
+ import { normalizeIdempotencyKey, RegistrationReservationPolicyError } from './registration-reservations-policy';
+ import { RegistrationOrderCheckoutIntentService } from './registration-order-checkout-intent.service';
+ import { requirePersistedGroupRefundConsent } from './registration-order-refund-acceptance';
+@@ -50,6 +51,39 @@
+     };
+   }
+ 
++  /**
++   * Cobrança NOVA é recusada em evento sob moderação da plataforma.
++   *
++   * O lugar importa. Esta conferência vem DEPOIS dos retornos antecipados que
++   * devolvem checkout ACTIVE ou PAID existente, de propósito: cobrança em
++   * andamento precisa continuar legível e conciliável. Suspender um evento não
++   * pode apagar a cobrança de quem já está pagando — e o webhook do provedor
++   * também não passa por aqui, porque barrá-lo perderia dinheiro em trânsito.
++   *
++   * E vem ANTES de `intent.prepare`, que cria a linha de checkout: conferir
++   * depois dela deixaria uma linha CREATING órfã para um evento que nunca vai
++   * cobrar.
++   *
++   * Não é transacional, e não dá para ser: a chamada ao provedor acontece fora
++   * de transação, por necessidade. A janela entre esta leitura e a cobrança
++   * existe e fica declarada. O que a estreita de verdade não é um lock, é o
++   * ponto de consumo `nova_inscricao`, que já barra reserva nova — um evento
++   * suspenso não acumula pedidos novos, e os pedidos anteriores são exatamente
++   * a "cobrança em andamento" que se quer conservar.
++   *
++   * A recusa reusa `Pedido não encontrado.`, a mesma frase que o método já usa, para que a
++   * apresentação pública não conte que há moderação em curso.
++   */
++  private async exigirSemBloqueioDeModeracao(eventId: string): Promise<void> {
++    const moderacao = await this.prisma.platformEventModeration.findUnique({
++      where: { eventId },
++      select: { state: true },
++    });
++    if (!podeOperar(moderacao, 'novo_pagamento').permitido) {
++      throw new NotFoundException('Pedido não encontrado.');
++    }
++  }
++
+   async getStatus(slugValue: string, orderId: string, rawKey?: string) {
+     let key: string;
+     try { key = normalizeIdempotencyKey(rawKey); }
+@@ -133,5 +167,6 @@
+     }
+     // Existing paid/active checkouts remain readable when the provider is
+     // temporarily disabled; only a genuinely new charge needs live gateway.
++    await this.exigirSemBloqueioDeModeracao(event.id);
+     await requirePersistedGroupRefundConsent(this.prisma, { orderId, eventId: event.id, organizationId });
+     if (!this.gateway.isConfigured()) throw new UnprocessableEntityException('O pagamento está temporariamente indisponível.');
