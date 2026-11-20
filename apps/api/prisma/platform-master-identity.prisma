@@ -1,0 +1,57 @@
+enum PlatformMasterRole {
+  OWNER
+  DELEGADO
+}
+
+enum PlatformMasterStatus {
+  ACTIVE
+  SUSPENDED
+}
+
+enum PlatformCeremonyKind {
+  REGISTRATION
+  AUTHENTICATION
+}
+
+model PlatformMasterIdentity {
+  id                       String                @id @default(cuid())
+  userId                   String                @unique
+  role                     PlatformMasterRole
+  status                   PlatformMasterStatus  @default(ACTIVE)
+  provisionedByNote        String                @db.VarChar(200)
+  provisionedAt            DateTime              @default(now())
+  pendingChallenge         String?               @unique @db.VarChar(255)
+  pendingChallengeKind     PlatformCeremonyKind?
+  pendingChallengeExpires  DateTime?
+
+  @@index([role, status])
+}
+
+model PlatformWebAuthnCredential {
+  id           String   @id @default(cuid())
+  identityId   String
+  credentialId String   @unique @db.VarChar(255)
+  publicKey    String   @db.VarChar(1024)
+  counter      Int      @default(0)
+  label        String   @db.VarChar(80)
+  backedUp     Boolean  @default(false)
+  transports   String   @default("") @db.VarChar(120)
+  createdAt    DateTime @default(now())
+  lastUsedAt   DateTime?
+
+  @@index([identityId, createdAt])
+}
+
+model PlatformMasterSession {
+  id             String    @id @default(cuid())
+  identityId     String
+  tokenHash      String    @unique @db.VarChar(64)
+  secondFactorAt DateTime
+  stepUpAt       DateTime?
+  expiresAt      DateTime
+  revokedAt      DateTime?
+  createdAt      DateTime  @default(now())
+
+  @@index([identityId, createdAt])
+  @@index([expiresAt])
+}
