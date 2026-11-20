@@ -1,3 +1,4 @@
+import { setTimeout as delay } from 'node:timers/promises';
 import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 import { Prisma, type PrismaClient } from '@prisma/client';
 import { FiscalInvoicePolicyError, validateFiscalSetup, type FiscalSetup } from './nfse-draft-policy';
@@ -41,6 +42,8 @@ export async function readOrPrepareFiscalDraft(
       if (error instanceof FiscalInvoicePolicyError) throw new NotFoundException('Recibo indisponível.');
       if (!(error instanceof Prisma.PrismaClientKnownRequestError) || !['P2034','P2002'].includes(error.code)) throw error;
       if (attempt >= 4) throw new ConflictException('Prévia em atualização. Repita a consulta.');
+      const windowMs = 10 * 2 ** (attempt - 1);
+      await delay(windowMs + Math.floor(Math.random() * windowMs));
     }
   }
 }
