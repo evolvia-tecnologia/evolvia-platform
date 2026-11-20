@@ -1,4 +1,5 @@
 import { Body, Controller, Get, Param, Put, Req, UseGuards } from '@nestjs/common';
+import { prepareFiscalAdapterPreview } from './nfse-adapter-preview';
 import type { FiscalSetup } from './nfse-draft-policy';
 import { AuthGuard, AuthenticatedRequest } from './auth.guard';
 import { SaveEventFinancialResponsibilityDto } from './event-financial-responsibility.dto';
@@ -12,6 +13,13 @@ export class EventFinancialResponsibilityController {
   @Get('receipts/:receiptId/nfse-draft')
   fiscalDraft(@Req() request: AuthenticatedRequest, @Param('eventId') eventId: string, @Param('receiptId') receiptId: string) {
     return this.responsibility.fiscalDraft(request.user!.id, eventId, receiptId);
+  }
+
+  @Get('receipts/:receiptId/nfse-draft/adapters/:provider')
+  async fiscalAdapterPreview(@Req() request: AuthenticatedRequest, @Param('eventId') eventId: string,
+    @Param('receiptId') receiptId: string, @Param('provider') provider: string) {
+    const draft = await this.responsibility.fiscalDraft(request.user!.id, eventId, receiptId);
+    return prepareFiscalAdapterPreview(provider, draft);
   }
 
   @Put('receipts/:receiptId/nfse-draft')

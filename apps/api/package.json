@@ -11,12 +11,16 @@
     "prisma:migrate:deploy": "prisma migrate deploy",
     "test:unit": "node --test tests/*.test.mjs"
   },
+  "prisma": {
+    "schema": "./prisma"
+  },
   "dependencies": {
     "@nestjs/common": "11.1.28",
     "@nestjs/core": "11.1.28",
     "@nestjs/jwt": "11.0.2",
     "@nestjs/platform-express": "11.1.28",
     "@prisma/client": "6.19.3",
+    "@simplewebauthn/server": "14.1.0",
     "bcryptjs": "3.0.3",
     "class-transformer": "0.5.1",
     "class-validator": "0.14.4",

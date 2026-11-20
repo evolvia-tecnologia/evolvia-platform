@@ -68,6 +68,21 @@ test('prévia fiscal HTTP persiste uma vez e revalida organização, recibo e pa
   assert.equal((await send(token, { ...setup, recipientId: 'other' })).status, 409);
   assert.equal((await (await send(token)).json()).recipientId, setup.recipientId);
   assert.equal((await send(outsider.token)).status, 404);
+  const headers = { authorization: 'Bearer ' + token };
+  for (const provider of ['enotas', 'notazz']) {
+    const adapterUrl = url + '/adapters/' + provider;
+    assert.equal((await fetch(adapterUrl, { headers: { authorization: 'Bearer ' + outsider.token } })).status, 404);
+    const response = await fetch(adapterUrl, { headers });
+    assert.equal(response.status, 200);
+    const preview = await response.json();
+    assert.equal(preview.provider, provider);
+    assert.equal(preview.operation, 'PREVIEW');
+    assert.equal(preview.issueAuthorized, false);
+    assert.equal(preview.service.amountCents, 750);
+    assert.equal(preview.source.receiptId, receipt.id);
+    assert.equal(preview.idempotencyKey, (await (await send(token)).json()).idempotencyKey);
+  }
+  assert.equal((await fetch(url + '/adapters/unknown', { headers })).status, 404);
   await db.eventRegistrationCheckout.update({ where: { id: checkout.id }, data: { status: 'CANCELED' } });
   assert.equal((await send(token)).status, 404);
 });

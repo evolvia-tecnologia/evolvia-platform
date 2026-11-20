@@ -6,6 +6,7 @@ import {
   normalizeRaffle,
 } from './credential-raffle-policy';
 import { AuthorizationService } from './authorization.service';
+import { OperatorCapabilityRepository } from './operator-capability.repository';
 import {
   activeCheckedInAt,
   activeDeliveredAt,
@@ -21,8 +22,8 @@ import { eventCalendarDay, PresencePolicyError, presenceDay, presenceReversalRea
 import { printedCredential } from './credential-label';
 import { issueCheckInCode } from './check-in-policy';
 import {
-  categoryLabelTemplates, labelTemplateForCategory, normalizeCategoryLabelFields,
-  updateCategoryLabelTemplate, categoryBadgeItems,
+  categoryLabelTemplates, normalizeCategoryLabelFields,
+  updateCategoryLabelTemplate, categoryBadgeItems, normalizeLabelFieldStyles,
 } from './credential-category-template.policy';
 import {
   DeskPolicyError,
@@ -112,7 +113,11 @@ function kitPolicyError(error: unknown): never {
 
 @Injectable()
 export class EventDeskService {
-  constructor(private readonly prisma: PrismaService, private readonly authorization: AuthorizationService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly authorization: AuthorizationService,
+    private readonly impressoes: OperatorCapabilityRepository,
+  ) {}
 
   private async eventFor(userId: string, eventId: string) {
     const event = await this.prisma.event.findUnique({
@@ -405,7 +410,7 @@ export class EventDeskService {
       where: { eventId: event.id, code: 'credential' },
       select: { config: true },
     });
-    const orderedFields = labelTemplateForCategory(config?.config, reservation.category.id);
+    const template = categoryLabelTemplates(config?.config).find((item) => item.categoryId === reservation.category.id);
     const credential = printedCredential(
       event.name,
       reservation.registrationData,
@@ -416,9 +421,30 @@ export class EventDeskService {
       process.env.JWT_SECRET ?? '',
       readLabelConfig(config?.config),
     );
-    const orderedContent = categoryBadgeItems(reservation.registrationData, orderedFields);
+    // Emitir o conteúdo da etiqueta é TENTATIVA, nunca conclusão: arquivo
+    // gerado não é papel impresso. A razão canônica recebe ISSUED aqui, e
+    // só uma confirmação explícita grava CONFIRMED — que é o único tipo que
+    // `jaImprimiu` conta, logo o único que passa a exigir reimpressão.
+    //
+    // Identidade e escopo vêm do servidor: `userId` do token, `organizationId`
+    // e `eventId` do próprio evento, `reservationId` da reserva já resolvida.
+    // Nada disso vem do corpo da requisição.
+    const sequence = await this.impressoes.registrarTentativaDeImpressao({
+      organizationId: event.organizationId!,
+      eventId: event.id,
+      reservationId: reservation.id,
+      actorUserId: userId,
+    });
+    // Never replace a historical event-wide label with hardcoded category
+    // defaults. Until the organizer explicitly saves a category template,
+    // the existing name/company/extra fields, QR/barcode mode and paper
+    // settings remain the actual print contract for that category.
+    if (!template) return { ...credential, emissao: { sequence, concluida: false } };
+    const orderedFields = template.fields;
+    const orderedContent = categoryBadgeItems(reservation.registrationData, orderedFields, template.styles);
     return {
       ...credential, name: null, company: null, lines: [], category: null,
+      emissao: { sequence, concluida: false },
       orderedContent,
       qr: orderedFields.includes('qr')
         ? issueCheckInCode(event.id, reservation.id, process.env.JWT_SECRET ?? '')
@@ -445,21 +471,34 @@ export class EventDeskService {
       .filter((field) => !field.appliesToCategoryIds?.length || field.appliesToCategoryIds.includes(categoryId))
       .map((field) => field.code);
     let fields: string[];
+    let styles: ReturnType<typeof normalizeLabelFieldStyles>;
+    let preserveExistingStyles = false;
     try {
       const body = input && typeof input === 'object' && !Array.isArray(input) ? input as Record<string, unknown> : {};
-      if (Object.keys(body).some((key) => key !== 'fields')) throw new DeskPolicyError('Configuração de etiqueta inválida.');
+      if (Object.keys(body).some((key) => key !== 'fields' && key !== 'styles')) throw new DeskPolicyError('Configuração de etiqueta inválida.');
       fields = normalizeCategoryLabelFields(body.fields, allowed);
+      // Older clients send only fields. Omission must not erase formatting
+      // already saved for this category; explicit styles: {} still clears it.
+      preserveExistingStyles = !Object.prototype.hasOwnProperty.call(body, 'styles');
+      styles = normalizeLabelFieldStyles(body.styles, fields);
     } catch (error) { policyError(error); }
 
     for (let attempt = 0; attempt < 3; attempt += 1) {
       try {
-        await this.prisma.$transaction(async (tx) => {
+        const savedStyles = await this.prisma.$transaction(async (tx) => {
           const cap = await tx.eventCapability.findFirst({
             where: { eventId: event.id, code: 'credential', status: CapabilityStatus.ACTIVE },
             select: { config: true },
           });
           if (!cap) throw new NotFoundException('Credenciamento indisponível.');
-          const config = updateCategoryLabelTemplate(cap.config, categoryId, fields);
+          // Resolve historical formatting inside the serializable transaction,
+          // so a concurrent category edit cannot be silently overwritten.
+          const historical = categoryLabelTemplates(cap.config)
+            .find((item) => item.categoryId === categoryId)?.styles ?? {};
+          const effectiveStyles = preserveExistingStyles
+            ? Object.fromEntries(Object.entries(historical).filter(([code]) => fields.includes(code)))
+            : styles;
+          const config = updateCategoryLabelTemplate(cap.config, categoryId, fields, effectiveStyles);
           await tx.eventCapability.update({
             where: { eventId_code: { eventId: event.id, code: 'credential' } },
             data: { config: config as Prisma.InputJsonObject },
@@ -470,8 +509,9 @@ export class EventDeskService {
             entityId: categoryId,
             metadata: { count: fields.length, fields } as Prisma.InputJsonObject,
           } });
+          return effectiveStyles;
         }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
-        return { categoryId, fields };
+        return { categoryId, fields, styles: savedStyles };
       } catch (error) {
         if ((error as { code?: string })?.code === 'P2034' && attempt < 2) continue;
         throw error;
@@ -486,37 +526,55 @@ export class EventDeskService {
     this.requireCapability(event.capabilities.map((item) => item.code), 'credential');
     let label;
     try { label = normalizeLabelConfig(input); } catch (error) { policyError(error); }
-    const current = await this.prisma.eventCapability.findFirst({
-      where: { eventId: event.id, code: 'credential' },
-      select: { config: true },
-    });
-    if (!current) throw new NotFoundException('Evento não encontrado.');
-    await this.prisma.$transaction(async (tx) => {
-      await tx.eventCapability.update({
-        where: { eventId_code: { eventId: event.id, code: 'credential' } },
-        data: { config: mergeLabelConfig(current.config, label) as Prisma.InputJsonObject },
-      });
-      await tx.auditLog.create({
-        data: {
-          organizationId: event.organizationId!,
-          eventId: event.id,
-          actorUserId: userId,
-          action: 'credential.label_updated',
-          entityType: 'Event',
-          entityId: event.id,
-          metadata: {
-            preset: label.preset,
-            widthMm: label.widthMm,
-            heightMm: label.heightMm,
-            codeMode: label.codeMode,
-            showName: label.showName,
-            showCompany: label.showCompany,
-            showCategory: label.showCategory,
-          } as Prisma.InputJsonObject,
-        },
-      });
-    });
-    return { label };
+    // The global printer settings and category templates share one JSON column.
+    // Reading outside the transaction can silently overwrite a concurrent model
+    // save (including its order, per-field font, alignment, bold and color).
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      try {
+        await this.prisma.$transaction(async (tx) => {
+          const current = await tx.eventCapability.findFirst({
+            where: {
+              // EventCapability has no organizationId column. The tenant is
+              // authorized via eventFor(), and eventId uniquely scopes this row.
+              eventId: event.id, code: 'credential', status: CapabilityStatus.ACTIVE,
+            },
+            select: { config: true },
+          });
+          if (!current) throw new NotFoundException('Credenciamento indisponível.');
+          await tx.eventCapability.update({
+            where: { eventId_code: { eventId: event.id, code: 'credential' } },
+            data: { config: mergeLabelConfig(current.config, label) as Prisma.InputJsonObject },
+          });
+          await tx.auditLog.create({
+            data: {
+              organizationId: event.organizationId!,
+              eventId: event.id,
+              actorUserId: userId,
+              action: 'credential.label_updated',
+              entityType: 'Event',
+              entityId: event.id,
+              metadata: {
+                preset: label.preset,
+                widthMm: label.widthMm,
+                heightMm: label.heightMm,
+                codeMode: label.codeMode,
+                showName: label.showName,
+                showCompany: label.showCompany,
+                showCategory: label.showCategory,
+              } as Prisma.InputJsonObject,
+            },
+          });
+        }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+        return { label };
+      } catch (error) {
+        if ((error as { code?: string })?.code === 'P2034') {
+          if (attempt < 2) continue;
+          throw new ConflictException('Configuração concorrente. Tente novamente.');
+        }
+        throw error;
+      }
+    }
+    throw new ConflictException('Configuração concorrente. Tente novamente.');
   }
 
   async deliverMaterial(userId: string, eventId: string, input: { reservationId?: unknown; sizeId?: unknown; confirmSizeChange?: unknown }) {

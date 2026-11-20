@@ -8,6 +8,8 @@ export type PublicRegistrationField = {
   appliesToCategoryIds?: string[];
 };
 
+export class RegistrationCategoryValidationError extends Error {}
+
 const ESSENTIAL_FIELDS: PublicRegistrationField[] = [
   { code: 'full_name', label: 'Nome completo', type: 'TEXT', required: true },
   { code: 'preferred_name', label: 'Como deseja ser chamado', type: 'TEXT', required: true },
@@ -57,19 +59,19 @@ export function validateCategoryAnswers(
   categoryId: string,
 ): void {
   if (!answers || typeof answers !== 'object' || Array.isArray(answers)) {
-    throw new Error('As respostas fornecidas são inválidas.');
+    throw new RegistrationCategoryValidationError('As respostas fornecidas são inválidas.');
   }
   const allowed = new Map(fields.map((field) => [field.code, field]));
   for (const field of allowed.values()) {
     const value = answers[field.code];
     if (field.required && (value === undefined || value === null || value === false || (typeof value === 'string' && value.trim() === '') || (Array.isArray(value) && value.length === 0))) {
-      throw new Error(`Preencha o campo obrigatório: ${field.label}.`);
+      throw new RegistrationCategoryValidationError(`Preencha o campo obrigatório: ${field.label}.`);
     }
   }
   if (answers.registration_type !== undefined && answers.registration_type !== categoryId) {
-    throw new Error('A categoria informada na ficha não corresponde à inscrição.');
+    throw new RegistrationCategoryValidationError('A categoria informada na ficha não corresponde à inscrição.');
   }
   if (Object.keys(answers).some((code) => code !== 'registration_type' && !allowed.has(code))) {
-    throw new Error('A ficha contém campos que não pertencem a esta categoria do evento.');
+    throw new RegistrationCategoryValidationError('A ficha contém campos que não pertencem a esta categoria do evento.');
   }
 }
