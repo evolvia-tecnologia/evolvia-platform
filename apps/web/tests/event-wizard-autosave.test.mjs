@@ -15,9 +15,9 @@ function harness(draft, response, extra = {}) {
     draftRef: { current: draft }, revisionRef: { current: 3 },
     catalogRef: { current: [] }, savedStepRef: { current: 'identity' },
     saveQueueRef: { current: Promise.resolve() }, dirty: true,
-    requests: [], recovered: 0, saveState: 'idle',
+    requests: [], recovered: 0, saveState: 'idle', resumes: 0,
   };
-  const save = (targetStep, snapshot = state.draftRef.current) => queueWizardSave(targetStep, snapshot, {
+  const save = (targetStep, snapshot = state.draftRef.current, options) => queueWizardSave(targetStep, snapshot, {
     queue: state.saveQueueRef,
     savedStep: state.savedStepRef,
     getDirty: () => state.dirty,
@@ -36,8 +36,11 @@ function harness(draft, response, extra = {}) {
     recoverLatest: async () => { state.recovered += 1; },
     datesConfirmed: extra.datesConfirmed,
     rejectionOf: extra.rejectionOf,
-    resume: extra.resume,
-  });
+    resume: () => {
+      state.resumes += 1;
+      extra.resume?.();
+    },
+  }, options);
   return { state, save };
 }
 
@@ -179,7 +182,7 @@ test('salvar e sair durante o PATCH permanece até a edição nova ser confirmad
   let left = false;
   const exiting = saveCurrentDraftBeforeExit({
     currentDraft: () => state.draftRef.current,
-    save: (snapshot) => save('identity', snapshot),
+    save: (snapshot) => save('identity', snapshot, { resumeOnStale: false }),
   }).then(() => { left = true; });
 
   await flush();
@@ -197,6 +200,7 @@ test('salvar e sair durante o PATCH permanece até a edição nova ser confirmad
   assert.equal(left, true);
   assert.equal(state.dirty, false);
   assert.equal(state.saveState, 'saved');
+  assert.equal(state.resumes, 0);
 });
 
 const schedule = { startDate: '2026-10-16T03:00:00.000Z', endDate: '2026-10-17T03:00:00.000Z', timeZone: 'America/Sao_Paulo' };
@@ -247,7 +251,7 @@ test('edição do local durante o PATCH só avisa depois da confirmação nova',
   let notice = '';
   const saving = saveCurrentDraftBeforeExit({
     currentDraft: () => state.draftRef.current,
-    save: (snapshot) => save('location', snapshot),
+    save: (snapshot) => save('location', snapshot, { resumeOnStale: false }),
   }).then(() => { notice = 'Local salvo'; });
   await flush();
   state.draftRef.current = edited;
@@ -263,6 +267,7 @@ test('edição do local durante o PATCH só avisa depois da confirmação nova',
   assert.equal(state.dirty, false);
   assert.equal(state.saveState, 'saved');
   assert.equal(state.draftRef.current.venue, 'Centro definitivo');
+  assert.equal(state.resumes, 0);
 });
 
 test('Salvar datas só avisa depois que a edição feita durante o PATCH é confirmada', async () => {
@@ -283,7 +288,7 @@ test('Salvar datas só avisa depois que a edição feita durante o PATCH é conf
   let notice = '';
   const saving = saveCurrentDraftBeforeExit({
     currentDraft: () => state.draftRef.current,
-    save: (snapshot) => save('identity', snapshot),
+    save: (snapshot) => save('identity', snapshot, { resumeOnStale: false }),
   }).then(() => { notice = 'Datas salvas'; });
   await flush();
   state.draftRef.current = edited;
@@ -295,6 +300,48 @@ test('Salvar datas só avisa depois que a edição feita durante o PATCH é conf
   await saving;
   assert.equal(notice, 'Datas salvas');
   assert.equal(state.saveState, 'saved');
+  assert.equal(state.resumes, 0);
+});
+
+test('salvar e sair interrompe após três tentativas se o rascunho não estabilizar', async () => {
+  let tick = 0;
+  const { state, save } = harness(
+    { name: 'v0' },
+    async () => ({ session: { revision: 4 }, answers: { name: 'v0' } }),
+  );
+  await assert.rejects(
+    saveCurrentDraftBeforeExit({
+      currentDraft: () => state.draftRef.current,
+      save: async (snapshot) => {
+        await save('identity', snapshot, { resumeOnStale: false });
+        tick += 1;
+        // Simula edição do usuário: rascunho novo + dirty, senão a fila pula o PATCH.
+        state.draftRef.current = { name: `v${tick}` };
+        state.dirty = true;
+      },
+    }),
+    /mudou durante o salvamento/,
+  );
+  assert.equal(tick, 3);
+  assert.equal(state.requests.length, 3);
+  assert.equal(state.resumes, 0);
+});
+
+test('data limpa no cliente equivale a null no servidor', () => {
+  assert.equal(
+    wizardDatesConfirmed(
+      { startDate: '', endDate: '', timeZone: 'America/Sao_Paulo' },
+      { startDate: null, endDate: null, timeZone: 'America/Sao_Paulo' },
+    ),
+    true,
+  );
+  assert.equal(
+    wizardScheduleRejection(
+      { startDate: '   ', endDate: null, timeZone: 'America/Sao_Paulo', venue: 'Centro', venuePending: false },
+      { startDate: null, endDate: null, timeZone: 'America/Sao_Paulo', venue: 'Centro', venuePending: false },
+    ),
+    null,
+  );
 });
 
 test('Salvar e sair com data recusada permanece na tela e mostra o motivo', async () => {
@@ -307,12 +354,16 @@ test('Salvar e sair com data recusada permanece na tela e mostra o motivo', asyn
   const exit = source.slice(source.indexOf('async function saveAndExit'), source.indexOf('function toggleCapability'));
   assert.match(exit, /saveCurrentDraftBeforeExit\(/);
   assert.match(exit, /setError\(wizardBlockedExitMessage\(reason\)\)/);
+  assert.match(exit, /resumeOnStale:\s*false/);
   const dates = source.slice(source.indexOf('async function saveDates'), source.indexOf('async function saveVenue'));
   assert.ok(dates.indexOf('saveCurrentDraftBeforeExit') < dates.indexOf("setDateNotice('Datas salvas"));
+  assert.match(dates, /resumeOnStale:\s*false/);
   const venue = source.slice(source.indexOf('async function saveVenue'), source.indexOf('async function saveAndExit'));
   assert.ok(venue.indexOf('saveCurrentDraftBeforeExit') < venue.indexOf("setVenueNotice('Local salvo"));
+  assert.match(venue, /resumeOnStale:\s*false/);
   const goTo = source.slice(source.indexOf('async function goTo'), source.indexOf('async function finish'));
   assert.ok(goTo.indexOf('saveCurrentDraftBeforeExit') < goTo.indexOf('setStepIndex(index)'));
+  assert.match(goTo, /resumeOnStale:\s*false/);
   assert.match(exit, /return;/);
   assert.ok(exit.indexOf('setError(wizardBlockedExitMessage(reason))') < exit.indexOf("router.push('/painel')"));
 });

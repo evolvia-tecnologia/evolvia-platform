@@ -334,7 +334,11 @@ export default function EventWizard({ eventId }: EventWizardProps) {
     setError('O rascunho havia sido alterado em outra sessão. Carregamos a versão mais recente para evitar perda de dados.');
   }, [applyPayload, currentEventId]);
 
-  const queueSave = useCallback((targetStep: string, snapshot = draftRef.current) => {
+  const queueSave = useCallback((
+    targetStep: string,
+    snapshot = draftRef.current,
+    options?: { resumeOnStale?: boolean },
+  ) => {
     if (!currentEventId) return Promise.resolve();
     return queueWizardSave(targetStep, snapshot, {
       queue: saveQueueRef,
@@ -356,7 +360,7 @@ export default function EventWizard({ eventId }: EventWizardProps) {
       recoverLatest,
       rejectionOf: (snapshot, payload) => wizardScheduleRejection(snapshot, payload.answers),
       resume: () => setSaveGeneration((value) => value + 1),
-    });
+    }, options);
   }, [applyPayload, currentEventId, recoverLatest, setDirty]);
 
   useEffect(() => {
@@ -429,7 +433,7 @@ export default function EventWizard({ eventId }: EventWizardProps) {
     try {
       await saveCurrentDraftBeforeExit({
         currentDraft: () => draftRef.current,
-        save: (snapshot) => queueSave(target, snapshot),
+        save: (snapshot) => queueSave(target, snapshot, { resumeOnStale: false }),
       });
       setStepIndex(index);
       window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -477,7 +481,7 @@ export default function EventWizard({ eventId }: EventWizardProps) {
     try {
       await saveCurrentDraftBeforeExit({
         currentDraft: () => draftRef.current,
-        save: (snapshot) => queueSave('identity', snapshot),
+        save: (snapshot) => queueSave('identity', snapshot, { resumeOnStale: false }),
       });
       setDateNotice('Datas salvas. Inscrições, lotes, pagamentos, janelas científicas, programação, kits e confirmações não foram alterados.');
     } catch (reason) {
@@ -498,7 +502,7 @@ export default function EventWizard({ eventId }: EventWizardProps) {
     try {
       await saveCurrentDraftBeforeExit({
         currentDraft: () => draftRef.current,
-        save: (snapshot) => queueSave('location', snapshot),
+        save: (snapshot) => queueSave('location', snapshot, { resumeOnStale: false }),
       });
       setVenueNotice('Local salvo. Datas, inscrições e pagamentos não foram alterados.');
     } catch (reason) {
@@ -513,7 +517,7 @@ export default function EventWizard({ eventId }: EventWizardProps) {
       try {
         await saveCurrentDraftBeforeExit({
           currentDraft: () => draftRef.current,
-          save: (snapshot) => queueSave(stepId, snapshot),
+          save: (snapshot) => queueSave(stepId, snapshot, { resumeOnStale: false }),
         });
       } catch (reason) {
         setError(wizardBlockedExitMessage(reason));
