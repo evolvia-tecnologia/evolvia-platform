@@ -210,6 +210,9 @@ test('combinações principais preservam contraste WCAG AA', () => {
   assert.ok(contrast('#147449', '#e8f8ef') >= 4.5);
   assert.ok(contrast('#875600', '#fff4da') >= 4.5);
   assert.ok(contrast('#a52b2b', '#fff0f0') >= 4.5);
+  assert.ok(contrast('#22365e', '#edf4ff') >= 4.5);
+  assert.ok(contrast('#147449', '#edf4ff') >= 4.5);
+  assert.ok(contrast('#52647b', '#f8faff') >= 4.5);
 });
 
 
