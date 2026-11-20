@@ -9,6 +9,7 @@ import { createHash, randomBytes } from 'node:crypto';
 import { IntegrationFoundationService } from './integration-foundation.service';
 import type { ConfirmedRegistrationNotice } from './integration-foundation.policy';
 import { PrismaService } from './prisma.service';
+import { podeOperar } from './platform-moderation-enforcement';
 import { RegistrationRefundService } from './registration-refund.service';
 import { RegistrationCategoryValidationError, publicRegistrationFields, validateCategoryAnswers } from './registration-category-fields';
 import { AsaasCheckoutGateway } from './asaas-checkout.gateway';
@@ -86,6 +87,38 @@ export class RegistrationReservationsService {
     private readonly webhooks: IntegrationFoundationService,
     private readonly refunds: RegistrationRefundService,
   ) {}
+
+  /**
+   * A moderação da plataforma barra uma operação NOVA neste evento?
+   *
+   * Lido DENTRO da transação, logo após a conferência de status e antes de
+   * qualquer leitura de catálogo ou escrita. Fora da transação haveria janela
+   * entre perguntar e reservar, e uma suspensão aplicada nesse intervalo
+   * deixaria passar exatamente a inscrição que ela existe para impedir.
+   *
+   * A recusa reusa a MESMA frase de evento indisponível, de propósito: a
+   * apresentação pública nunca conta que há moderação em curso, nem a
+   * classificação, o motivo ou a referência do caso. Antes da apuração,
+   * acusação pública é risco jurídico; depois dela, continua não sendo assunto
+   * de quem está se inscrevendo.
+   *
+   * Só a inscrição NOVA é barrada. Reserva existente, leitura, histórico e
+   * reembolso seguem seus próprios caminhos e não passam por aqui — suspender
+   * um evento não pode apagar a compra de quem já pagou.
+   *
+   * Ausência de linha é ATIVO, e essa decisão vive num lugar só, em
+   * `platform-moderation-enforcement`. Repeti-la aqui criaria a segunda
+   * definição que um dia diverge da primeira.
+   */
+  private async exigirSemBloqueioDeModeracao(tx: Prisma.TransactionClient, eventId: string): Promise<void> {
+    const moderacao = await tx.platformEventModeration.findUnique({
+      where: { eventId },
+      select: { state: true },
+    });
+    if (!podeOperar(moderacao, 'nova_inscricao').permitido) {
+      throw new NotFoundException('Inscrições indisponíveis para este evento.');
+    }
+  }
 
   private async resolveFormSchema(
     client: Prisma.TransactionClient | PrismaService,
@@ -361,6 +394,7 @@ export class RegistrationReservationsService {
           if (!event?.organizationId || event.status !== EventStatus.PUBLISHED) {
             throw new NotFoundException('Inscrições indisponíveis para este evento.');
           }
+          await this.exigirSemBloqueioDeModeracao(tx, event.id);
           // Checkout agrupado não recebe cobrança no POST posterior: recusar
           // reservas pagas sem pagador/destinatário antes de qualquer escrita.
           if (event.registrationMode === RegistrationMode.PAID && !order.billing) {
@@ -733,6 +767,7 @@ export class RegistrationReservationsService {
           if (!event?.organizationId || event.status !== EventStatus.PUBLISHED) {
             throw new NotFoundException('Inscrições indisponíveis para este evento.');
           }
+          await this.exigirSemBloqueioDeModeracao(tx, event.id);
 
           const existing = await tx.eventRegistrationReservation.findUnique({
             where: { eventId_idempotencyKeyHash: { eventId: event.id, idempotencyKeyHash } },
