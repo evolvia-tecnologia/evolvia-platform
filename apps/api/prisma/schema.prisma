@@ -901,6 +901,7 @@ model EventRegistrationOrderEntry {
 }
 
 model EventRegistrationOrderCheckout {
+  refundPreparations RegistrationRefundRequest[]
   id                 String                     @id @default(cuid())
   organizationId     String
   eventId            String
@@ -1009,6 +1010,11 @@ model RegistrationRefundAcceptance {
 }
 
 model RegistrationRefundRequest {
+  preparedAmountCents     Int?
+  preparedCheckoutId      String?
+  preparedCheckout        EventRegistrationCheckout?      @relation(fields: [preparedCheckoutId, eventId, organizationId], references: [id, eventId, organizationId], onDelete: Restrict, map: "RefundPreparation_single_fkey")
+  preparedOrderCheckoutId String?
+  preparedOrderCheckout   EventRegistrationOrderCheckout? @relation(fields: [preparedOrderCheckoutId, eventId, organizationId], references: [id, eventId, organizationId], onDelete: Restrict, map: "RefundPreparation_order_fkey")
   id                String                          @id @default(cuid())
   reservationId     String                          @unique
   eventId           String
@@ -1023,6 +1029,8 @@ model RegistrationRefundRequest {
   createdAt         DateTime                        @default(now())
   updatedAt         DateTime                        @updatedAt
 
+  @@index([preparedCheckoutId], map: "RefundPreparation_single_idx")
+  @@index([preparedOrderCheckoutId], map: "RefundPreparation_order_idx")
   @@unique([reservationId, eventId, organizationId])
   @@index([organizationId, eventId, status, createdAt])
 }
@@ -1100,6 +1108,7 @@ model ParticipantAccessSession {
 }
 
 model EventRegistrationCheckout {
+  refundPreparations RegistrationRefundRequest[]
   id                     String                       @id @default(cuid())
   organizationId         String
   eventId                String
