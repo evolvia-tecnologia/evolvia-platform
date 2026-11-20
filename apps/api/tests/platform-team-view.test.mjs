@@ -57,7 +57,6 @@ test('alcance desconhecido NÃO vira GLOBAL', () => {
     assert.notEqual(alcance.tipo, 'GLOBAL', `"${bruto}" virou alcance global`);
     assert.equal(alcance.tipo, 'DESCONHECIDO');
   }
-  // E carrega o bruto, para que quem olha saiba o que apareceu no banco.
   assert.deepEqual(
     alcanceDaLinha(concessao({ scopeKind: 'ORGANIZACOES' })),
     { tipo: 'DESCONHECIDO', bruto: 'ORGANIZACOES' },
@@ -70,7 +69,6 @@ test('alcance desconhecido é CONTADO, para aparecer a um humano', () => {
     [], [pessoa()], AGORA,
   );
   assert.equal(visao.comAlcanceDesconhecido, 1);
-  // E a linha não é descartada: descartar esconderia a anomalia.
   assert.equal(visao.pessoas[0].acessos.length, 2);
 });
 
@@ -87,11 +85,28 @@ test('sem prazo é vigente; prazo futuro é vigente; prazo passado é expirado',
 test('prazo ilegível conta como expirado, não como sem prazo', () => {
   // Na dúvida a leitura mostra o estado menos favorável: ninguém deve contar
   // com um acesso que o autorizador pode recusar.
+  //
+  // Este teste também corrige uma afirmação da revisão: ela supunha que prazo
+  // ilegível faria acesso expirado parecer VIGENTE. É o contrário.
   assert.equal(situacaoDoAcesso('nao-e-data', AGORA), 'EXPIRADA');
 });
 
 test('o instante exato da expiração já é expirado', () => {
   assert.equal(situacaoDoAcesso(new Date(AGORA).toISOString(), AGORA), 'EXPIRADA');
+});
+
+test('epoch em NÚMERO é entendido, em string numérica não é adivinhado', () => {
+  // `new Date("1700000000000")` é Invalid Date: epoch em número precisava de
+  // ramo próprio, e veio da revisão.
+  assert.equal(situacaoDoAcesso(AGORA + 86400_000, AGORA), 'VIGENTE');
+  assert.equal(situacaoDoAcesso(AGORA - 86400_000, AGORA), 'EXPIRADA');
+  assert.equal(situacaoDoAcesso(Number.NaN, AGORA), 'EXPIRADA');
+  assert.equal(situacaoDoAcesso(Number.POSITIVE_INFINITY, AGORA), 'EXPIRADA');
+
+  // String puramente numérica NÃO é tratada como epoch, de propósito:
+  // '20261120' como epoch em ms dá 20 de janeiro de 1970, e como data dá 20 de
+  // novembro de 2026. Para texto, ISO é a única leitura que não adivinha.
+  assert.equal(situacaoDoAcesso('20261120', AGORA), 'VIGENTE', 'foi lido como data de 2026, não como epoch de 1970');
 });
 
 test('concessão expirada aparece na lista, com a data e rótulada', () => {
@@ -123,8 +138,6 @@ test('vigentes e expiradas são contadas separadamente', () => {
 // --- quem perdeu acesso não desaparece ------------------------------------
 
 test('pessoa sem concessão mas com histórico APARECE', () => {
-  // `PlatformGrant` não tem coluna de revogação: revogar apaga a linha. Sem o
-  // histórico, quem foi revogado é indistinguível de quem nunca teve acesso.
   const visao = montarVisaoDaEquipe(
     [],
     [mudanca({ kind: 'REVOKED', occurredAt: DIAS(-1) })],
@@ -173,8 +186,6 @@ test('a união cobre quem tem concessão, quem tem histórico, e quem tem os doi
 // --- pessoa sem registro --------------------------------------------------
 
 test('id sem registro de usuário aparece, com nome nulo e contado', () => {
-  // Pode acontecer se a conta foi apagada e a concessão ficou. Omitir
-  // esconderia um acesso que o autorizador ainda honra.
   const visao = montarVisaoDaEquipe([concessao({ targetUserId: 'fantasma' })], [], [pessoa()], AGORA);
   assert.equal(visao.pessoas.length, 1);
   assert.equal(visao.pessoas[0].userId, 'fantasma');
@@ -211,6 +222,47 @@ test('a ordem é por nome, depois e-mail, depois id', () => {
   assert.deepEqual(visao.pessoas.map((p) => p.userId), ['c', 'b', 'a']);
 });
 
+test('nome acentuado ordena como português, não por code point', () => {
+  // Apontamento da revisão, e estava certo: com `<`, `Ávila` cai DEPOIS de
+  // `Bruno`, porque `Á` é 193 e `B` é 66. Em português, Ávila vem primeiro.
+  const visao = montarVisaoDaEquipe(
+    [
+      concessao({ targetUserId: '1' }),
+      concessao({ targetUserId: '2' }),
+      concessao({ targetUserId: '3' }),
+    ],
+    [],
+    [
+      { id: '1', name: 'Bruno' },
+      { id: '2', name: 'Ávila' },
+      { id: '3', name: 'Çesar' },
+    ],
+    AGORA,
+  );
+  assert.deepEqual(
+    visao.pessoas.map((p) => p.nome), ['Ávila', 'Bruno', 'Çesar'],
+    'a ordenação voltou a comparar por code point',
+  );
+});
+
+test('a ordem ignora caixa mas respeita acento', () => {
+  // `sensitivity: 'accent'`: `ana` e `Ana` empatam no nome e desempatam pelo
+  // id, enquanto `Ana` e `Ána` continuam distintas e em ordem.
+  const visao = montarVisaoDaEquipe(
+    [
+      concessao({ targetUserId: 'z' }),
+      concessao({ targetUserId: 'a' }),
+    ],
+    [],
+    [{ id: 'z', name: 'ana' }, { id: 'a', name: 'Ana' }],
+    AGORA,
+  );
+  assert.deepEqual(
+    visao.pessoas.map((p) => p.userId), ['a', 'z'],
+    'nomes iguais a menos de caixa deveriam desempatar pelo id',
+  );
+});
+
 test('a ordem não depende da ordem recebida', () => {
   const linhas = [concessao({ targetUserId: 'x' }), concessao({ targetUserId: 'y' })];
   const pessoas = [{ id: 'x', name: 'Beto' }, { id: 'y', name: 'Alice' }];
@@ -234,9 +286,9 @@ test('vigentes vêm antes das expiradas na lista de acessos', () => {
   );
 });
 
-// --- entrada imprestável --------------------------------------------------
+// --- entrada imprestável: descartada, mas NUNCA em silêncio ---------------
 
-test('linha sem pessoa ou sem ação é descartada, e não inventa uma linha vazia', () => {
+test('linha sem pessoa ou sem ação é descartada E contada', () => {
   const visao = montarVisaoDaEquipe(
     [
       concessao({ targetUserId: '' }),
@@ -247,11 +299,41 @@ test('linha sem pessoa ou sem ação é descartada, e não inventa uma linha vaz
     [], [], AGORA,
   );
   assert.equal(visao.pessoas.length, 0);
+  assert.equal(
+    visao.linhasDescartadas, 4,
+    'descartar é certo; descartar em silêncio é o defeito que este módulo existe para não ter',
+  );
+});
+
+test('identificador que NÃO é texto não vira pessoa fantasma', () => {
+  // A revisão sugeriu coagir com `String(v)`. Recusado: `String({})` dá
+  // `'[object Object]'` e `String([1,2])` dá `'1,2'` — uma linha estragada
+  // viraria uma pessoa de identificador plausível numa lista administrativa.
+  // Fabricar identidade é pior que descartar; descartar e CONTAR é o certo.
+  const visao = montarVisaoDaEquipe(
+    [
+      concessao({ targetUserId: {} }),
+      concessao({ targetUserId: [1, 2] }),
+      concessao({ targetUserId: 42 }),
+      concessao({ targetUserId: true }),
+    ],
+    [], [], AGORA,
+  );
+  assert.equal(visao.pessoas.length, 0, 'um valor não textual virou identificador de pessoa');
+  assert.equal(visao.linhasDescartadas, 4);
+});
+
+test('histórico sem pessoa também é contado', () => {
+  const visao = montarVisaoDaEquipe([], [mudanca({ targetUserId: '' }), mudanca({ targetUserId: null })], [], AGORA);
+  assert.equal(visao.pessoas.length, 0);
+  assert.equal(visao.linhasDescartadas, 2);
 });
 
 test('entrada vazia devolve visão vazia, e não erro', () => {
   const visao = montarVisaoDaEquipe([], [], [], AGORA);
-  assert.deepEqual(visao, { pessoas: [], semIdentificacao: 0, comAlcanceDesconhecido: 0 });
+  assert.deepEqual(visao, {
+    pessoas: [], semIdentificacao: 0, comAlcanceDesconhecido: 0, linhasDescartadas: 0,
+  });
 });
 
 test('a mesma pessoa com várias concessões vira UMA linha', () => {

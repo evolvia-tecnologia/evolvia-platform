@@ -4,7 +4,7 @@
  * Responde "quem tem o quê nesta plataforma", que é a pergunta que a área não
  * sabia responder. Há rota para conceder, revisar e revogar; não havia nenhuma
  * para LER o estado das delegações — e um sistema em que se concede e revoga
- * sem poder ver não é operiável: o proprietário não sabe o que revogar, e o
+ * sem poder ver não é operável: o proprietário não sabe o que revogar, e o
  * colaborador não sabe o que pode.
  *
  * Módulo puro: sem Prisma, sem Nest, sem I/O. Recebe linhas e devolve a visão.
@@ -21,7 +21,8 @@
  * conclusão natural de quem olha é "o sistema perdeu a concessão".
  *
  * Então a regra deste módulo é o oposto da regra do autorizador, de propósito:
- * **nada é escondido; tudo é rótulado.**
+ * **nada é escondido; tudo é rótulado.** O que não dá para rótular é contado,
+ * nunca descartado em silêncio — ver `linhasDescartadas`.
  */
 
 /** Alcance como a leitura o apresenta. */
@@ -108,12 +109,46 @@ export interface VisaoDaEquipe {
   readonly semIdentificacao: number;
   /** Quantas concessões trazem alcance que o modelo não reconhece. */
   readonly comAlcanceDesconhecido: number;
+  /**
+   * Linhas que não deu para ler — sem pessoa ou sem ação utilizável.
+   *
+   * Elas são descartadas, e isso é deliberado: um identificador que não é texto
+   * não pode ser coagido com `String(v)`, porque `String({})` devolve
+   * `'[object Object]'` e uma linha estragada viraria uma PESSOA FANTASMA com
+   * identificador plausível numa lista administrativa. Fabricar identidade é
+   * pior que descartar.
+   *
+   * Mas descartar em SILÊNCIO seria o defeito que este módulo existe para não
+   * ter. Por isso são contadas: quem lê vê que havia linhas ilegíveis e pode ir
+   * ao banco olhar, em vez de concluir que a lista está completa.
+   */
+  readonly linhasDescartadas: number;
 }
 
+/**
+ * Só texto é texto.
+ *
+ * Não coage com `String(v)` de propósito — ver `linhasDescartadas`. Os
+ * identificadores deste domínio são `String` no schema; não há id numérico
+ * autoincremental neste banco, e se um dia houver, o reparo é no mapeamento do
+ * repositório, não numa coerção que aceita qualquer coisa.
+ */
 const texto = (v: unknown): string => (typeof v === 'string' ? v.trim() : '');
 
+/**
+ * Instante a partir de `Date`, número (epoch em milissegundos) ou texto ISO.
+ *
+ * O ramo numérico veio da revisão: `new Date("1700000000000")` é `Invalid Date`,
+ * então epoch em número viraria ilegível.
+ *
+ * String puramente numérica NÃO é tratada como epoch, e a recusa é deliberada:
+ * `'20261120'` é ambigua — como epoch em milissegundos dá 20 de janeiro de
+ * 1970, e como data dá 20 de novembro de 2026. Para texto, a interpretação ISO
+ * é a única que não adivinha. Quem tiver epoch, passe número.
+ */
 function instante(valor: unknown): number | null {
   if (valor === null || valor === undefined || valor === '') return null;
+  if (typeof valor === 'number') return Number.isFinite(valor) ? valor : null;
   const data = valor instanceof Date ? valor : new Date(String(valor));
   const tempo = data.getTime();
   return Number.isNaN(tempo) ? null : tempo;
@@ -186,11 +221,15 @@ export function montarVisaoDaEquipe(
 
   const acessosPorPessoa = new Map<string, AcessoDaPessoa[]>();
   let comAlcanceDesconhecido = 0;
+  let linhasDescartadas = 0;
 
   for (const linha of concessoes) {
     const userId = texto(linha.targetUserId);
     const acao = texto(linha.action);
-    if (userId === '' || acao === '') continue;
+    if (userId === '' || acao === '') {
+      linhasDescartadas += 1;
+      continue;
+    }
     const alcance = alcanceDaLinha(linha);
     if (alcance.tipo === 'DESCONHECIDO') comAlcanceDesconhecido += 1;
     const lista = acessosPorPessoa.get(userId) ?? [];
@@ -209,7 +248,10 @@ export function montarVisaoDaEquipe(
   const ultimaPorPessoa = new Map<string, { quando: number; mudanca: UltimaMudanca }>();
   for (const linha of historico) {
     const userId = texto(linha.targetUserId);
-    if (userId === '') continue;
+    if (userId === '') {
+      linhasDescartadas += 1;
+      continue;
+    }
     const quando = instante(linha.occurredAt) ?? 0;
     const atual = ultimaPorPessoa.get(userId);
     if (atual !== undefined && atual.quando >= quando) continue;
@@ -245,7 +287,12 @@ export function montarVisaoDaEquipe(
     });
   }
 
-  return { pessoas: ordenarPessoas(linhas), semIdentificacao, comAlcanceDesconhecido };
+  return {
+    pessoas: ordenarPessoas(linhas),
+    semIdentificacao,
+    comAlcanceDesconhecido,
+    linhasDescartadas,
+  };
 }
 
 /**
@@ -255,17 +302,36 @@ export function montarVisaoDaEquipe(
  * e comparar é o que quem audita faz. O id entra como último critério porque
  * é o único sempre presente, então o desempate nunca fica a cargo da ordem em
  * que o banco devolveu.
+ *
+ * `localeCompare` e não `<`, por apontamento da revisão: comparação por code
+ * point coloca `Ávila` depois de `Bruno`, porque `Á` é 193 e `B` é 66. Em
+ * português isso é simplesmente errado.
+ *
+ * `sensitivity: 'accent'` é escolha, não padrão. O padrão `variant` distingue
+ * caixa, e aí `ana` e `Ana` ficam em posições diferentes numa lista de pessoas.
+ * `base` iria ao outro extremo e trataria `a` e `á` como iguais — e a ordem
+ * entre Ana e Ána passaria a depender da ordem de entrada, quebrando o
+ * determinismo que esta função existe para garantir. `accent` é o único dos
+ * três que dá insensível a caixa e sensível a acento.
  */
 function ordenarPessoas(linhas: readonly LinhaDaEquipe[]): LinhaDaEquipe[] {
   return [...linhas].sort((a, b) => {
-    const chaveA = (a.nome ?? a.email ?? a.userId).toLocaleLowerCase('pt-BR');
-    const chaveB = (b.nome ?? b.email ?? b.userId).toLocaleLowerCase('pt-BR');
-    if (chaveA !== chaveB) return chaveA < chaveB ? -1 : 1;
+    const chaveA = a.nome ?? a.email ?? a.userId;
+    const chaveB = b.nome ?? b.email ?? b.userId;
+    const comparacao = chaveA.localeCompare(chaveB, 'pt-BR', { sensitivity: 'accent' });
+    if (comparacao !== 0) return comparacao;
+    // Desempate pelo id: é ASCII e sempre presente, então aqui `<` basta e não
+    // depende de ICU.
     return a.userId < b.userId ? -1 : a.userId > b.userId ? 1 : 0;
   });
 }
 
-/** Vigentes antes das expiradas, e dentro de cada grupo por ação. */
+/**
+ * Vigentes antes das expiradas, e dentro de cada grupo por ação.
+ *
+ * Aqui `<` basta: as ações vêm de `ACOES_CONCEDIVEIS`, que é catálogo fechado e
+ * só tem ASCII minúsculo. Não há acento para colar errado.
+ */
 function ordenarAcessos(acessos: readonly AcessoDaPessoa[]): AcessoDaPessoa[] {
   return [...acessos].sort((a, b) => {
     if (a.situacao !== b.situacao) return a.situacao === 'VIGENTE' ? -1 : 1;
