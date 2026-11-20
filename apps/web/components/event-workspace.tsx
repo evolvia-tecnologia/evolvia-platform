@@ -26,6 +26,7 @@ import {
   workspaceShell,
   type EventFlowSection,
 } from '../lib/event-flow';
+import { eventStatusLabel } from '../lib/event-status-labels';
 import styles from './event-admin-dashboard.module.css';
 import AccessibilityPanel from './accessibility-panel';
 
@@ -45,17 +46,6 @@ type WorkspacePayload = {
     eventType?: string;
     capabilities?: string[];
   };
-};
-
-const statusLabels: Record<string, string> = {
-  DRAFT: 'Rascunho',
-  SETUP: 'Em configuração',
-  HOMOLOGATION: 'Em homologação',
-  READY_TO_PUBLISH: 'Pronto para publicar',
-  PUBLISHED: 'Publicado',
-  SUSPENDED: 'Suspenso',
-  FINISHED: 'Finalizado',
-  CANCELLED: 'Cancelado',
 };
 
 const sectionLabels: Record<EventFlowSection, string> = {
@@ -297,7 +287,7 @@ export default function EventWorkspace({
     || (section === 'scientific' && !isScientific)
     || (worksPath(pathname) && !hasWorks)
     || (programPath(pathname) && !hasProgram);
-  const eventStatus = statusLabels[payload.event.status] ?? payload.event.status;
+  const eventStatus = eventStatusLabel(payload.event.status);
   const desktopNavigationHidden = !mobileNavigation && sidebarCollapsed;
   const navigationHidden = desktopNavigationHidden || (mobileNavigation && !menuOpen);
   const navigationTabIndex = navigationHidden ? -1 : undefined;
@@ -411,11 +401,7 @@ export default function EventWorkspace({
             <span className={styles.navGroupLabel}>Trabalhos científicos</span>
             <Link className={navClass(worksPath(pathname))} aria-current={worksPath(pathname) ? 'page' : undefined} href={`/eventos/${eventId}/cientifico/trabalhos`} tabIndex={navigationTabIndex} onClick={closeMenu}>
               <span aria-hidden="true">◇</span>
-              <span><strong>Trabalhos científicos</strong><small>Submissão, avaliação e decisão</small></span>
-            </Link>
-            <Link className={navClass(false)} href={`/eventos/${eventId}/cientifico/submissoes#estacao`} tabIndex={navigationTabIndex} onClick={closeMenu}>
-              <span aria-hidden="true">▤</span>
-              <span><strong>Estação científica</strong><small>Resumos, e-pôsteres e link do totem</small></span>
+              <span><strong>Trabalhos científicos</strong><small>Hub, configuração, avaliação, estação e decisões</small></span>
             </Link>
             </div>}
             {hasProgram && <div className={styles.navigationGroup} role="group" aria-label="Programação científica">
