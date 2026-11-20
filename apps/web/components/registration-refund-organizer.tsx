@@ -32,6 +32,10 @@ function simulationStep(item: Item): keyof typeof simulationLabels {
 }
 
 export default function RegistrationRefundOrganizer({ eventId }: { eventId: string }) {
+  return <RefundPanel key={eventId} eventId={eventId} />;
+}
+
+function RefundPanel({ eventId }: { eventId: string }) {
   const [policy, setPolicy] = useState<Policy | null>(null);
   const [windowCode, setWindowCode] = useState<WindowCode>('NONE');
   const [items, setItems] = useState<Item[]>([]);
@@ -51,6 +55,7 @@ export default function RegistrationRefundOrganizer({ eventId }: { eventId: stri
     setLoading(true);
     setCanSimulate(false);
     setItems([]);
+    setNextCursor(null);
     const params = new URLSearchParams();
     if (requestFilter) params.set('status', requestFilter);
     const query = params.toString();
@@ -73,13 +78,14 @@ export default function RegistrationRefundOrganizer({ eventId }: { eventId: stri
   }, [eventId, requestFilter]);
 
   async function loadMore() {
-    if (!nextCursor) return;
+    if (!nextCursor || loading || saving || busyId) return;
     setSaving(true);
     setError('');
     try {
       const params = new URLSearchParams({ cursor: nextCursor });
       if (requestFilter) params.set('status', requestFilter);
       const page = await api<RequestPage>(`/events/${encodeURIComponent(eventId)}/refunds/requests?${params.toString()}`);
+      setCanSimulate(page.canSimulateRefund === true);
       setItems((current) => [...current, ...page.items]);
       setNextCursor(page.nextCursor);
     } catch (reason) {
@@ -157,7 +163,7 @@ export default function RegistrationRefundOrganizer({ eventId }: { eventId: stri
       if (result.id !== item.id || result.moneyReturned !== false) throw new Error('Resposta inesperada. Recarregue os pedidos.');
       if (step === 'preparation' && result.amountCents === amountCents) update = { preparedAmountCents: amountCents };
       else if (step === 'sandbox-payment-reference' && result.processingStatus === 'SANDBOX_PAYMENT_IDENTIFIED') update = { sandboxPaymentIdentified: true };
-      else if (result.simulated && result.mockRefundStatus === (step === 'mock-refund' ? 'ISSUED' : 'RECONCILED')) update = { mockRefundStatus: result.mockRefundStatus };
+      else if ((step === 'mock-refund' || step === 'mock-reconciliation') && result.simulated === true && result.mockRefundStatus === (step === 'mock-refund' ? 'ISSUED' : 'RECONCILED')) update = { mockRefundStatus: result.mockRefundStatus };
       else throw new Error('Não foi possível confirmar a etapa. Recarregue os pedidos.');
       setItems(current => current.map(row => row.id === item.id ? { ...row, ...update } : row));
       setNotice(`Etapa de simulação concluída para ${item.protocol}.`);
@@ -187,7 +193,7 @@ export default function RegistrationRefundOrganizer({ eventId }: { eventId: stri
     {policy && <p className={styles.note}>{policy.message}</p>}
     <div className={styles.filters}>
       <label>Situação dos pedidos
-        <select value={requestFilter} onChange={(event) => setRequestFilter(event.target.value as RequestFilter)}>
+        <select disabled={saving || Boolean(busyId)} value={requestFilter} onChange={(event) => setRequestFilter(event.target.value as RequestFilter)}>
           <option value="">Todas</option>
           <option value="REQUESTED">Em análise</option>
           <option value="APPROVED">Aprovado, aguardando processamento</option>
@@ -233,6 +239,6 @@ export default function RegistrationRefundOrganizer({ eventId }: { eventId: stri
         </tr>)}
       </tbody>
     </table>}
-    {nextCursor && <button type="button" disabled={saving} onClick={() => void loadMore()}>{saving ? 'Carregando…' : 'Carregar mais pedidos'}</button>}
+    {nextCursor && <button type="button" disabled={loading || saving || Boolean(busyId)} onClick={() => void loadMore()}>{saving ? 'Carregando…' : 'Carregar mais pedidos'}</button>}
   </section>;
 }
