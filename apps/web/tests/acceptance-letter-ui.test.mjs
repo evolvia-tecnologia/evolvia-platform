@@ -24,11 +24,19 @@ test('a carta fica na área do autor aceito ou recusado e a EVA não promete e-m
   const open = panel.slice(panel.indexOf('async function openLetter('), panel.indexOf('async function downloadLetter('));
   assert.ok(open.indexOf("setLetter(null)") < open.indexOf('decision-letter'));
   assert.ok(open.indexOf("setLetterReceipt('')") < open.indexOf('decision-letter'));
+  // Resposta lenta / troca de sessão: só aplica carta se o contexto ainda for o atual.
+  const openStill = [...open.matchAll(/if \(!stillCurrent\(context\)\) return;/gu)];
+  assert.equal(openStill.length, 2);
+  assert.ok(open.indexOf('if (!stillCurrent(context)) return;') < open.indexOf('setLetter({'));
+  assert.match(open, /payload\.message === 'string' \? payload\.message : 'Não foi possível abrir a carta\.'/u);
   assert.match(open, /catch \(caught\)[\s\S]*setLetter\(null\)[\s\S]*setLetterReceipt\(''\)/u);
   const download = panel.slice(panel.indexOf('async function downloadLetter('), panel.indexOf('async function uploadEposter('));
   assert.match(download, /new Blob\(\[payload\.text\]/u);
   assert.ok(download.indexOf('if (!stillCurrent(context)) return;') < download.indexOf('link.click()'));
   assert.ok(download.indexOf("action !== 'DOWNLOADED'") < download.indexOf('link.click()'));
+  // Erro no download: mensagem ao usuário e sem disparar o clique do arquivo.
+  assert.match(download, /catch \(caught\)[\s\S]*setError\([\s\S]*Não foi possível baixar a carta/u);
+  assert.ok(download.indexOf('catch (caught)') > download.indexOf('link.click()'));
   assert.match(area, /Não mostro parecer, nota ou o trabalho de outra pessoa/u);
   assert.match(area, /aceita ou recusa/u);
   assert.match(area, /A EVA não envia e-mail nem parecer/u);
