@@ -1,5 +1,20 @@
 # Evolvia Master Codex
 
+## Conferência de 21/11/2026
+
+No `develop` publicado em `8f6409b0`, a matriz registra 87 critérios com integração, testes e publicação e um critério com aceite funcional. A média dos 11 Gates continua em 94,3% de implementação e 71,0% de conclusão I/T/D/F. As linhas G2.11, G2.13, G2.14, G5.8, G6.8 e G7.4 agora identificam as entregas parciais e os responsáveis pela próxima prova. A atualização de G1.6 inclui o ensaio público em três perfis. [Evidência da publicação](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/44855700901/job/136701219650).
+
+## Reconciliação de 19/11/2026
+
+Implementação **94,3%**; conclusão comprovada **71,0%**; **87/93** unidades integradas; **0/11 Gates encerrados**.
+
+Base integrada `865bf03f2315642612c1e251559701bca87a993e`. G2.10 e G10.10 têm integração, CI e publicação demonstrados. O aceite autenticado segue pendente. Ambos os jobs registraram a prontidão da API e do banco e depois reprovaram o cabeçalho Server. [Compra múltipla](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/42683330025/job/129390430705) · [Permissões de operador](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/42715129263/job/129500945850).
+
+
+## Registro operacional de 17/11/2026
+
+O gateway anunciou `c4512c2d` às 15h34 de São Paulo. O domínio canônico apresentou readiness da API e do PostgreSQL, HTTPS 200 e redirecionamento 308. O cabeçalho Server expôs a versão do Nginx. Work mantém o aceite operacional condicionado à recuperação [#108](https://github.com/evolvia-tecnologia/evolvia-platform/issues/108) e à prova independente do SHA servido. [job de publicação](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/44146606412/job/134271238197).
+
 ## Checkpoint de execução — 06/11/2026
 
 Direção do fundador e contratos em [#571/6685989083](https://github.com/evolvia-tecnologia/evolvia-platform/issues/571#issuecomment-6685989083). Work integra e mantém #637; Codex mantém compra múltipla/reembolso/confirmação/fiscal; Claude mantém #642 e operação/CAEX; Gemini recebe cartas/comunicações e #610 mediante ACK; Cursor retomado explicitamente para etiquetas #614→#647 e Sports #621→#648, em sessão contratada sem Cloud/cobrança nova. Um dono por conjunto de paths, transferências com SHA/ACK, compartilhados serializados. Esta direção substitui as atribuições históricas incompatíveis abaixo.
@@ -507,3 +522,7 @@ testes, rollback, PRs, commits, CI e ambiente.
 - #497 continua reservado e serializado com #515/#516. Sem alterações em main, produção, infra ou secrets. Rollback de #541/#536: reversão da aplicação, sem migration/destruição de dados. Revisão do diff não é auditoria total.
 
 
+
+## Patrimônio de decisão — checkpoint 14/11/2026, 19h BRT (proposta)
+
+Área Master: o proprietário da **plataforma** administra eventos de qualquer organização mediante autenticação forte, suporte auditável, suspensão reversível com status anterior persistido, reativação e exclusão lógica com preservação de provas/obrigações legais. Ações financeiras e comunicações reais exigem autorização separada. Papel OWNER organizacional não implica papel Master; concessões de equipe por escopo/ação/prazo, sem autoelevação. Relatórios reutilizam o escopo autorizado pelo guard e filtros apenas restringem. #675 ainda não fornece UI operacional e está bloqueado por CI/PR contra main. #676 exige correção de isolamento. Nenhuma dessas decisões representa implementação aceita ou deploy. Evidências e risco detalhados em [CLOSING_2026-11-14_19H.md](./CLOSING_2026-11-14_19H.md); manter decisões aprovadas no registro DECISIONS mediante revisão específica.
