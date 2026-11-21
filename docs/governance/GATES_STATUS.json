@@ -1342,7 +1342,27 @@
   },
   "integratedCriteria": 87,
   "criteriaCount": 93,
-  "methodNote": "Reconciliação de 19/11. G2.10 e G10.10 recebem I/T/D por evidência dos próprios merges. Aceite funcional pendente. A integração #688 não encerra critérios.",
+  "methodNote": "Reconciliação de 19/11 validada novamente após a integração #680 em 20/11. G2.10 (#471) e G10.10 (#642) sustentam I/T/D. #680 melhora UX e declara que não conclui G2.11; #694 somente simulação (moneyReturned:false). Não dar novo crédito a G2.11/G2.13/G2.14/G5.8/G6.8/G7.4 nem a refinamentos de critérios existentes. Revisão do HEAD develop e evidências não equivale a homologação/Go de produção.",
+  "lastCrossCheck": {
+    "localDate": "2026-11-20",
+    "developSha": "8f6409b02178b795359ba96ad1e46f03514e3550",
+    "latestMergeNumber": 680,
+    "integratedCriteria": 87,
+    "criteriaCount": 93,
+    "implementationPercent": 94.26406926406926,
+    "verifiedPercent": 70.98214285714286,
+    "gateClosure": "0/11",
+    "noAdditionalCredit": [
+      680,
+      694,
+      693,
+      675,
+      678,
+      696,
+      689
+    ],
+    "limitation": "HEAD consultado; fonte das provas I/T/D anteriores preservada em sourceSha. Homologação/aceite continuam separados."
+  },
   "integrationCiRun": null,
   "technicalValidation": {
     "sourceSha": "877ee94e4236580f99376f9399c1513b70b3c2af",
