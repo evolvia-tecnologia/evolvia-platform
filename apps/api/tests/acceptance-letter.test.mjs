@@ -144,6 +144,43 @@ test('a carta só sai do trabalho desta inscrição e a recusa também tem texto
   await assert.rejects(() => service.acceptanceLetter('congresso', 'Bearer token', 'csubmission01'), /banco/u);
 });
 
+test('carta exige inscrição dona do trabalho; outra reserva ou org recebe NotFound', async () => {
+  const queries = [];
+  const prisma = {
+    scientificSubmission: {
+      findFirst: async (query) => {
+        queries.push(query.where);
+        return null;
+      },
+    },
+    scientificSubmissionConfig: { findUnique: async () => null },
+    $transaction: async () => { throw new Error('não deve gravar entrega'); },
+  };
+  const participants = {
+    requireConfirmedScope: async () => ({
+      eventId: 'event-1', organizationId: 'org-1', reservationId: 'res-peer',
+    }),
+  };
+  const service = new ScientificAuthorService(prisma, participants, {});
+  await assert.rejects(
+    () => service.acceptanceLetter('congresso', 'Bearer token', 'csubmission01'),
+    NotFoundException,
+  );
+  assert.deepEqual(queries[0], {
+    id: 'csubmission01', eventId: 'event-1', organizationId: 'org-1', ownerReservationId: 'res-peer',
+  });
+
+  participants.requireConfirmedScope = async () => ({
+    eventId: 'event-2', organizationId: 'org-2', reservationId: 'res-1',
+  });
+  await assert.rejects(
+    () => service.recordDecisionDownload('congresso', 'Bearer token', 'csubmission01'),
+    NotFoundException,
+  );
+  assert.equal(queries[1].organizationId, 'org-2');
+  assert.equal(queries[1].eventId, 'event-2');
+});
+
 test('o autor não recebe o modelo e as duas rotas usam o mesmo método', () => {
   const getSource = source.slice(source.indexOf('async get('), source.indexOf('async submit('));
   const letterSource = source.slice(source.indexOf('async acceptanceLetter'), source.indexOf('async uploadEposter'));
