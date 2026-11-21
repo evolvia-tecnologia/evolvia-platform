@@ -196,6 +196,8 @@ test('publicação bloqueia a fundação e a grade, e o check-in não entrega a 
   assert.match(central, /cientifico\/grade/u);
   assert.match(central, /cientifico\/submissoes#estacao/u);
   assert.match(central, /Abrir a estação científica/u);
+  assert.match(central, /ScientificWorksNav/u);
+  assert.match(central, /Trabalhos científicos/u);
   assert.match(central, /if \(loadedEventId !== eventId\)/u);
   assert.match(central, /belongsToEvent\(requestedId, liveEventId\.current, result\)/u);
   assert.match(central, /payload\.event\.id !== eventId/u);

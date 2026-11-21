@@ -71,7 +71,7 @@ export default function ScientificReviewDistribution({ eventId }: { eventId: str
   const preview = currentScope ? data : null;
   const cap = preview?.cap == null ? 'um avaliador por trabalho' : `${preview.cap} por trabalho`;
 
-  return <section className={styles.panel} aria-labelledby="review-distribution-title">
+  return <section id="distribuicao-assistida" className={styles.panel} aria-labelledby="review-distribution-title">
     <p className={styles.eyebrow}>AVALIAÇÃO</p>
     <h2 id="review-distribution-title">Distribuição assistida</h2>
     <p>O servidor sugere até 40 atribuições, pula conflito de autoria e respeita o teto ({cap}). Não há e-mail. O trabalho aparece na área do avaliador.</p>
