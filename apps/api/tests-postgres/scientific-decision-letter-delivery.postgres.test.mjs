@@ -128,7 +128,7 @@ async function createDecidedSubmission(ctx, scope, title, status) {
       eventId: ctx.event.id,
       submissionId: submission.id,
       personId: person.id,
-      sortOrder: 0,
+      sortOrder: 1,
       isCorresponding: true,
       isPresenter: true,
       nameSnapshot: person.name,
