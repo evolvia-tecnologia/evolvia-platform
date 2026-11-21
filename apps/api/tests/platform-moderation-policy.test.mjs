@@ -152,6 +152,49 @@ test('remover já removido é nada a fazer', () => {
   assert.equal(d.motivo, 'ja_removido');
 });
 
+test('suspender um evento REMOVIDO recusa dizendo que ele JÁ está removido', () => {
+  // Apontamento do Gemini na #691, e procede. O motivo era `nao_esta_removido`:
+  // a mensagem afirmava o oposto do estado real, porque o evento ESTÁ removido.
+  // Medido antes do reparo — motivo `nao_esta_removido`, idempotente false.
+  //
+  // `ja_removido` já existe no catálogo e `remover` o usa como idempotente.
+  // Aqui é RECUSA, e a diferença é deliberada: remoção é mais restritiva que
+  // suspensão, então pedir suspensão de um evento removido parte de um modelo
+  // mental errado, e tratar como "nada a fazer" esconderia isso de quem opera.
+  // O código do motivo descreve o ESTADO; quem diz se havia o que fazer é
+  // `idempotente`.
+  const d = decidirModeracao(p({ acao: 'suspender', estadoAtual: 'REMOVIDO', statusOriginal: 'PUBLISHED' }));
+  assert.equal(d.permitido, false);
+  assert.equal(d.motivo, 'ja_removido', 'o motivo tem de descrever o estado real do evento');
+  assert.equal(d.idempotente, false, 'remoção é mais restritiva: pedir suspensão não é "nada a fazer"');
+  assert.equal(d.estadoNovo, null);
+  assert.equal(d.statusOriginalNovo, undefined, 'nada pode ser gravado numa recusa');
+});
+
+test('nenhum motivo de recusa afirma o contrário do estado informado', () => {
+  // A generalização do defeito acima, para que ele não volte em outro ramo.
+  // Um motivo `nao_esta_X` não pode sair quando o estado atual É X, e um
+  // `ja_X` não pode sair quando o estado NÃO é X. Vale para as doze
+  // transições, inclusive as idempotentes.
+  const nomeDoEstado = { ATIVO: 'ativo', SUSPENSO: 'suspenso', REMOVIDO: 'removido' };
+  for (const acao of ACOES) {
+    for (const estadoAtual of ESTADOS) {
+      const d = decidirModeracao(p({
+        acao, estadoAtual, statusOriginal: 'PUBLISHED', estadoAnterior: 'SUSPENSO',
+        segundaAprovacaoPor: OUTRO, permitirSemSuspensaoPrevia: true,
+      }));
+      if (d.permitido || !d.motivo) continue;
+      assert.notEqual(d.motivo, `nao_esta_${nomeDoEstado[estadoAtual]}`,
+        `${acao} em ${estadoAtual} recusou com "${d.motivo}", que NEGA o estado informado`);
+      for (const [outro, nome] of Object.entries(nomeDoEstado)) {
+        if (outro === estadoAtual) continue;
+        assert.notEqual(d.motivo, `ja_${nome}`,
+          `${acao} em ${estadoAtual} recusou com "${d.motivo}", que afirma um estado DIFERENTE do informado`);
+      }
+    }
+  }
+});
+
 test('restaurar devolve o estado de moderação anterior, não um padrão', () => {
   const paraAtivo = decidirModeracao(p({ acao: 'restaurar', estadoAtual: 'REMOVIDO', estadoAnterior: 'ATIVO', statusOriginal: 'SETUP' }));
   assert.equal(paraAtivo.estadoNovo, 'ATIVO');
