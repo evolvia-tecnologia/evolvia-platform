@@ -210,6 +210,7 @@ test('transporte recusa redirecionamento e retoma no destinatário configurado',
   const received = [];
   let redirect = true;
   const server = createServer(async (req, res) => {
+    req.setEncoding('utf8');
     let body = '';
     for await (const part of req) body += part;
     received.push({ path: req.url, key: req.headers['idempotency-key'], payload: JSON.parse(body) });
