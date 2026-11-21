@@ -169,7 +169,11 @@ export function decidirModeracao(pedido: Pedido): Veredito {
     // Recusa, não idempotência: suspender de novo sobrescreveria a fotografia
     // pelo próprio estado suspenso e tornaria a volta ao original impossível.
     if (pedido.estadoAtual === 'SUSPENSO') return recusa('ja_suspenso');
-    if (pedido.estadoAtual === 'REMOVIDO') return recusa('nao_esta_removido');
+    // `ja_removido`, e não `nao_esta_removido`: o evento ESTÁ removido, e um
+    // motivo que afirma o contrário do estado real engana quem opera. Recusa, e
+    // não idempotência: remoção é mais restritiva que suspensão, então o pedido
+    // vem de um modelo mental errado, e "nada a fazer" esconderia isso.
+    if (pedido.estadoAtual === 'REMOVIDO') return recusa('ja_removido');
     if (statusAgora === '') return recusa('status_original_ausente');
     return concluir({
       estadoNovo: 'SUSPENSO',

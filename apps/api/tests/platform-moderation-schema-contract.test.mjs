@@ -93,6 +93,37 @@ test('a CHECK de segunda aprovação concorda com a política', () => {
   }
 });
 
+test('o limite de 64 do ator cabe os identificadores que o sistema produz', () => {
+  // Apontamento do Gemini nas threads 2 e 3 da #691: `actorUserId` era TEXT
+  // enquanto `approverUserId`, na MESMA tabela, e `lastActorUserId`, na tabela
+  // irmã, já eram VARCHAR(64). A inconsistência era real e foi corrigida.
+  //
+  // A JUSTIFICATIVA da revisão, porém, não se sustenta, e isso está medido em
+  // PostgreSQL 16.15: `pg_column_size` do MESMO valor é IDÊNTICO em `text` e em
+  // `varchar(64)` — 26 bytes para um cuid nos dois casos. VARCHAR(n) não
+  // economiza armazenamento nem acelera índice no PostgreSQL; ele apenas impõe
+  // um limite. A mudança vale pela consistência e pelo limite explícito, não
+  // por desempenho, e registrar isso evita propagar a crença errada.
+  //
+  // E limite em coluna de TRILHA só é seguro se couber tudo o que o sistema
+  // consegue produzir: uma linha de auditoria que falha por tamanho é pior que
+  // uma coluna larga. Daí este caso existir.
+  const LIMITE_DO_ATOR = 64;
+  const identificadores = [
+    'ckv9q8r2p0000abcd1234efgh', // cuid do Prisma
+    'sistema:bootstrap-master',  // ator sistêmico de platform-master
+  ];
+  for (const id of identificadores) {
+    assert.ok(id.length <= LIMITE_DO_ATOR,
+      `"${id}" tem ${id.length} caracteres e não cabe em VARCHAR(${LIMITE_DO_ATOR}): a trilha falharia ao gravar`);
+  }
+  // Margem, e não limite raspado: se um identificador passar de metade, vale
+  // reavaliar antes de a trilha começar a recusar escrita.
+  const maior = Math.max(...identificadores.map((id) => id.length));
+  assert.ok(maior * 2 <= LIMITE_DO_ATOR,
+    `o maior identificador tem ${maior} caracteres, mais de metade de ${LIMITE_DO_ATOR}: a margem ficou apertada`);
+});
+
 test('o limite de coluna da migration cabe o que a política permite', () => {
   const d = decidirModeracao(pedido({
     acao: 'suspender', estadoAtual: 'ATIVO', statusDoEvento: 'PUBLISHED',
