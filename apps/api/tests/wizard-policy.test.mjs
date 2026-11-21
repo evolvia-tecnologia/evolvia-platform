@@ -375,3 +375,19 @@ test('normaliza timezone IANA e impede conclusão sem confirmação do organizad
   assert.equal(invalid.timeZone, undefined);
   assert.ok(getWizardCompletionIssues(invalid).includes('Escolha o fuso horário do evento.'));
 });
+
+test('string vazia em data vira null explícito; inválida continua omitida', () => {
+  const cleared = normalizeWizardAnswers({
+    eventType: 'Outro tipo de evento',
+    startDate: '2026-10-16T12:00:00.000Z',
+    endDate: '',
+  });
+  assert.equal(cleared.endDate, null);
+  assert.equal(cleared.startDate, '2026-10-16T12:00:00.000Z');
+
+  const blank = normalizeWizardAnswers({ endDate: '   ' });
+  assert.equal(blank.endDate, null);
+
+  const invalid = normalizeWizardAnswers({ endDate: 'não-é-data' });
+  assert.equal(invalid.endDate, undefined);
+});
