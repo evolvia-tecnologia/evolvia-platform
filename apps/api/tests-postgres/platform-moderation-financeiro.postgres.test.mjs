@@ -23,7 +23,7 @@
 //   - reembolso APROVADO com recibo: a decisão e o valor sobrevivem à moderação,
 //     porque suspender o evento não desfaz uma aprovação que já aconteceu;
 //   - estado terminal: evento FINISHED moderado preserva o status terminal E o
-//     dinheiro;
+//     dinheiro, e a supressão do status é AFIRMADA no plano;
 //   - isolamento: moderar a organização A não encosta no dinheiro da B.
 //
 // Os nomes dos modelos vieram do handoff do @Work em #691, e foram CONFERIDOS
@@ -321,7 +321,22 @@ test('evento FINISHED moderado preserva o status terminal E o dinheiro', { timeo
   const antes = await fotografiaFinanceira(cena.evento.id);
   assert.equal(antes.contagens.reembolsos, 1, 'a cena não tem reembolso: o caso não provaria preservação');
 
-  await moderar(cena.evento, cena.organizacao, { acao: 'suspender' });
+  const plano = await moderar(cena.evento, cena.organizacao, { acao: 'suspender' });
+
+  // A SUPRESSÃO TEM DE SER AFIRMADA, e não inferida de um `null`.
+  //
+  // `platform-moderation-transaction.ts` declara que
+  // `statusPreservadoPorSerTerminal` existe "para que a supressão seja afirmada
+  // e auditável em vez de inferida de um null". Afirmar apenas que o status não
+  // mudou deixaria passar um plano que suprimisse SEM registrar — e quem
+  // precisasse reconstituir o caso depois não teria o campo que explica por que
+  // o status ficou como estava.
+  assert.equal(plano.statusPreservadoPorSerTerminal, true,
+    'a supressão do status terminal não foi registrada no plano: ela ficou silenciosa');
+  // E o plano não pode nem PEDIR a escrita: sem isto, um plano que pedisse e
+  // falhasse em aplicar produziria o mesmo estado final observável.
+  assert.equal(plano.statusDoEventoNovo, null,
+    'o plano pediu escrita em Event.status num evento terminal');
 
   assert.equal(await statusDoEvento(cena.evento.id), 'FINISHED',
     'a moderação reescreveu um status terminal: o evento deixou de constar como realizado');
