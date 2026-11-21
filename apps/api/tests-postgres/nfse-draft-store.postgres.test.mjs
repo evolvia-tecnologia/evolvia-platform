@@ -49,7 +49,7 @@ async function fiscalFixture(t) {
   const receipt = await db.eventRegistrationPaymentReceipt.create({ data: { ...scope, reservationId: reservation.id, checkoutId: checkout.id,
     number: randomUUID().slice(0,20), sellerSnapshot: {}, amountCents: 750, paidAt } });
   const url = 'http://127.0.0.1:' + server.address().port + '/events/' + event.id + '/financial-responsibility/receipts/' + receipt.id + '/nfse-draft';
-  const setup = { issuerId: 'issuer', recipientId: 'recipient', serviceCode: '12.01', municipalityIbgeCode: '3550308' };
+  const setup = { issuerId: org.id, recipientId: 'recipient', serviceCode: '12.01', municipalityIbgeCode: '3550308' };
   const send = (auth, body) => fetch(url, { method: body === undefined ? 'GET' : 'PUT',
     headers: { 'content-type': 'application/json', ...(auth && { authorization: 'Bearer ' + auth }) }, body: JSON.stringify(body) });
   return { db, org, owner, token, outsider, checkout, receipt, url, setup, send };
@@ -61,6 +61,11 @@ test('prévia fiscal HTTP persiste uma vez e revalida organização, recibo e pa
   assert.equal((await send(outsider.token, setup)).status, 404);
   assert.equal((await send(token)).status, 404);
   assert.equal((await send(token, {})).status, 400);
+  assert.equal((await send(token, { ...setup, issuerId: outsider.org.id })).status, 400);
+  const sibling = await db.event.create({ data: { organizationId: receipt.organizationId, ownerId: (await db.organization.findUniqueOrThrow({ where: { id: receipt.organizationId } })).createdById,
+    name: 'Outro evento', slug: randomUUID(), eventType: 'Outro', registrationMode: 'PAID', format: 'IN_PERSON' } });
+  const otherEventUrl = url.replace('/events/' + receipt.eventId + '/', '/events/' + sibling.id + '/');
+  assert.equal((await fetch(otherEventUrl, { method: 'PUT', headers: { authorization: 'Bearer ' + token, 'content-type': 'application/json' }, body: JSON.stringify(setup) })).status, 404);
   const requests = await Promise.all(Array.from({ length: 6 }, () => send(token, { ...setup, amountCents: 1, issueAuthorized: true })));
   for (const response of requests) {
     assert.equal(response.status, 200);
@@ -69,6 +74,10 @@ test('prévia fiscal HTTP persiste uma vez e revalida organização, recibo e pa
     assert.equal(draft.issueAuthorized, false);
     assert.equal(draft.status, 'AWAITING_MUNICIPAL_ADAPTER');
   }
+  const audits = await db.auditLog.findMany({ where: { entityId: receipt.id, action: 'nfse.draft_prepared' } });
+  assert.equal(audits.length, 1);
+  assert.equal(audits[0].metadata, null);
+  assert.equal(audits[0].organizationId, receipt.organizationId);
   assert.equal(await db.fiscalReceiptDraft.count({ where: { receiptId: receipt.id } }), 1);
   assert.equal((await send(token, { ...setup, recipientId: 'other' })).status, 409);
   assert.equal((await (await send(token)).json()).recipientId, setup.recipientId);
@@ -111,4 +120,26 @@ test('dois tomadores concorrentes e revogação do OWNER preservam a primeira pr
   const stored = await db.fiscalReceiptDraft.findUniqueOrThrow({ where: { receiptId: receipt.id } });
   assert.equal(stored.recipientId, proposals[winner].recipientId);
   assert.equal(stored.idempotencyKey, draft.idempotencyKey);
+});
+
+test('revogação confirmada depois da leitura impede gravar rascunho e auditoria', async t => {
+  const { db, org, owner, receipt, setup } = await fiscalFixture(t);
+  const { readOrPrepareFiscalDraft } = await import('../dist/nfse-draft-store.js');
+  let revoked = false;
+  const instrumented = db.$extends({ query: { eventRegistrationPaymentReceipt: {
+    async findFirst({ args, query }) {
+      const result = await query(args);
+      if (result && !revoked) {
+        const change = await db.organizationMembership.updateMany({ where: { userId: owner.id, organizationId: org.id }, data: { role: 'ADMIN' } });
+        assert.equal(change.count, 1);
+        revoked = true;
+      }
+      return result;
+    },
+  } } });
+  await assert.rejects(readOrPrepareFiscalDraft(instrumented, owner.id, receipt.eventId, receipt.id, { setup }),
+    error => error.getStatus?.() === 404);
+  assert.equal(revoked, true);
+  assert.equal(await db.fiscalReceiptDraft.count({ where: { receiptId: receipt.id } }), 0);
+  assert.equal(await db.auditLog.count({ where: { entityId: receipt.id, action: 'nfse.draft_prepared' } }), 0);
 });
