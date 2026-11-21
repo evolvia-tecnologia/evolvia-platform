@@ -103,10 +103,18 @@ test('epoch em NÚMERO é entendido, em string numérica não é adivinhado', ()
   assert.equal(situacaoDoAcesso(Number.NaN, AGORA), 'EXPIRADA');
   assert.equal(situacaoDoAcesso(Number.POSITIVE_INFINITY, AGORA), 'EXPIRADA');
 
-  // String puramente numérica NÃO é tratada como epoch, de propósito:
-  // '20261120' como epoch em ms dá 20 de janeiro de 1970, e como data dá 20 de
-  // novembro de 2026. Para texto, ISO é a única leitura que não adivinha.
-  assert.equal(situacaoDoAcesso('20261120', AGORA), 'VIGENTE', 'foi lido como data de 2026, não como epoch de 1970');
+  // String puramente numérica NÃO é adivinhada — e a consequência disso eu
+  // tinha AFIRMADO ERRADO aqui. Dizia VIGENTE, com a justificativa de que
+  // '20261120' seria lido como 20 de novembro de 2026 em vez de epoch de 1970.
+  //
+  // Medido no Node v22.23.4: `new Date('20261120').getTime()` é NaN. A string
+  // não é data nenhuma, então cai em ilegível e a leitura devolve EXPIRADA.
+  //
+  // O fato medido deixa o argumento MAIS forte, não mais fraco: para texto não
+  // há adivinhação alguma, nem como data nem como epoch — a forma é recusada, e
+  // recusar é a direção segura. A premissa está medida em
+  // `platform-team-view-instante.test.mjs`, para quebrar se o Node mudar.
+  assert.equal(situacaoDoAcesso('20261120', AGORA), 'EXPIRADA');
 });
 
 test('concessão expirada aparece na lista, com a data e rótulada', () => {
