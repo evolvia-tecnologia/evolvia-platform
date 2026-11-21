@@ -1,3 +1,4 @@
+import { inspectSandboxPayment, submitSandboxRefund } from './asaas-sandbox-refund';
 import { lookupSandboxRefundPayment } from './asaas-refund-payment-lookup';
 import { BadRequestException, ConflictException, Injectable, NotFoundException, UnauthorizedException, ServiceUnavailableException } from '@nestjs/common';
 import { EventStatus, MembershipRole, Prisma, RegistrationCheckoutStatus, RegistrationRefundRequestStatus, RegistrationReservationStatus } from '@prisma/client';
@@ -530,8 +531,59 @@ export class RegistrationRefundService {
     });
   }
 
-  // Both commands operate exclusively on a local simulated receipt. The payment and
-  // registration remain unchanged; an organization must explicitly opt into simulation.
+  async processSandboxRefund(userId: string, eventId: string, requestId: string) {
+    const fields = { providerCheckoutId: true, provider: true, amountCents: true, status: true, paidAt: true } as const;
+    const where = { id: requestId, eventId, reservation: { event: { organization: {
+      memberships: { some: { userId, role: MembershipRole.OWNER, status: 'ACTIVE' as const } },
+    } } } };
+    const select = { organizationId: true, status: true, preparedAmountCents: true, sandboxPaymentId: true,
+      preparedCheckout: { select: fields }, preparedOrderCheckout: { select: fields } } as const;
+    const request = await this.prisma.registrationRefundRequest.findFirst({ where, select });
+    if (!request) throw new NotFoundException('Pedido não encontrado.');
+    const { organizationId } = request;
+    const token = process.env.ASAAS_REFUND_SANDBOX_TOKEN?.trim();
+    if (!token || process.env.ASAAS_REFUND_SANDBOX_ORGANIZATION_ID !== organizationId ||
+        process.env.ASAAS_REFUND_SANDBOX_EXECUTION_ORGANIZATION_ID !== organizationId) {
+      throw new ServiceUnavailableException('Processamento de homologação desabilitado.');
+    }
+    const checkout = request.preparedCheckout ?? request.preparedOrderCheckout;
+    if (request.status !== 'APPROVED' || !request.sandboxPaymentId || !request.preparedAmountCents ||
+        !checkout?.providerCheckoutId || !checkout.paidAt || checkout.provider !== 'ASAAS' || checkout.status !== 'PAID' ||
+        (request.preparedCheckout && request.preparedOrderCheckout)) {
+      throw new ConflictException('A execução exige uma cobrança paga e um pedido aprovado e preparado.');
+    }
+    const op = { requestId, paymentId: request.sandboxPaymentId, checkoutId: checkout.providerCheckoutId,
+      amountCents: request.preparedAmountCents, checkoutCents: checkout.amountCents };
+    const observed = await inspectSandboxPayment(op, token);
+    const claim = await this.prisma.$transaction(async tx => {
+      const owner = await tx.$queryRaw<{ id: string }[]>`
+        SELECT id FROM "OrganizationMembership" WHERE "userId" = ${userId} AND "organizationId" = ${organizationId}
+        AND role = 'OWNER' AND status = 'ACTIVE' FOR SHARE`;
+      if (!owner.length) throw new NotFoundException('Pedido não encontrado.');
+      await tx.$queryRaw`SELECT id FROM "RegistrationRefundRequest"
+        WHERE id = ${requestId} AND "eventId" = ${eventId} AND "organizationId" = ${organizationId} FOR SHARE`;
+      const current = await tx.registrationRefundRequest.findFirst({ where, select });
+      if (!current || JSON.stringify(current) !== JSON.stringify(request)) throw new ConflictException('O pedido mudou.');
+      const inserted = await tx.$executeRaw`
+        INSERT INTO "SandboxRefundOperation" ("requestId","organizationId","eventId","paymentId","amountCents")
+        VALUES (${requestId},${organizationId},${eventId},${op.paymentId},${op.amountCents}) ON CONFLICT ("requestId") DO NOTHING`;
+      if (inserted && (!observed.eligible || observed.matched)) throw new ConflictException('Cobrança indisponível para nova operação.');
+      return inserted === 1;
+    });
+    const status = claim ? await submitSandboxRefund(op, token) : observed.status;
+    const [saved] = await this.prisma.$queryRaw<{ status: string }[]>`
+      UPDATE "SandboxRefundOperation" SET
+        status = CASE WHEN status = 'RECONCILED' OR ${status} = 'RECONCILED' THEN 'RECONCILED'
+                      WHEN status = 'FAILED' THEN status ELSE ${status} END,
+        "reconciledAt" = CASE WHEN ${status} = 'RECONCILED' THEN COALESCE("reconciledAt", now()) ELSE "reconciledAt" END
+      WHERE "requestId" = ${requestId} AND "organizationId" = ${organizationId} AND "eventId" = ${eventId}
+        AND "amountCents" = ${op.amountCents} AND "paymentId" = ${op.paymentId} RETURNING status`;
+    if (!saved) throw new ConflictException('Operação divergente do pedido preparado.');
+    return { requestId, environment: 'SANDBOX', processingStatus: saved.status, amountCents: op.amountCents,
+      sandboxRefundConfirmed: saved.status === 'RECONCILED', moneyReturned: false };
+  }
+
+  // Simulation requires an explicit opt-in and writes only a local receipt.
   async mockRefund(userId: string, eventId: string, requestId: string, command: 'ISSUE' | 'RECONCILE', now = new Date()) {
     const org = simulationOrganization();
     if (!org) throw new NotFoundException('Simulação indisponível.');

@@ -1019,6 +1019,7 @@ model MockRefundReceipt {
 }
 
 model RegistrationRefundRequest {
+  sandboxOperation SandboxRefundOperation?
   mockReceipt             MockRefundReceipt?
   sandboxPaymentId        String? @db.VarChar(200)
   preparedAmountCents     Int?
@@ -2539,4 +2540,17 @@ model EventCommunicationDraft {
 
   @@unique([id, eventId, organizationId])
   @@index([organizationId, eventId, updatedAt])
+}
+
+model SandboxRefundOperation {
+  requestId      String                    @id
+  request        RegistrationRefundRequest @relation(fields: [requestId], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  organizationId String
+  eventId        String
+  paymentId      String
+  amountCents    Int
+  attempts       Int                       @default(1)
+  status         String                    @default("PROCESSING")
+  createdAt      DateTime                  @default(now()) @db.Timestamptz(6)
+  reconciledAt   DateTime?                 @db.Timestamptz(6)
 }

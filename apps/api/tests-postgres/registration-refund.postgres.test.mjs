@@ -663,3 +663,59 @@ test('cancelar uma inscrição paga preserva a preparação do reembolso aprovad
   const saved = await prisma.eventRegistrationReservation.findUniqueOrThrow({ where: { id: row.id } });
   assert.equal(saved.status, 'CANCELLED');
 });
+
+test('sandbox Pix preserva uma tentativa após timeout, concorrência e reinício', async t => {
+  const event = await insertEvent(organizationId);
+  const { lot, category } = await catalog(event);
+  const row = await reservation(event, lot, category, { status: 'CONFIRMED', priceCents: 1200, identityHash: digest(), emailHash: digest() });
+  const checkoutRow = await checkout(row, 'PAID');
+  const checkoutId = 'checkout_' + digest();
+  const paymentId = 'pay_' + digest();
+  await prisma.eventRegistrationCheckout.update({ where: { id: checkoutRow.id }, data: { providerCheckoutId: checkoutId } });
+  const req = await prisma.registrationRefundRequest.create({ data: {
+    organizationId, eventId: event.id, reservationId: row.id, reason, status: 'APPROVED',
+  } });
+  await refunds.prepare(people.owner.id, event.id, req.id, { amountCents: 750 });
+  await prisma.registrationRefundRequest.update({ where: { id: req.id }, data: { sandboxPaymentId: paymentId } });
+  const config = { ASAAS_REFUND_SANDBOX_ORGANIZATION_ID: organizationId,
+    ASAAS_REFUND_SANDBOX_EXECUTION_ORGANIZATION_ID: organizationId, ASAAS_REFUND_SANDBOX_TOKEN: 'fixture' };
+  for (const [key, value] of Object.entries(config)) {
+    const prior = process.env[key];
+    process.env[key] = value;
+    t.after(() => { if (prior === undefined) delete process.env[key]; else process.env[key] = prior; });
+  }
+  let posts = 0;
+  let history = [];
+  t.mock.method(globalThis, 'fetch', async (url, init) => {
+    assert.equal(url.origin, 'https://api-sandbox.asaas.com');
+    if (init.method === 'GET') {
+      assert.equal(url.pathname, '/v3/payments/' + paymentId);
+      return Response.json({ id: paymentId, checkoutSession: checkoutId, billingType: 'PIX', value: 12,
+        status: 'RECEIVED', refunds: history });
+    }
+    assert.equal(url.pathname, '/v3/payments/' + paymentId + '/refund');
+    posts++;
+    const body = JSON.parse(init.body);
+    assert.deepEqual(body, { value: 7.5, description: 'Evolvia/' + req.id });
+    history = [{ ...body, status: 'PENDING' }];
+    throw new Error('timeout após recebimento');
+  });
+  const run = service => service.processSandboxRefund(people.owner.id, event.id, req.id);
+  await rejects(refunds.processSandboxRefund(people.outsider.id, event.id, req.id), 404);
+  const results = await Promise.all([run(refunds), run(refunds)]);
+  assert.ok(results.every(result => result.processingStatus === 'PROCESSING'));
+  assert.equal(posts, 1);
+  const restarted = new RegistrationRefundService(prisma, new AuthorizationService(prisma));
+  history[0].status = 'DONE';
+  for (let i = 0; i < 2; i++) {
+    const result = await run(restarted);
+    assert.equal(result.processingStatus, 'RECONCILED');
+    assert.equal(result.sandboxRefundConfirmed, true);
+    assert.equal(result.moneyReturned, false);
+  }
+  assert.equal(posts, 1);
+  const [record] = await prisma.$queryRaw`SELECT * FROM "SandboxRefundOperation" WHERE "requestId" = ${req.id}`;
+  assert.equal(record.amountCents, 750);
+  assert.equal(record.attempts, 1);
+  assert.ok(record.reconciledAt);
+});
