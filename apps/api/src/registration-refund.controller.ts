@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Headers, Param, Post, Query, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Headers, HttpCode, Param, Post, Query, Req, UseGuards } from '@nestjs/common';
 import { AuthGuard, AuthenticatedRequest } from './auth.guard';
 import { RegistrationRefundService } from './registration-refund.service';
 
@@ -7,6 +7,7 @@ export class RegistrationRefundPublicController {
   constructor(private readonly refunds: RegistrationRefundService) {}
 
   @Post('integrations/asaas/sandbox/refunds/webhook')
+  @HttpCode(200)
   async sandboxWebhook(@Headers('asaas-access-token') token: string | undefined, @Body() body: unknown) {
     await this.refunds.reconcileSandboxWebhook(token, body);
     return { received: true };

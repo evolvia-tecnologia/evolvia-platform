@@ -708,7 +708,29 @@ test('sandbox Pix preserva uma tentativa após timeout, concorrência e reiníci
   const restarted = new RegistrationRefundService(prisma, new AuthorizationService(prisma));
   const notification = { event: 'PAYMENT_PARTIALLY_REFUNDED', payment: { id: paymentId, status: 'REFUNDED' } };
   const notify = (header = 'webhook-fixture') => restarted.reconcileSandboxWebhook(header, notification);
-  await rejects(notify('invalid'), 401);
+  const { NestFactory } = await import('@nestjs/core');
+  const { Module } = await import('@nestjs/common');
+  const { RegistrationRefundPublicController } = await import('../dist/registration-refund.controller.js');
+  const { request: httpRequest } = await import('node:http');
+  class WebhookTestModule {}
+  Module({ controllers: [RegistrationRefundPublicController], providers: [
+    { provide: RegistrationRefundService, useValue: restarted },
+  ] })(WebhookTestModule);
+  const app = await NestFactory.create(WebhookTestModule, { logger: false });
+  await app.listen(0, '127.0.0.1');
+  t.after(() => app.close());
+  const webhookUrl = new URL('/public/integrations/asaas/sandbox/refunds/webhook', await app.getUrl());
+  const postWebhook = header => new Promise((resolve, reject) => {
+    const call = httpRequest(webhookUrl, { method: 'POST', headers: {
+      'content-type': 'application/json', 'asaas-access-token': header,
+    } }, response => {
+      response.resume();
+      response.on('end', () => resolve(response.statusCode));
+    });
+    call.on('error', reject);
+    call.end(JSON.stringify(notification));
+  });
+  assert.equal(await postWebhook('invalid'), 401);
   await notify();
   const localStatus = async () => (await prisma.$queryRaw`SELECT status FROM "SandboxRefundOperation" WHERE "requestId" = ${req.id}`)[0].status;
   assert.equal(await localStatus(), 'PROCESSING');
@@ -719,7 +741,7 @@ test('sandbox Pix preserva uma tentativa após timeout, concorrência e reiníci
   assert.equal(await localStatus(), 'PROCESSING');
   process.env.ASAAS_REFUND_SANDBOX_ORGANIZATION_ID = organizationId;
   process.env.ASAAS_REFUND_SANDBOX_EXECUTION_ORGANIZATION_ID = organizationId;
-  await Promise.all([notify(), notify()]);
+  assert.deepEqual(await Promise.all([postWebhook('webhook-fixture'), postWebhook('webhook-fixture')]), [200, 200]);
   assert.equal(await localStatus(), 'RECONCILED');
   for (let i = 0; i < 2; i++) {
     const result = await run(restarted);
