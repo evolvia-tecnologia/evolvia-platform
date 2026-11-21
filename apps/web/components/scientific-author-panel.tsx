@@ -531,6 +531,9 @@ export default function ScientificAuthorPanel({ slug, token }: { slug: string; t
     if (busy) return;
     if (letter?.id === submissionId) { setLetter(null); setLetterReceipt(''); return; }
     const context = contextKey;
+    // Trocar de trabalho descarta carta e recibo anteriores antes da nova leitura.
+    setLetter(null);
+    setLetterReceipt('');
     setBusy(true);
     setError('');
     try {
@@ -547,7 +550,11 @@ export default function ScientificAuthorPanel({ slug, token }: { slug: string; t
       setLetter({ id: submissionId, kind, headline: payload.headline, text: payload.text });
       setLetterReceipt('Carta aberta nesta inscrição. A entrega fica registrada aqui. Não enviamos e-mail.');
     } catch (caught) {
-      if (stillCurrent(context)) setError(caught instanceof Error ? caught.message : 'Não foi possível abrir a carta.');
+      if (stillCurrent(context)) {
+        setLetter(null);
+        setLetterReceipt('');
+        setError(caught instanceof Error ? caught.message : 'Não foi possível abrir a carta.');
+      }
     } finally { if (stillCurrent(context)) setBusy(false); }
   }
 
