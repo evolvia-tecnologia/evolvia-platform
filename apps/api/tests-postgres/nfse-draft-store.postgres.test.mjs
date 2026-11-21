@@ -12,7 +12,7 @@ import { PrismaService } from '../dist/prisma.service.js';
 import { EventFinancialResponsibilityController } from '../dist/event-financial-responsibility.controller.js';
 import { EventFinancialResponsibilityService } from '../dist/event-financial-responsibility.service.js';
 
-test('prévia fiscal HTTP persiste uma vez e revalida organização, recibo e pagamento', async t => {
+async function fiscalFixture(t) {
   const db = new PrismaClient();
   t.after(() => db.$disconnect());
   class FiscalTestModule {}
@@ -52,6 +52,11 @@ test('prévia fiscal HTTP persiste uma vez e revalida organização, recibo e pa
   const setup = { issuerId: 'issuer', recipientId: 'recipient', serviceCode: '12.01', municipalityIbgeCode: '3550308' };
   const send = (auth, body) => fetch(url, { method: body === undefined ? 'GET' : 'PUT',
     headers: { 'content-type': 'application/json', ...(auth && { authorization: 'Bearer ' + auth }) }, body: JSON.stringify(body) });
+  return { db, org, owner, token, outsider, checkout, receipt, url, setup, send };
+}
+
+test('prévia fiscal HTTP persiste uma vez e revalida organização, recibo e pagamento', async t => {
+  const { db, token, outsider, checkout, receipt, url, setup, send } = await fiscalFixture(t);
   assert.equal((await send(null)).status, 401);
   assert.equal((await send(outsider.token, setup)).status, 404);
   assert.equal((await send(token)).status, 404);
@@ -85,4 +90,25 @@ test('prévia fiscal HTTP persiste uma vez e revalida organização, recibo e pa
   assert.equal((await fetch(url + '/adapters/unknown', { headers })).status, 404);
   await db.eventRegistrationCheckout.update({ where: { id: checkout.id }, data: { status: 'CANCELED' } });
   assert.equal((await send(token)).status, 404);
+});
+
+test('dois tomadores concorrentes e revogação do OWNER preservam a primeira prévia', async t => {
+  const { db, org, owner, token, receipt, url, setup, send } = await fiscalFixture(t);
+  const proposals = [setup, { ...setup, recipientId: 'segundo-tomador' }];
+  const responses = await Promise.all(proposals.map(body => send(token, body)));
+  assert.deepEqual(responses.map(response => response.status).sort(), [200, 409]);
+  const winner = responses.findIndex(response => response.status === 200);
+  const draft = await responses[winner].json();
+  assert.equal(draft.recipientId, proposals[winner].recipientId);
+  assert.deepEqual(await (await send(token, proposals[winner])).json(), draft);
+  const membership = await db.organizationMembership.findFirstOrThrow({ where: { userId: owner.id, organizationId: org.id } });
+  await db.organizationMembership.update({ where: { id: membership.id }, data: { role: 'ADMIN' } });
+  assert.equal((await send(token)).status, 404);
+  assert.equal((await send(token, proposals[winner])).status, 404);
+  for (const provider of ['enotas', 'notazz']) {
+    assert.equal((await fetch(url + '/adapters/' + provider, { headers: { authorization: 'Bearer ' + token } })).status, 404);
+  }
+  const stored = await db.fiscalReceiptDraft.findUniqueOrThrow({ where: { receiptId: receipt.id } });
+  assert.equal(stored.recipientId, proposals[winner].recipientId);
+  assert.equal(stored.idempotencyKey, draft.idempotencyKey);
 });
