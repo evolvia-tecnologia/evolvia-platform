@@ -5,14 +5,14 @@
 //
 // O PROBLEMA QUE ISTO PROTEGE
 // ---------------------------
-// `platform-master.repository.escopoDaLinha` traduz `scopeKind` assim:
+// `platform-master.repository.escopoDaLinha` traduzia `scopeKind` assim:
 //
 //     if (tipo === 'ORGANIZACAO') return { tipo: 'ORGANIZACAO', organizationId };
 //     if (tipo === 'EVENTO')      return { tipo: 'EVENTO', eventId };
 //     return { tipo: 'GLOBAL' };
 //
-// Qualquer valor que não seja os dois primeiros vira GLOBAL — o alcance MAIS
-// LARGO. É fail-open num campo de alcance.
+// Qualquer valor que não fosse os dois primeiros virava GLOBAL — o alcance MAIS
+// LARGO. Fail-open num campo de alcance.
 //
 // Hoje isso é latente, porque a coluna é enum e só aceita os três valores
 // tratados. O risco é futuro e silencioso: no dia em que alguem acrescentar um
@@ -24,8 +24,9 @@
 // que o código sabe tratar. Acrescentar um valor sem tratar a tradução passa a
 // ser CI vermelho, e a mensagem diz onde consertar.
 //
-// Salvaguarda não é reparo, e eu não chamo uma de outra: o reparo é fazer
-// `escopoDaLinha` falhar fechado, e sai em patch porque toca arquivo integrado.
+// O reparo em si está em `patches/697-escopo-fail-closed.patch`: `escopoDaLinha`
+// passa a devolver `null` no desconhecido e `concessoes` descarta a linha.
+// Salvaguarda não é reparo, e as duas coisas são entregues separadas.
 //
 // POR QUE O NOME DO TIPO NÃO ESTÁ ESCRITO AQUI
 // --------------------------------------------
@@ -33,6 +34,22 @@
 // (`information_schema.columns.udt_name`) e só então consulta `pg_enum`. Fixar
 // o nome de memória seria exatamente o tipo de suposição de schema que já me
 // custou doze casos de CI nesta semana.
+//
+// O QUE SAIU DAQUI, E POR QUÊ
+// ---------------------------
+// A primeira versão deste arquivo também exigia
+// `PlatformEventModeration.state`. Essa tabela chega com a migration da #691,
+// que é PR ABERTA e não integrada — e esta branch saiu de `develop`, onde a
+// tabela não existe. O caso falhava em "a coluna não existe no schema atual",
+// que é a própria asserção escrita para detectar contrato mudado de lugar.
+// Falha legítima, apontando erro meu: asserção sobre schema de outra branch.
+//
+// O gatilho equivalente para o estado de moderação pertence à branch da #691, e
+// lá ele tem um papel DIFERENTE: a moderação falha FECHADO — `estadoDe` devolve
+// INDETERMINADO e `permite()` nega —, então o gatilho de lá é informativo, não
+// protetivo. Um estado novo não vira poder; vira bloqueio de tudo naquele
+// estado, inclusive leitura administrativa e auditoria, que nunca deveriam ser
+// barradas.
 import assert from 'node:assert/strict';
 import test, { after } from 'node:test';
 import { PrismaClient } from '@prisma/client';
@@ -89,35 +106,6 @@ test('o alcance de concessão tem exatamente os três valores que o código trad
       + 'Antes de acrescentar o valor: trate-o em `escopoDaLinha` e em\n'
       + '`escopoAlcanca` (platform-grant-policy.ts), decida se ele alcança o alvo\n'
       + 'PLATAFORMA, e só então atualize a lista deste teste.',
-  );
-});
-
-test('o estado de moderação tem exatamente os três estados da política', { timeout: 120000 }, async () => {
-  // Contrato OPOSTO ao de cima, e a diferença importa para quem for ler um
-  // vermelho destes.
-  //
-  // A moderação falha FECHADO: `estadoDe` devolve INDETERMINADO para valor que
-  // não reconhece, e `permite()` nega. Um estado novo no enum, sem tratamento,
-  // não vira poder — vira bloqueio de tudo naquele estado, inclusive das
-  // operações que deveriam seguir liberadas.
-  //
-  // Então este gatilho é INFORMATIVO, não protetivo: ele avisa que falta
-  // tratamento, mas o pior caso de não ter o aviso é um evento travado, não um
-  // acesso indevido. Chamar os dois de "a mesma proteção" seria apagar
-  // justamente a distinção que decide a urgência de cada um.
-  const tipo = await tipoDaColuna('PlatformEventModeration', 'state');
-  const rotulos = await rotulosDoEnum(tipo);
-
-  assert.deepEqual(
-    rotulos, ['ATIVO', 'REMOVIDO', 'SUSPENSO'],
-    `O enum "${tipo}" tem ${JSON.stringify(rotulos)}.\n\n`
-      + 'A política (`platform-moderation-policy.ESTADOS`) e a porta de consumo\n'
-      + '(`platform-moderation-enforcement.estadoDe`) conhecem três estados. Um\n'
-      + 'estado novo falha FECHADO — nega tudo —, o que é seguro mas trava o\n'
-      + 'evento por inteiro, inclusive leitura administrativa e auditoria, que\n'
-      + 'nunca deveriam ser barradas.\n\n'
-      + 'Antes de acrescentar: declare o estado em ESTADOS, decida seus efeitos\n'
-      + 'na tabela de `permite()`, e atualize a lista deste teste.',
   );
 });
 
