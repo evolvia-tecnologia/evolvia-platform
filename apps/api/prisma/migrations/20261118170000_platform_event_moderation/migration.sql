@@ -57,7 +57,13 @@ CREATE TABLE "PlatformEventModerationEvent" (
   "classification" "PlatformModerationClass" NOT NULL,
   "reason" VARCHAR(200) NOT NULL,
   "caseRef" VARCHAR(64) NOT NULL,
-  "actorUserId" TEXT NOT NULL,
+  -- VARCHAR(64) para acompanhar "approverUserId" aqui e "lastActorUserId" na
+  -- tabela irmã. Era TEXT, e a inconsistência foi apontada na revisão da #691.
+  -- O limite é seguro e medido: cuid tem 25 caracteres e o ator sistêmico
+  -- "sistema:bootstrap-master" tem 24, com teste exigindo margem. Não há ganho
+  -- de armazenamento — pg_column_size do mesmo valor é idêntico em text e em
+  -- varchar(64) —, o ganho é consistência e limite explícito.
+  "actorUserId" VARCHAR(64) NOT NULL,
   "approverUserId" VARCHAR(64) NOT NULL DEFAULT '',
   "correlationId" VARCHAR(64) NOT NULL,
   "occurredAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,

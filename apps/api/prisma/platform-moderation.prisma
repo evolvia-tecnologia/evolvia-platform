@@ -75,7 +75,14 @@ model PlatformEventModerationEvent {
   classification      PlatformModerationClass
   reason              String                   @db.VarChar(200)
   caseRef             String                   @db.VarChar(64)
-  actorUserId         String
+  /// `VarChar(64)` para acompanhar `approverUserId` aqui e `lastActorUserId` na
+  /// tabela irmã, que já eram limitados. Era `String` solto, e a inconsistência
+  /// foi apontada na revisão da #691. O limite é seguro e está medido: cuid tem
+  /// 25 caracteres e o ator sistêmico `sistema:bootstrap-master` tem 24, com
+  /// teste exigindo margem — linha de trilha que falha por tamanho é pior que
+  /// coluna larga. Não há ganho de armazenamento: medido em PostgreSQL 16.15,
+  /// `pg_column_size` do mesmo valor é idêntico em `text` e `varchar(64)`.
+  actorUserId         String                   @db.VarChar(64)
   /// Segunda aprovação, exigida para remover. Vazio nas ações que não a pedem.
   approverUserId      String                   @default("") @db.VarChar(64)
   correlationId       String                   @db.VarChar(64)
