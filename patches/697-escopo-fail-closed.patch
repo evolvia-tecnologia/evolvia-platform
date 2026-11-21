@@ -1,0 +1,67 @@
+--- a/apps/api/src/platform-master.repository.ts
++++ b/apps/api/src/platform-master.repository.ts
+@@ -287,22 +287,55 @@
+-  /** Concessões vigentes de uma pessoa, na forma que a política consome. */
++  /**
++   * Concessões vigentes de uma pessoa, na forma que a política consome.
++   *
++   * Linha cujo alcance este adaptador não reconhece é DESCARTADA, não
++   * convertida — ver `escopoDaLinha`. Descartar é `deny-by-default`: o que não
++   * se entende não autoriza.
++   *
++   * Quem precisa VER a linha estranha é a leitura, não o autorizador:
++   * `platform-team-view.alcanceDaLinha` a devolve como `DESCONHECIDO` e a
++   * conta, para que a anomalia apareça a um humano em vez de desaparecer.
++   */
+   async concessoes(targetUserId: string): Promise<Concessao[]> {
+     const linhas = await this.prisma.platformGrant.findMany({
+       where: { targetUserId },
+       select: { action: true, scopeKind: true, organizationId: true, eventId: true, expiresAt: true },
+     });
+-    return linhas.map((l) => ({
+-      acao: l.action,
+-      escopo: this.escopoDaLinha(l.scopeKind, l.organizationId, l.eventId),
+-      expiraEm: l.expiresAt,
+-      revogadaEm: null,
+-    }));
++    const concessoes: Concessao[] = [];
++    for (const l of linhas) {
++      const escopo = this.escopoDaLinha(l.scopeKind, l.organizationId, l.eventId);
++      if (escopo === null) continue;
++      concessoes.push({ acao: l.action, escopo, expiraEm: l.expiresAt, revogadaEm: null });
++    }
++    return concessoes;
+   }
+ 
+-  private escopoDaLinha(scopeKind: unknown, organizationId: string, eventId: string): Concessao['escopo'] {
++  /**
++   * Traduz `scopeKind` para alcance, e devolve `null` no que não reconhece.
++   *
++   * Isto ERA um fail-open. A versão anterior tratava GLOBAL como o caso de
++   * queda:
++   *
++   *     if (tipo === 'ORGANIZACAO') return { tipo: 'ORGANIZACAO', organizationId };
++   *     if (tipo === 'EVENTO')      return { tipo: 'EVENTO', eventId };
++   *     return { tipo: 'GLOBAL' };
++   *
++   * Ou seja: qualquer valor que o código não conhecesse recebia o alcance MAIS
++   * LARGO da plataforma. Era latente, porque a coluna é enum do PostgreSQL e só
++   * aceita os três valores tratados — e por isso nenhum teste pegava. Mas no dia
++   * em que alguém acrescentasse um valor ao enum, toda concessão daquele tipo
++   * passaria a valer na plataforma inteira, sem erro, sem log e sem vermelho.
++   *
++   * Agora GLOBAL é explícito e o desconhecido é `null`, que `concessoes`
++   * descarta. O enum também ganhou gatilho de contrato em
++   * `tests-postgres/platform-enum-contract.postgres.test.mjs`: acrescentar
++   * valor sem tratar aqui passa a ser CI vermelho.
++   */
++  private escopoDaLinha(scopeKind: unknown, organizationId: string, eventId: string): Concessao['escopo'] | null {
+     const tipo = String(scopeKind);
++    if (tipo === 'GLOBAL') return { tipo: 'GLOBAL' };
+     if (tipo === 'ORGANIZACAO') return { tipo: 'ORGANIZACAO', organizationId };
+     if (tipo === 'EVENTO') return { tipo: 'EVENTO', eventId };
+-    return { tipo: 'GLOBAL' };
++    return null;
+   }
+ 
+   /** A organização persistida de um evento, ou `null` se ele não existe. */
