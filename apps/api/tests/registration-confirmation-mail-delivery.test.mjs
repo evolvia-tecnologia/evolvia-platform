@@ -204,3 +204,42 @@ test('configuração corrigida retoma envio após três falhas de preparação e
   assert.equal(audits.at(-1).metadata.providerAccepted, true);
   assert.equal(audits.at(-1).metadata.received, false);
 }));
+
+test('transporte recusa redirecionamento e retoma no destinatário configurado', withDeliveryEnv(async () => {
+  const { createServer } = await import('node:http');
+  const received = [];
+  let redirect = true;
+  const server = createServer(async (req, res) => {
+    let body = '';
+    for await (const part of req) body += part;
+    received.push({ path: req.url, key: req.headers['idempotency-key'], payload: JSON.parse(body) });
+    if (redirect && req.url === '/send') res.writeHead(307, { Location: '/outro' });
+    else res.writeHead(202);
+    res.end();
+  });
+  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+  const origin = 'http://127.0.0.1:' + server.address().port;
+  const realFetch = globalThis.fetch;
+  const endpoint = 'https://mail.example/send';
+  try {
+    Object.assign(process.env, { EVOLVIA_EMAIL_DELIVERY_ENDPOINT: endpoint, EVOLVIA_EMAIL_DELIVERY_TOKEN: 'fixture',
+      EVOLVIA_EMAIL_FROM: 'avisos@eventos.example', EVOLVIA_PUBLIC_BASE_URL: 'https://eventos.example' });
+    globalThis.fetch = (url, init) => {
+      assert.equal(url, endpoint);
+      return realFetch(origin + '/send', init);
+    };
+    const { service, audits } = harness();
+    await service.sendConfirmed(notice);
+    assert.equal(audits.at(-1).metadata.reason, 'rejected');
+    redirect = false;
+    await service.sendConfirmed(notice);
+    await service.sendConfirmed(notice);
+    assert.equal(audits.at(-1).metadata.reason, 'provider_accepted');
+    assert.deepEqual(received.map(entry => entry.path), ['/send', '/send']);
+    assert.equal(received[0].key, received[1].key);
+    assert.deepEqual(received[1].payload.to ?? received[1].payload.message?.to, [recipient]);
+  } finally {
+    globalThis.fetch = realFetch;
+    await new Promise(resolve => server.close(resolve));
+  }
+}));
