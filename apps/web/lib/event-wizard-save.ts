@@ -4,6 +4,8 @@ type SaveState = 'saving' | 'saved' | 'error';
 export type WizardSaveContext<T, P> = {
   queue: Ref<Promise<void>>;
   savedStep: Ref<string>;
+  /** Incrementado em 409 para invalidar snapshots já enfileirados antes da recuperação. */
+  conflictEpoch?: Ref<number>;
   getDirty: () => boolean;
   currentDraft: () => T;
   request: (step: string, snapshot: T) => Promise<P>;
@@ -133,11 +135,15 @@ export function queueWizardSave<T, P>(
 ): Promise<void> {
   const resumeOnStale = options?.resumeOnStale !== false;
   const snapshotJson = JSON.stringify(snapshot);
+  const epochAtEnqueue = context.conflictEpoch?.current ?? 0;
   const operation = context.queue.current.then(async () => {
+    // Snapshot enfileirado antes de um 409 não pode gravar após a recuperação.
+    if ((context.conflictEpoch?.current ?? 0) !== epochAtEnqueue) return;
     if (!context.getDirty() && context.savedStep.current === targetStep) return;
     context.setSaveState('saving');
     try {
       const payload = await context.request(targetStep, snapshot);
+      if ((context.conflictEpoch?.current ?? 0) !== epochAtEnqueue) return;
       const stillCurrent = JSON.stringify(context.currentDraft()) === snapshotJson;
       const rejection = context.rejectionOf
         ? context.rejectionOf(snapshot, payload)
@@ -160,6 +166,7 @@ export function queueWizardSave<T, P>(
     } catch (reason) {
       context.setSaveState('error');
       if (context.isConflict(reason)) {
+        if (context.conflictEpoch) context.conflictEpoch.current += 1;
         await context.recoverLatest();
         throw new Error('O rascunho foi alterado em outra sessão. Confira a versão mais recente antes de continuar.');
       }

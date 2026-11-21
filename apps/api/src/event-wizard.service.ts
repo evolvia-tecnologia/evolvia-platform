@@ -393,8 +393,18 @@ export class EventWizardService {
         }
       }
     }
-    if (answers.startDate || answers.datesPending) data.startDate = answers.startDate ? new Date(answers.startDate) : null;
-    if (answers.endDate || answers.datesPending) data.endDate = answers.endDate ? new Date(answers.endDate) : null;
+    // Datas: null explícito remove o valor no Event. undefined (omissão/inválido) não altera o histórico.
+    if (answers.datesPending === true) {
+      data.startDate = null;
+      data.endDate = null;
+    } else {
+      if (answers.startDate !== undefined) {
+        data.startDate = answers.startDate ? new Date(answers.startDate) : null;
+      }
+      if (answers.endDate !== undefined) {
+        data.endDate = answers.endDate ? new Date(answers.endDate) : null;
+      }
+    }
     if (answers.timeZone) data.timeZone = answers.timeZone;
     if (answers.venue !== undefined || answers.venuePending) data.venue = answers.venue ?? null;
     if (answers.estimatedAudience !== undefined || answers.audiencePending) {

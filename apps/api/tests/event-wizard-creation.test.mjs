@@ -189,6 +189,37 @@ test('Wizard inicia rascunho privado para um tipo canônico', async () => {
   assert.match(eventData.slug, /^rascunho-[a-f0-9]{24}$/u);
 });
 
+test('limpar só o término grava endDate null no Event sem apagar o início', async () => {
+  const service = serviceWith(async () => {});
+  const changes = [];
+  const tx = {
+    event: {
+      findUnique: async () => ({ slug: 'congresso-abc123def456' }),
+      update: async ({ data }) => {
+        changes.push(data);
+        return { id: 'evt-1' };
+      },
+    },
+  };
+
+  await service.persistEventData(tx, 'evt-1', {
+    startDate: '2026-10-16T12:00:00.000Z',
+    endDate: null,
+    datesPending: false,
+    timeZone: 'America/Sao_Paulo',
+  });
+  assert.equal(changes[0].startDate.toISOString(), '2026-10-16T12:00:00.000Z');
+  assert.equal(changes[0].endDate, null);
+
+  await service.persistEventData(tx, 'evt-1', { name: 'Só o nome' });
+  assert.equal(changes[1].startDate, undefined);
+  assert.equal(changes[1].endDate, undefined);
+
+  await service.persistEventData(tx, 'evt-1', { datesPending: true });
+  assert.equal(changes[2].startDate, null);
+  assert.equal(changes[2].endDate, null);
+});
+
 test('Autosave mantém rascunho privado; conclusão gera sigla e código público estável', async () => {
   const service = serviceWith(async () => {});
   let currentSlug = 'rascunho-aabbccddeeff001122334455';
