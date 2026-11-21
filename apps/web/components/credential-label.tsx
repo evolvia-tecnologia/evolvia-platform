@@ -110,7 +110,7 @@ export default function CredentialLabel({ label, preview = false }: { label: Cre
       {!ordered && <p className={styles.event}>{label.eventName}</p>}
       {ordered
         ? ordered.map((item, index) => item.kind === 'qr'
-          ? (label.qr ? <div className={styles.orderedQr} key={`${index}-qr`} style={item.style?.align ? { justifySelf: item.style.align === 'center' ? 'center' : item.style.align === 'right' ? 'end' : 'start' } : undefined}><CredentialQr code={label.qr} compact /></div> : null)
+          ? (label.qr ? <div className={styles.orderedQr} key={`${index}-qr`} data-a11y-speak="off" style={item.style?.align ? { justifySelf: item.style.align === 'center' ? 'center' : item.style.align === 'right' ? 'end' : 'start' } : undefined}><CredentialQr code={label.qr} compact /></div> : null)
           : <p key={`${index}-${item.code}`} className={index === firstTextIndex ? styles.orderedFirst : styles.line}
               style={item.style ? { textAlign: item.style.align, fontWeight: item.style.bold ? 700 : 400, color: item.style.color,
                 fontFamily: item.style.fontFamily ? SAFE_FONTS[item.style.fontFamily] : undefined,
@@ -120,11 +120,11 @@ export default function CredentialLabel({ label, preview = false }: { label: Cre
           label.company && <p key="company" className={styles.company}>{label.company}</p>,
           ...lines.map((line, index) => <p key={`${index}-${line}`} className={styles.line}>{line}</p>),
           label.category && <p key="category" className={styles.category}>{label.category}</p>,
-          label.barcode && <p key="barcode" className={styles.code}>Código {label.protocol}</p>,
+          label.barcode && <p key="barcode" className={styles.code} data-a11y-speak="off">Código {label.protocol}</p>,
         ]}
     </div>
-    {label.qr && !ordered && <div className={styles.codes}><CredentialQr code={label.qr} compact /></div>}
-    {label.barcode && !ordered && <div className={styles.barcode}><CredentialBarcode value={label.barcode} /></div>}
+    {label.qr && !ordered && <div className={styles.codes} data-a11y-speak="off"><CredentialQr code={label.qr} compact /></div>}
+    {label.barcode && !ordered && <div className={styles.barcode} data-a11y-speak="off"><CredentialBarcode value={label.barcode} /></div>}
   </section>;
   return preview ? <>
     {fitWarning && <p role="alert">{emptyOrdered

@@ -82,6 +82,7 @@ export const PUBLIC_HELP_ARTICLES: readonly PublicHelpArticle[] = [
     description: 'O site público é navegável por teclado, com foco visível e texto que se ajusta à tela.',
     paragraphs: [
       'No início de cada página há um link para pular ao conteúdo. Os botões e links principais têm área de toque confortável. O movimento decorativo respeita a preferência de reduzir animação.',
+      'O botão Acessibilidade guarda neste navegador o tamanho do texto, o contraste, o foco e o modo de leitura. A leitura em voz alta usa somente a voz do dispositivo. Se essa voz não existir, o painel explica a limitação e não mostra um botão sem efeito.',
       'Cada evento pode publicar um resumo de acessibilidade escrito pelo organizador. Se esse resumo não existir, a página diz isso em vez de inventar rampa, intérprete ou recurso.',
     ],
     points: [

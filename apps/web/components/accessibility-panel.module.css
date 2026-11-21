@@ -59,7 +59,8 @@
   display: grid;
   gap: var(--space-16);
   width: min(28rem, calc(100vw - var(--space-32)));
-  max-height: min(70vh, 40rem);
+  box-sizing: border-box;
+  max-height: min(40rem, calc(100dvh - var(--space-44) - var(--space-28) - var(--space-16) - env(safe-area-inset-bottom, 0px)));
   overflow: auto;
   padding: var(--space-20);
   border: 1px solid var(--color-border-strong);
@@ -118,10 +119,19 @@
 }
 
 .close,
-.reset {
+.reset,
+.speech {
   min-height: var(--space-44);
   border-radius: var(--radius-md);
   font-weight: var(--font-weight-bold);
+}
+
+.speech {
+  justify-self: start;
+  padding: 0 var(--space-16);
+  border: 1px solid var(--color-border-strong);
+  background: var(--color-surface);
+  color: var(--color-text-strong);
 }
 
 .close {
@@ -140,7 +150,7 @@
   .dialog {
     left: var(--space-8);
     width: calc(100vw - var(--space-16));
-    max-height: 75vh;
+    max-height: calc(100dvh - var(--space-44) - var(--space-28) - var(--space-16) - env(safe-area-inset-bottom, 0px));
   }
 }
 
@@ -152,7 +162,8 @@
   .launcher,
   .dialog,
   .close,
-  .reset {
+  .reset,
+  .speech {
     border: 1px solid ButtonText;
   }
 }

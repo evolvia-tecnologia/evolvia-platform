@@ -2,6 +2,14 @@
 
 import { useEffect, useId, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { usePathname } from 'next/navigation';
+import {
+  browserSpeechEngine,
+  collectReadableText,
+  SpeechEngine,
+  startLocalReading,
+  stopLocalReading,
+} from '../lib/accessibility-reading';
 import {
   ACCESSIBILITY_STORAGE_KEY,
   DEFAULT_ACCESSIBILITY_PREFERENCES,
@@ -29,14 +37,28 @@ export default function AccessibilityPanel({ inline = false }: { inline?: boolea
   const dialogId = useId();
   const launcherRef = useRef<HTMLButtonElement>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
+  const engineRef = useRef<SpeechEngine | null>(null);
+  const speakingRef = useRef(false);
+  const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const [preferences, setPreferences] = useState<AccessibilityPreferences>(DEFAULT_ACCESSIBILITY_PREFERENCES);
   const [status, setStatus] = useState('');
+  const [speechSupport, setSpeechSupport] = useState<'unknown' | 'ready' | 'missing'>('unknown');
+  const [speaking, setSpeaking] = useState(false);
 
   useEffect(() => {
     const stored = readStoredPreferences();
     setPreferences(stored);
     applyAccessibilityPreferences(document.documentElement, stored);
+  }, []);
+
+  useEffect(() => {
+    const engine = browserSpeechEngine();
+    engineRef.current = engine;
+    setSpeechSupport(engine ? 'ready' : 'missing');
+    return () => {
+      if (engine) stopLocalReading(engine);
+    };
   }, []);
 
   useEffect(() => {
@@ -89,7 +111,54 @@ export default function AccessibilityPanel({ inline = false }: { inline?: boolea
     commit({ ...preferences, ...partial }, 'Ajustes atualizados.');
   }
 
-  return <div className={inline ? styles.inline : styles.floating}>
+  function setSpeakingState(value: boolean) {
+    speakingRef.current = value;
+    setSpeaking(value);
+  }
+
+  function stopSpeech() {
+    const engine = engineRef.current;
+    if (engine) stopLocalReading(engine);
+    setSpeakingState(false);
+  }
+
+  useEffect(() => {
+    if (!speakingRef.current) return;
+    stopSpeech();
+    setStatus('Leitura interrompida ao mudar de página.');
+  }, [pathname]);
+
+  function toggleSpeech() {
+    const engine = engineRef.current;
+    if (!engine) return;
+    if (speaking) {
+      stopSpeech();
+      setStatus('Leitura interrompida.');
+      return;
+    }
+    const text = collectReadableText(document.getElementById('conteudo-principal'));
+    const result = startLocalReading(engine, text, () => {
+      setSpeakingState(false);
+      setStatus('Leitura concluída neste dispositivo.');
+    }, () => {
+      setSpeakingState(false);
+      setStatus('Este navegador bloqueou a voz. O texto continua nesta página.');
+    });
+    if (result === 'empty') {
+      setSpeakingState(false);
+      setStatus('Não há texto legível nesta página.');
+      return;
+    }
+    setSpeakingState(true);
+    setStatus('A leitura permanece neste dispositivo.');
+  }
+
+  function restore() {
+    stopSpeech();
+    commit({ ...DEFAULT_ACCESSIBILITY_PREFERENCES }, 'Ajustes restaurados.');
+  }
+
+  return <div className={inline ? styles.inline : styles.floating} data-a11y-chrome="" data-a11y-speak="off">
     <button
       ref={launcherRef}
       className={styles.launcher}
@@ -102,10 +171,12 @@ export default function AccessibilityPanel({ inline = false }: { inline?: boolea
       Acessibilidade
     </button>
     {open && typeof document !== 'undefined' && createPortal(<>
-      <button className={styles.backdrop} type="button" tabIndex={-1} aria-hidden="true" onClick={() => setOpen(false)} />
+      <button className={styles.backdrop} type="button" tabIndex={-1} aria-hidden="true" data-a11y-chrome="" onClick={() => setOpen(false)} />
       <div
         ref={dialogRef}
         className={`${styles.dialog} ${inline ? styles.inlineDialog : ''}`}
+        data-a11y-chrome=""
+        data-a11y-speak="off"
         id={dialogId}
         role="dialog"
         aria-modal="true"
@@ -117,7 +188,7 @@ export default function AccessibilityPanel({ inline = false }: { inline?: boolea
           <h2 id={titleId}>Ajustes de leitura</h2>
           <button className={styles.close} type="button" onClick={() => setOpen(false)}>Fechar</button>
         </div>
-        <p className={styles.intro} id={descriptionId}>Estes ajustes valem em todo o Evolvia neste navegador. O leitor de tela continua sendo o do seu dispositivo.</p>
+        <p className={styles.intro} id={descriptionId}>Estes ajustes valem em todo o Evolvia neste navegador. O leitor de tela continua sendo o do seu dispositivo. A leitura em voz alta também fica nele e não envia o texto para fora.</p>
         <fieldset className={styles.group}>
           <legend>Tamanho do texto</legend>
           <div className={styles.choices}>
@@ -153,10 +224,18 @@ export default function AccessibilityPanel({ inline = false }: { inline?: boolea
           <label className={styles.check}><input type="checkbox" checked={preferences.motion === 'reduce'} onChange={(event) => update({ motion: event.target.checked ? 'reduce' : 'system' })} /> Reduzir animações</label>
           <label className={styles.check}><input type="checkbox" checked={preferences.focus === 'strong'} onChange={(event) => update({ focus: event.target.checked ? 'strong' : 'default' })} /> Realçar o foco do teclado</label>
           <label className={styles.check}><input type="checkbox" checked={preferences.targets === 'large'} onChange={(event) => update({ targets: event.target.checked ? 'large' : 'default' })} /> Áreas de toque maiores</label>
+          <label className={styles.check}><input type="checkbox" checked={preferences.reading === 'on'} onChange={(event) => update({ reading: event.target.checked ? 'on' : 'off' })} /> Modo de leitura</label>
         </div>
         <p className={styles.note}>Contraste alto deixa o texto preto sobre fundo branco e os botões em azul escuro. Com a opção desmarcada, o Evolvia acompanha o contraste pedido pelo sistema operacional.</p>
-        <button className={styles.reset} type="button" onClick={() => commit({ ...DEFAULT_ACCESSIBILITY_PREFERENCES }, 'Ajustes restaurados.')}>Restaurar padrão</button>
+        <p className={styles.note}>O modo de leitura aumenta o espaço das linhas e a medida do texto. Imagens, QR codes, credenciais e a impressão continuam visíveis.</p>
+        <fieldset className={styles.group}>
+          <legend>Leitura em voz alta</legend>
+          <p className={styles.note}>A voz é a deste dispositivo. Nenhum texto é enviado a um serviço de voz ou de inteligência artificial.</p>
+          {speechSupport === 'missing' && <p className={styles.note}>A leitura em voz alta não está disponível neste navegador.</p>}
+          {speechSupport === 'ready' && <button className={styles.speech} type="button" aria-pressed={speaking} onClick={toggleSpeech}>{speaking ? 'Parar leitura' : 'Ler esta página'}</button>}
+        </fieldset>
         <p className={styles.status} role="status" aria-live="polite">{status}</p>
+        <button className={styles.reset} type="button" onClick={restore}>Restaurar padrão</button>
       </div>
     </>, document.body)}
   </div>;

@@ -24,7 +24,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return <html lang={DEFAULT_LOCALE}>
     <body>
       <script dangerouslySetInnerHTML={{ __html: ACCESSIBILITY_BOOT_SCRIPT }} />
-      {children}
+      <a className="content-skip" href="#conteudo-principal" data-a11y-chrome="">Pular para o conteúdo principal</a>
+      <div id="conteudo-principal" tabIndex={-1}>
+        {children}
+      </div>
       <AccessibilityPanel />
     </body>
   </html>;
