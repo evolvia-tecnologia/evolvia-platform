@@ -23,5 +23,5 @@
 .rubricTable caption { text-align: left; font-weight: var(--font-weight-semibold); padding-block: var(--space-8); }
 
 #criterios, #distribuicao, #distribuicao-assistida, #acompanhamento, #decisao {
-  scroll-margin-top: 88px;
+  scroll-margin-top: calc(var(--space-80) + var(--space-8));
 }

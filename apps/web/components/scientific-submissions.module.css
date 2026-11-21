@@ -105,5 +105,5 @@
 }
 
 #regras, #conteudo, #autoria, #areas, #formas, #cegamento, #cartas, #lista, #estacao {
-  scroll-margin-top: 88px;
+  scroll-margin-top: calc(var(--space-80) + var(--space-8));
 }

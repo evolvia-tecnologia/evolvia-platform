@@ -365,7 +365,7 @@ export default function ScientificSubmissions({ eventId }: { eventId: string }) 
         </article>
 
         <article id="formas" className={styles.card}>
-          <span className={styles.step}>2 · O QUE SERÁ ACEITO?</span><h2>Formas de apresentação e prazos</h2><p>Forma de apresentação (oral, pôster, pôster digital etc.) não é a mesma coisa que tipo de trabalho. Aqui você define o que o autor pode escolher no envio e os prazos/blocos de cada opção.</p>
+          <span className={styles.step}>2 · O QUE SERÁ ACEITO?</span><h2>Modalidades de submissão</h2><p>Escolha o que o autor pode selecionar no envio: oral, tema livre, pôster, pôster digital ou outra modalidade deste evento. Forma de apresentação não é a mesma coisa que tipo de trabalho; aqui você também define prazos e blocos de cada opção.</p>
           <ul className={styles.formatList}>{visibleFormats(payload).map((item) => {
             const modality = payload.modalities.find((entry) => entry.code === item.code);
             return <li key={item.code}>
