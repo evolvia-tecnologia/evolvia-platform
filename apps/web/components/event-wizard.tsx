@@ -217,6 +217,7 @@ export default function EventWizard({ eventId }: EventWizardProps) {
   const savedStepRef = useRef('profile');
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const saveQueueRef = useRef<Promise<void>>(Promise.resolve());
+  const conflictEpochRef = useRef(0);
   const stepRequestApplied = useRef(false);
   const reviewingFoundation = useRef(false);
 
@@ -343,6 +344,7 @@ export default function EventWizard({ eventId }: EventWizardProps) {
     return queueWizardSave(targetStep, snapshot, {
       queue: saveQueueRef,
       savedStep: savedStepRef,
+      conflictEpoch: conflictEpochRef,
       getDirty: () => dirtyRef.current,
       currentDraft: () => draftRef.current,
       request: (currentStep, snapshot) => api<WizardPayload>(`/event-wizard/${currentEventId}`, {

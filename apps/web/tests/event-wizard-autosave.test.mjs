@@ -14,17 +14,18 @@ function harness(draft, response, extra = {}) {
   const state = {
     draftRef: { current: draft }, revisionRef: { current: 3 },
     catalogRef: { current: [] }, savedStepRef: { current: 'identity' },
-    saveQueueRef: { current: Promise.resolve() }, dirty: true,
-    requests: [], recovered: 0, saveState: 'idle', resumes: 0,
+    saveQueueRef: { current: Promise.resolve() }, conflictEpochRef: { current: 0 },
+    dirty: true, requests: [], recovered: 0, saveState: 'idle', resumes: 0,
   };
   const save = (targetStep, snapshot = state.draftRef.current, options) => queueWizardSave(targetStep, snapshot, {
     queue: state.saveQueueRef,
     savedStep: state.savedStepRef,
+    conflictEpoch: state.conflictEpochRef,
     getDirty: () => state.dirty,
     currentDraft: () => state.draftRef.current,
     request: async (currentStep, answers) => {
       state.requests.push({ currentStep, answers, revision: state.revisionRef.current });
-      return response(state.requests.length);
+      return response(state.requests.length, { currentStep, answers });
     },
     applyPayload: (payload, overwrite) => {
       state.revisionRef.current = payload.session.revision;
@@ -33,7 +34,13 @@ function harness(draft, response, extra = {}) {
     setDirty: value => { state.dirty = value; },
     setSaveState: value => { state.saveState = value; },
     isConflict: reason => reason instanceof ApiError && reason.status === 409,
-    recoverLatest: async () => { state.recovered += 1; },
+    recoverLatest: async () => {
+      state.recovered += 1;
+      if (extra.recoverDraft) {
+        state.draftRef.current = extra.recoverDraft;
+        state.revisionRef.current = extra.recoverRevision ?? state.revisionRef.current;
+      }
+    },
     datesConfirmed: extra.datesConfirmed,
     rejectionOf: extra.rejectionOf,
     resume: () => {
@@ -104,6 +111,37 @@ test('conflito 409 continua recuperando versão canônica e interrompe avanço',
   await assert.rejects(save('location'), /outra sessão/);
   assert.equal(state.recovered, 1);
   assert.equal(state.savedStepRef.current, 'identity');
+  assert.equal(state.conflictEpochRef.current, 1);
+});
+
+test('após 409, snapshot de outra etapa já enfileirado não grava a revisão antiga', async () => {
+  let releaseIdentity;
+  const identityGate = new Promise((done) => { releaseIdentity = done; });
+  const recovered = { name: 'Versão B', startDate: '2026-10-20T12:00:00.000Z', endDate: null, timeZone: 'America/Sao_Paulo' };
+  const { state, save } = harness(
+    { name: 'Versão A', startDate: '2026-10-16T12:00:00.000Z', endDate: '2026-10-17T12:00:00.000Z', timeZone: 'America/Sao_Paulo' },
+    async (number) => {
+      if (number === 1) {
+        await identityGate;
+        throw new ApiError('Conflito de versão', 409);
+      }
+      return { session: { revision: 9 }, answers: recovered };
+    },
+    { recoverDraft: recovered, recoverRevision: 2 },
+  );
+  const identitySave = save('identity');
+  await Promise.resolve();
+  // Navegação enfileirada ainda carrega o snapshot A/rev1.
+  const locationSave = save('location', state.draftRef.current);
+  releaseIdentity();
+  await assert.rejects(identitySave, /outra sessão/);
+  await locationSave;
+  assert.equal(state.recovered, 1);
+  assert.equal(state.conflictEpochRef.current, 1);
+  assert.equal(state.requests.length, 1);
+  assert.equal(state.requests[0].currentStep, 'identity');
+  assert.equal(state.revisionRef.current, 2);
+  assert.equal(state.draftRef.current.name, 'Versão B');
 });
 
 test('navegação com digitação durante PATCH preserva edição nova para próximo save', async () => {
