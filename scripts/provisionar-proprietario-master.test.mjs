@@ -7,7 +7,7 @@ import {
   TAMANHO_DO_CUID, decidirEntrada, ehAtorSistemico, ehUrlDeSocketUnix, hostDoBanco,
   idEstiloCuid, literal, montarSql,
 } from './provisionar-proprietario-master.policy.mjs';
-import { chamadoDiretamente, lerArgumentos } from './provisionar-proprietario-master.mjs';
+import { chamadoDiretamente, executar, lerArgumentos } from './provisionar-proprietario-master.mjs';
 
 const URL_OK = 'postgresql://evolvia:senha@db.homologacao.interno:5432/evolvia?schema=public';
 const HOST_OK = 'db.homologacao.interno';
@@ -78,8 +78,10 @@ test('nota é obrigatória, limitada à coluna e sem caractere de controle', () 
   assert.equal(decidirEntrada(base({ nota: 'a'.repeat(LIMITE_DA_NOTA + 1) })).motivo, 'nota_muito_longa');
   // O último caso usa U+200B (espaço de largura zero) escrito por código, e não
   // como caractere literal nem como escape: caractere invisível no fonte é
-  // armadilha para quem revisa, e o escape ​ não sobreviveu ao conector
-  // que escreve no repositorio.
+  // armadilha para quem revisa. E o comentario que estava aqui CONTINHA um
+  // U+200B literal, invisivel no fonte: a propria armadilha que ele descreve.
+  // Removido, e escrito por nome. Caractere invisivel em codigo-fonte nao deve
+  // existir nem dentro de um comentario que adverte contra ele.
   for (const nota of ['linha1\nlinha2', 'com\ttab', 'com\u0000nulo', 'com' + String.fromCharCode(0x200b) + 'zero']) {
     assert.equal(decidirEntrada(base({ nota })).motivo, 'nota_com_controle', `aceitou ${JSON.stringify(nota)}`);
   }
@@ -117,12 +119,20 @@ test('o SQL é uma transação só', () => {
   assert.doesNotMatch(sql, /ROLLBACK/u, 'ON_ERROR_STOP já cuida; rollback explícito mascararia erro');
 });
 
-test('as três condições de dados são verificadas dentro da transação', () => {
+test('as quatro condições de dados são verificadas dentro da transação', () => {
   const sql = sqlBase();
-  for (const guarda of [/Nao existe usuario com esse e-mail/u, /nao tem e-mail verificado/u, /Ja existe proprietario Master ativo/u]) {
+  for (const guarda of [
+    /Nao existe usuario com esse e-mail/u,
+    /nao tem e-mail verificado/u,
+    /ja possui identidade Master/u,
+    /Ja existe proprietario Master ativo/u,
+  ]) {
     assert.match(sql, guarda);
   }
-  assert.equal((sql.match(/RAISE EXCEPTION/gu) ?? []).length, 3,
+  // Eram três; a quarta nasceu do reparo de segurança da #690. Identidade
+  // existente que NÃO seja OWNER ativa passou a recusar em vez de devolver
+  // sucesso — ver o teste da fidelidade do replay, abaixo.
+  assert.equal((sql.match(/RAISE EXCEPTION/gu) ?? []).length, 4,
     'cada condição precisa de exceção própria, não de INSERT que simplesmente não casa');
 });
 
@@ -183,12 +193,74 @@ test('o namespace sistêmico sobrevive ao escape para SQL', () => {
   assert.ok(sqlBase().includes(`'${ATOR_DO_BOOTSTRAP}'`));
 });
 
-test('o pedido explícito remove a guarda de proprietário, e só ela', () => {
-  const sem = sqlBase({ permitirSegundoProprietario: true });
+test('não existe mais caminho para um segundo proprietário por script', () => {
+  // ESTE TESTE SUBSTITUI UM ERRO MEU, e o erro merece ficar escrito.
+  //
+  // O teste que estava aqui se chamava "o pedido explícito remove a guarda de
+  // proprietário, e só ela" e AFIRMAVA a vulnerabilidade como comportamento
+  // desejado: exigia que `permitirSegundoProprietario: true` apagasse a guarda
+  // e deixasse apenas duas exceções. Ou seja, a suíte guardava o buraco em vez
+  // de guardar a proteção — e passava, 26 de 26.
+  //
+  // Medido em PostgreSQL 16.15 com o SQL que aquela flag gerava: dois OWNER
+  // ATIVOS, que é exatamente o que este script existe para impedir. Nenhuma
+  // guarda de dados restante impedia o segundo, porque a única que olhava
+  // proprietário era a que a flag apagava.
+  //
+  // A guarda agora é incondicional, e a flag é recusada em TRÊS camadas, para
+  // que nenhum caminho sobreviva: a leitura de argumentos, a política e o
+  // gerador de SQL.
   assert.match(sqlBase(), /Ja existe proprietario Master ativo/u);
-  assert.doesNotMatch(sem, /Ja existe proprietario Master ativo/u);
-  assert.match(sem, /Segundo proprietario autorizado explicitamente/u);
-  assert.equal((sem.match(/RAISE EXCEPTION/gu) ?? []).length, 2, 'as outras duas continuam');
+  assert.ok(!sqlBase().includes('Segundo proprietario autorizado explicitamente'),
+    'o texto do atalho não pode mais existir em SQL nenhum');
+
+  // Camada 1: a opção continua sendo LIDA, e só para poder ser recusada.
+  // Ignorá-la em silêncio deixaria um runbook antigo obtendo um SQL diferente
+  // do que o operador pensa estar pedindo.
+  assert.equal(lerArgumentos(['--permitir-segundo-proprietario']).segundoProprietarioPedido, true);
+  assert.equal(lerArgumentos([]).segundoProprietarioPedido, false);
+
+  // Camada 2: a política recusa, com motivo próprio e mensagem que explica.
+  const d = decidirEntrada(base({ segundoProprietarioPedido: true }));
+  assert.equal(d.permitido, false);
+  assert.equal(d.motivo, 'segundo_proprietario_por_script');
+  assert.match(d.mensagem, /REMOVIDO/u);
+  // E não vira exceção de conteúdo: o pedido é recusado mesmo com tudo válido.
+  assert.equal(decidirEntrada(base()).permitido, true, 'a mesma entrada sem a flag continua passando');
+
+  // Camada 3: quem chama o módulo por código também não consegue.
+  assert.throws(
+    () => sqlBase({ permitirSegundoProprietario: true }),
+    /REMOVIDO/u,
+    'passar a chave antiga tem de lançar, não ser ignorada em silêncio',
+  );
+});
+
+test('a fidelidade do replay: idempotente só para a MESMA identidade OWNER ativa', () => {
+  // Segundo reparo de segurança da #690. O SQL lia apenas o `id` de qualquer
+  // identidade do alvo e dava RETURN — então um DELEGADO, ou um OWNER
+  // suspenso, faziam o script sair com código 0 dizendo "nada a fazer", sem
+  // criar proprietário e sem gravar trilha. Medido em PostgreSQL 16.15 nos
+  // três casos: falso sucesso, zero proprietários, zero trilha.
+  //
+  // Falso sucesso é pior que erro: o operador lê 0 e conclui que a área tem
+  // titular. Não tem, e ninguém é avisado.
+  const sql = sqlBase();
+  // Lê papel e situação, e não só o id.
+  assert.match(sql, /SELECT id, role::text, status::text/u);
+  assert.ok(sql.includes("papel_existente = 'OWNER' AND situacao_existente = 'ACTIVE'"),
+    'a idempotência tem de ser condicionada à identidade OWNER ATIVA');
+  // O caminho de sucesso silencioso existe SÓ dentro dessa condição.
+  assert.ok(sql.indexOf("papel_existente = 'OWNER'") < sql.indexOf('RETURN;'),
+    'o RETURN tem de estar dentro da condição, senão qualquer identidade volta a dar sucesso');
+  // Qualquer outra situação recusa, e a mensagem diz o que encontrou.
+  assert.match(sql, /RAISE EXCEPTION 'Este usuario ja possui identidade Master % \/ %/u);
+  assert.ok(sql.includes('papel_existente, situacao_existente, ja_existe'),
+    'a recusa tem de dizer papel e situação reais, para o operador saber o que fazer');
+  // E diz explicitamente o que este script NÃO faz, porque promover e
+  // reativar são atos do proprietário, com autoria registrada.
+  assert.match(sql, /nao promove papel, nao reativa identidade suspensa/u);
+  assert.equal((sql.match(/RETURN;/gu) ?? []).length, 1, 'um único caminho de saída silenciosa');
 });
 
 test('o SQL não contém senha, hash nem desafio', () => {
@@ -271,19 +343,25 @@ test('a trava serializa o nascimento, porque o esquema não serializa', () => {
   assert.ok(sql.indexOf('BEGIN;') < sql.indexOf('pg_advisory_xact_lock'),
     'a trava tem de estar dentro da transação, senão é liberada antes do INSERT');
   assert.ok(sql.indexOf('pg_advisory_xact_lock') < sql.indexOf('INSERT INTO "PlatformMasterIdentity"'));
-  // Também vale no modo explícito de segundo proprietário: a trava não é a
-  // guarda, mas continua sendo o que impede duas escritas simultâneas.
-  assert.match(sqlBase({ permitirSegundoProprietario: true }), /pg_advisory_xact_lock/u);
+  // A asserção que havia aqui exercia o modo de segundo proprietário, que
+  // deixou de existir no reparo da #690. A trava continua sendo medida de
+  // verdade, contra banco, em
+  // `apps/api/tests-postgres/platform-owner-provisioning.postgres.test.mjs`:
+  // com trava nasce um proprietário, sem trava nascem dois.
+  assert.ok(sql.indexOf('pg_advisory_xact_lock') < sql.indexOf('SELECT id, role::text'),
+    'a trava tem de vir antes da leitura da identidade existente');
 });
 
 test('a linha de comando aceita as duas formas e não confia em valor ausente', () => {
   const a = lerArgumentos(['--email', 'a@b.com', '--nota', 'x y', '--confirmar-host', 'h']);
-  assert.deepEqual(a, { email: 'a@b.com', nota: 'x y', hostConfirmado: 'h', permitirSegundoProprietario: false });
+  assert.deepEqual(a, { email: 'a@b.com', nota: 'x y', hostConfirmado: 'h', segundoProprietarioPedido: false });
   const b = lerArgumentos(['--email=a@b.com', '--nota=x y', '--confirmar-host=h']);
   assert.deepEqual(b, a);
+  // O campo mudou de nome no reparo da #690, e o nome passou a dizer a
+  // verdade: é um PEDIDO lido para ser recusado, não uma permissão concedida.
   const c = lerArgumentos(['--email', 'a@b.com', '--permitir-segundo-proprietario']);
-  assert.equal(c.permitirSegundoProprietario, true);
-  assert.equal(lerArgumentos([]).permitirSegundoProprietario, false);
+  assert.equal(c.segundoProprietarioPedido, true);
+  assert.equal(lerArgumentos([]).segundoProprietarioPedido, false);
   // Opção sem valor devolve o BOOLEANO true no parser; booleano não pode
   // atravessar para onde o resto do módulo espera texto.
   for (const campo of ['email', 'nota', 'hostConfirmado']) {
@@ -294,6 +372,39 @@ test('a linha de comando aceita as duas formas e não confia em valor ausente', 
   const d = lerArgumentos(['--desconhecido', 'v', '--email', 'a@b.com']);
   assert.equal(d.email, 'a@b.com');
   assert.equal(lerArgumentos(['--email']).email, undefined);
+});
+
+test('a linha de comando recusa a flag antiga de ponta a ponta', () => {
+  // ESTE CASO NASCEU DE UM MUTANTE QUE SOBREVIVEU à minha primeira versão da
+  // suíte: fazer a CLI não repassar `segundoProprietarioPedido` à política.
+  //
+  // O resultado do mutante continuava SEGURO — o SQL saía com a guarda
+  // incondicional, então nenhum segundo proprietário nasceria. Mas o operador
+  // não recebia recusa nenhuma, e era exatamente esse o argumento do reparo:
+  // um runbook antigo tem de falhar ALTO, e não obter em silêncio um SQL
+  // diferente do que pensa estar pedindo.
+  //
+  // Nenhuma das camadas anteriores pegava isso, porque todas testavam as
+  // funções isoladas. Faltava exercer a costura.
+  const env = { NODE_ENV: 'development', DATABASE_URL: URL_OK };
+  const comuns = ['--email', 'rosberg@exemplo.com', '--nota', 'Autorizado.', '--confirmar-host', HOST_OK];
+
+  let saiu = '';
+  let errou = '';
+  const codigo = executar([...comuns, '--permitir-segundo-proprietario'],
+    env, (t) => { saiu += t; }, (t) => { errou += t; });
+  assert.equal(codigo, 1, 'a flag antiga tem de encerrar com código de erro');
+  assert.equal(saiu, '', 'nenhum SQL pode ser emitido quando o pedido é recusado');
+  assert.match(errou, /REMOVIDO/u, 'a recusa tem de explicar, não só falhar');
+
+  // O mesmo comando SEM a flag continua funcionando — senão este teste provaria
+  // apenas que eu quebrei a linha de comando.
+  saiu = '';
+  errou = '';
+  const ok = executar(comuns, env, (t) => { saiu += t; }, (t) => { errou += t; });
+  assert.equal(ok, 0);
+  assert.match(saiu, /Ja existe proprietario Master ativo/u, 'o SQL sai com a guarda');
+  assert.match(errou, /Alvo conferido/u);
 });
 
 test('a decisão de "fui executado diretamente" não depende de montar URL à mão', () => {
