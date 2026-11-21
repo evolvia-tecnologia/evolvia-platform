@@ -68,6 +68,8 @@ export const MOTIVOS = {
   nota_obrigatoria: 'Recusado: informe --nota com quem autorizou este provisionamento.',
   nota_muito_longa: `Recusado: a nota deve ter no máximo ${LIMITE_DA_NOTA} caracteres.`,
   nota_com_controle: 'Recusado: a nota deve ser texto imprimível de uma linha.',
+  segundo_proprietario_por_script:
+    'Recusado: --permitir-segundo-proprietario foi REMOVIDO. Ele desligava por completo a guarda de proprietário único, que é a única coisa que este script existe para garantir — com a flag, nasciam dois OWNER ativos. Nomear um segundo proprietário é prerrogativa do proprietário principal, pela Área Master, com trilha de auditoria e autoria preservada. Não há caminho por script para isso.',
 };
 
 const texto = (v) => (typeof v === 'string' ? v.trim() : '');
@@ -116,9 +118,16 @@ export function ehUrlDeSocketUnix(databaseUrl) {
  * recusado antes de qualquer outra coisa.
  */
 export function decidirEntrada(entrada) {
-  const { nodeEnv, databaseUrl, hostConfirmado, email, nota } = entrada ?? {};
+  const { nodeEnv, databaseUrl, hostConfirmado, email, nota, segundoProprietarioPedido } = entrada ?? {};
 
   if (texto(nodeEnv).toLowerCase() === 'production') return recusa('ambiente_de_producao');
+
+  // Logo depois da recusa de produção, e antes de qualquer validação de
+  // conteúdo: pedir a antiga flag é pedir para desligar a proteção, e isso é
+  // recusado de saída. A recusa é EXPLÍCITA, e não um silêncio: ignorar o
+  // argumento deixaria o operador com um runbook antigo acreditando que
+  // conseguiu o comportamento de antes, quando o SQL gerado seria outro.
+  if (segundoProprietarioPedido === true) return recusa('segundo_proprietario_por_script');
 
   const host = hostDoBanco(databaseUrl);
   if (host === null) return recusa(ehUrlDeSocketUnix(databaseUrl) ? 'host_de_socket_unix' : 'host_ausente');
@@ -189,19 +198,22 @@ export function literal(valor) {
  *  - o nascimento é serializado por trava, porque o esquema não o serializa.
  */
 export function montarSql({
-  email, nota, permitirSegundoProprietario = false, correlacao,
+  email, nota, correlacao,
   identidadeId = idEstiloCuid(), auditoriaId = idEstiloCuid(),
+  ...resto
 }) {
+  // Defesa em profundidade para quem chama o módulo por código, não pela CLI.
+  // Silenciosamente ignorar a chave seria FECHADO e portanto seguro, mas
+  // deixaria um chamador convencido de que obteve o SQL sem guarda. Lançar diz
+  // a verdade na hora.
+  if ('permitirSegundoProprietario' in resto) {
+    throw new Error(MOTIVOS.segundo_proprietario_por_script);
+  }
   const e = literal(email);
   const n = literal(nota);
   const c = literal(correlacao);
   const idIdentidade = literal(identidadeId);
   const idAuditoria = literal(auditoriaId);
-  const guardaDeProprietario = permitirSegundoProprietario
-    ? '  -- Segundo proprietario autorizado explicitamente na linha de comando.'
-    : `  IF EXISTS (SELECT 1 FROM "PlatformMasterIdentity" WHERE role = 'OWNER' AND status = 'ACTIVE') THEN
-    RAISE EXCEPTION 'Ja existe proprietario Master ativo. Nomear outro e prerrogativa do proprietario principal, pela area, nao por script.';
-  END IF;`;
 
   return `-- Nascimento do primeiro proprietario da Area Master (#665).
 -- Gerado por scripts/provisionar-proprietario-master.mjs. Revise antes de executar.
@@ -212,6 +224,8 @@ DO $evolvia$
 DECLARE
   alvo_id text;
   ja_existe text;
+  papel_existente text;
+  situacao_existente text;
 BEGIN
   -- Trava antes de qualquer leitura de estado, e e ela que torna a guarda de
   -- proprietario confiavel. "PlatformMasterIdentity" tem indice em
@@ -235,13 +249,30 @@ BEGIN
     RAISE EXCEPTION 'O usuario existe mas nao tem e-mail verificado.';
   END IF;
 
-  SELECT id INTO ja_existe FROM "PlatformMasterIdentity" WHERE "userId" = alvo_id;
+  -- Idempotencia SO para a mesma identidade OWNER ATIVA. Ler apenas o id e
+  -- dar RETURN para QUALQUER identidade existente era falso sucesso: um
+  -- DELEGADO, ou um OWNER suspenso, faziam o script sair com codigo 0 dizendo
+  -- "nada a fazer" sem criar proprietario nenhum e sem gravar trilha. O
+  -- operador le sucesso e conclui que a area tem titular; nao tem.
+  -- Qualquer outra situacao RECUSA, e a recusa desfaz a transacao: este script
+  -- faz NASCER o primeiro proprietario, e nao promove papel, nao reativa
+  -- identidade suspensa e nao altera identidade existente. Promover ou
+  -- reativar sao atos do proprietario, pela area, com autoria registrada.
+  SELECT id, role::text, status::text
+    INTO ja_existe, papel_existente, situacao_existente
+    FROM "PlatformMasterIdentity" WHERE "userId" = alvo_id;
   IF ja_existe IS NOT NULL THEN
-    RAISE NOTICE 'Nada a fazer: este usuario ja possui identidade Master (%).', ja_existe;
-    RETURN;
+    IF papel_existente = 'OWNER' AND situacao_existente = 'ACTIVE' THEN
+      RAISE NOTICE 'Nada a fazer: este usuario ja e proprietario Master ativo (%).', ja_existe;
+      RETURN;
+    END IF;
+    RAISE EXCEPTION 'Este usuario ja possui identidade Master % / % (%). Este script faz nascer o PRIMEIRO proprietario; ele nao promove papel, nao reativa identidade suspensa e nao altera identidade existente. Trate pela area, com trilha e autoria.',
+      papel_existente, situacao_existente, ja_existe;
   END IF;
 
-${guardaDeProprietario}
+  IF EXISTS (SELECT 1 FROM "PlatformMasterIdentity" WHERE role = 'OWNER' AND status = 'ACTIVE') THEN
+    RAISE EXCEPTION 'Ja existe proprietario Master ativo. Nomear outro e prerrogativa do proprietario principal, pela area, nao por script.';
+  END IF;
 
   INSERT INTO "PlatformMasterIdentity" ("id", "userId", "role", "status", "provisionedByNote", "provisionedAt")
   VALUES (${idIdentidade}, alvo_id, 'OWNER', 'ACTIVE', ${n}, now());

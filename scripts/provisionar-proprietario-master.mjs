@@ -14,6 +14,14 @@
 //
 // `--confirmar-host` tem de ser igual ao host do DATABASE_URL em uso. É o que
 // impede rodar contra o banco errado por engano.
+//
+// `--permitir-segundo-proprietario` FOI REMOVIDO. Ele desligava inteiramente a
+// guarda de proprietário único — medido em PostgreSQL 16.15: com a flag,
+// nasciam dois OWNER ativos, que é exatamente o que este script existe para
+// impedir. A opção continua sendo LIDA, e só para ser RECUSADA com mensagem:
+// um runbook antigo tem de falhar alto, não obter um SQL diferente em silêncio.
+// Nomear um segundo proprietário é ato do proprietário principal, pela Área
+// Master, com autoria e trilha — não há caminho por script.
 import { parseArgs } from 'node:util';
 import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
@@ -49,7 +57,8 @@ export function lerArgumentos(argv) {
     email: soTexto(values.email),
     nota: soTexto(values.nota),
     hostConfirmado: soTexto(values['confirmar-host']),
-    permitirSegundoProprietario: values['permitir-segundo-proprietario'] === true,
+    // O nome diz PEDIDO, não permissão: a opção é lida para ser recusada.
+    segundoProprietarioPedido: values['permitir-segundo-proprietario'] === true,
   };
 }
 
@@ -69,6 +78,7 @@ export function executar(argv, env, saida, erro) {
     hostConfirmado: args.hostConfirmado,
     email: args.email,
     nota: args.nota,
+    segundoProprietarioPedido: args.segundoProprietarioPedido,
   });
 
   if (!decisao.permitido) {
@@ -79,7 +89,6 @@ export function executar(argv, env, saida, erro) {
   saida(montarSql({
     email: decisao.email,
     nota: decisao.nota,
-    permitirSegundoProprietario: args.permitirSegundoProprietario,
     correlacao: correlacaoDe(),
   }));
   // Para stderr, de propósito: assim `> arquivo.sql` recebe só o SQL.
