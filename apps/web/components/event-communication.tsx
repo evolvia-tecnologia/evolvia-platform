@@ -127,10 +127,13 @@ function ScopedCommunication({ eventId }: { eventId: string }) {
       {!drafts.length && <p>Nenhum rascunho salvo neste evento.</p>}
       <ul className={styles.list}>{drafts.map((row) => <li key={row.id}><strong>{row.subject}</strong><span>Versão {row.revision} · {new Date(row.updatedAt).toLocaleString('pt-BR')}</span><button type="button" disabled={busy || dirty} onClick={() => void open(row.id)}>Abrir <span className={styles.srOnly}>{row.subject}</span></button></li>)}</ul>
     </section>}
-    {showAudience && <EventCommunicationAudience eventId={eventId} />}
+    {/* Mantém a prévia montada ao trocar de aba para não perder filtros/seleção. */}
+    <div hidden={!showAudience}>
+      <EventCommunicationAudience eventId={eventId} />
+    </div>
     {tab === 'history' && <section className={styles.card} aria-label="Histórico de envios">
       <h2>Histórico de envios</h2>
-      <p role="status">A API ainda não publica histórico de disparos. Esta tela não consulta envios e não afirma “enviado” ou “entregue”.</p>
+      <p>A API ainda não publica histórico de disparos. Esta tela não consulta envios e não afirma “enviado” ou “entregue”.</p>
       <p>Prévia de destinatários e rascunho salvo não contam como mensagem enviada. Quando o transporte e o histórico existirem, falhas, retentativas e resultados reais aparecerão aqui.</p>
     </section>}
   </main>;
