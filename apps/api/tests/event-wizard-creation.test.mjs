@@ -220,6 +220,71 @@ test('limpar só o término grava endDate null no Event sem apagar o início', a
   assert.equal(changes[2].endDate, null);
 });
 
+test('save persiste endDate null no Event e na sessão Wizard juntos', async () => {
+  const eventRow = {
+    id: 'evt-1',
+    ownerId: 'user-1',
+    organizationId: 'org-1',
+    status: 'DRAFT',
+    eventType: 'Congresso ou evento científico',
+    profileCode: 'SCIENTIFIC_EVENT',
+    name: 'Congresso QA',
+    format: 'IN_PERSON',
+    startDate: new Date('2026-10-16T12:00:00.000Z'),
+    endDate: new Date('2026-10-18T12:00:00.000Z'),
+    timeZone: 'America/Sao_Paulo',
+    venue: 'Centro',
+    estimatedAudience: 100,
+    slug: 'congresso-abc123def456',
+    organization: { id: 'org-1', name: 'Org', slug: 'org', status: 'ACTIVE' },
+    capabilities: [{ code: 'registration' }, { code: 'scientific' }],
+    updatedAt: new Date('2026-10-01T00:00:00.000Z'),
+  };
+  let eventPatch = null;
+  let sessionPatch = null;
+  const prisma = {
+    event: { findUnique: async () => eventRow },
+    $transaction: async (operation) => operation({
+      event: {
+        findUnique: async () => ({ slug: eventRow.slug }),
+        update: async ({ data }) => { eventPatch = data; return { id: eventRow.id }; },
+      },
+      eventCapability: { upsert: async () => ({}) },
+      eventWizardSession: {
+        updateMany: async ({ data }) => { sessionPatch = data; return { count: 1 }; },
+      },
+      auditLog: { create: async () => ({}) },
+    }),
+  };
+  const authorization = { requireRole: async () => ({ role: 'OWNER' }) };
+  const mutationPolicy = { assertFoundationMutable: () => undefined };
+  const service = new EventWizardService(prisma, authorization, mutationPolicy);
+  service.get = async () => ({ event: { id: 'evt-1' }, answers: { endDate: null } });
+
+  await service.save('user-1', 'evt-1', {
+    currentStep: 'identity',
+    revision: 3,
+    answers: {
+      eventType: eventRow.eventType,
+      name: eventRow.name,
+      format: 'IN_PERSON',
+      startDate: '2026-10-16T12:00:00.000Z',
+      endDate: null,
+      timeZone: 'America/Sao_Paulo',
+      datesPending: false,
+      venue: 'Centro',
+      registrationMode: 'FREE',
+      capabilities: ['registration', 'scientific'],
+      subjectAreas: ['saude'],
+    },
+  });
+
+  assert.equal(eventPatch.endDate, null);
+  assert.equal(eventPatch.startDate.toISOString(), '2026-10-16T12:00:00.000Z');
+  assert.equal(sessionPatch.answers.endDate, null);
+  assert.equal(sessionPatch.answers.startDate, '2026-10-16T12:00:00.000Z');
+});
+
 test('Autosave mantém rascunho privado; conclusão gera sigla e código público estável', async () => {
   const service = serviceWith(async () => {});
   let currentSlug = 'rascunho-aabbccddeeff001122334455';

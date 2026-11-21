@@ -114,6 +114,8 @@ function normalizeNullableText(value: unknown, maxLength = 240): string | null |
 function normalizeIsoDate(value: unknown): string | null | undefined {
   if (value === null) return null;
   if (typeof value !== 'string' || value.length > 40) return undefined;
+  // String vazia = limpeza explícita (mesmo efeito de null); inválido continua omitido.
+  if (!value.trim()) return null;
   const parsed = new Date(value);
   return Number.isNaN(parsed.getTime()) ? undefined : parsed.toISOString();
 }
