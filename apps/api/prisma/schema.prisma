@@ -1020,7 +1020,18 @@ model RegistrationRefundAcceptance {
   @@index([policyVersionId])
 }
 
+model MockRefundReceipt {
+  requestId    String @id
+  request      RegistrationRefundRequest @relation(fields: [requestId], references: [id], onDelete: Restrict)
+  paymentId    String @db.VarChar(200)
+  amountCents  Int
+  issuedAt     DateTime @default(now())
+  reconciledAt DateTime?
+}
+
 model RegistrationRefundRequest {
+  mockReceipt             MockRefundReceipt?
+  sandboxPaymentId        String? @db.VarChar(200)
   preparedAmountCents     Int?
   preparedCheckoutId      String?
   preparedCheckout        EventRegistrationCheckout?      @relation(fields: [preparedCheckoutId, eventId, organizationId], references: [id, eventId, organizationId], onDelete: Restrict, map: "RefundPreparation_single_fkey")
