@@ -1,0 +1,70 @@
+enum PlatformGrantScopeKind {
+  GLOBAL
+  ORGANIZACAO
+  EVENTO
+}
+
+enum PlatformGrantEventKind {
+  GRANTED
+  REVOKED
+}
+
+enum PlatformAuditResult {
+  ALLOWED
+  DENIED
+  FAILED
+}
+
+model PlatformGrantEvent {
+  id             String                 @id @default(cuid())
+  kind           PlatformGrantEventKind
+  action         String                 @db.VarChar(40)
+  scopeKind      PlatformGrantScopeKind
+  organizationId String                 @default("") @db.VarChar(64)
+  eventId        String                 @default("") @db.VarChar(64)
+  targetUserId   String
+  actorUserId    String
+  reason         String                 @db.VarChar(200)
+  expiresAt      DateTime?
+  correlationId  String                 @db.VarChar(64)
+  occurredAt     DateTime               @default(now())
+
+  @@index([targetUserId, action, occurredAt])
+  @@index([occurredAt])
+}
+
+model PlatformGrant {
+  id              String                 @id @default(cuid())
+  targetUserId    String
+  action          String                 @db.VarChar(40)
+  scopeKind       PlatformGrantScopeKind
+  organizationId  String                 @default("") @db.VarChar(64)
+  eventId         String                 @default("") @db.VarChar(64)
+  grantedByUserId String
+  grantedAt       DateTime               @default(now())
+  expiresAt       DateTime?
+
+  @@unique([targetUserId, action, scopeKind, organizationId, eventId], map: "PlatformGrant_alvo_acao_escopo_key")
+  @@index([targetUserId, action])
+  @@index([expiresAt])
+}
+
+model PlatformAuditLog {
+  id             String                 @id @default(cuid())
+  actorUserId    String
+  action         String                 @db.VarChar(60)
+  scopeKind      PlatformGrantScopeKind
+  organizationId String                 @default("") @db.VarChar(64)
+  eventId        String                 @default("") @db.VarChar(64)
+  targetUserId   String                 @default("") @db.VarChar(64)
+  reason         String                 @db.VarChar(200)
+  result         PlatformAuditResult
+  changes        Json?
+  correlationId  String                 @db.VarChar(64)
+  occurredAt     DateTime               @default(now())
+
+  @@index([occurredAt])
+  @@index([actorUserId, occurredAt])
+  @@index([eventId, occurredAt])
+  @@index([action, occurredAt])
+}

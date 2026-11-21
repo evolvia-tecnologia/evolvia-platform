@@ -2026,13 +2026,13 @@
     }
   ],
   "lastConfirmedDeployment": {
-    "sourceSha": "6ca5070282fa03c96ab8262b7f01e69dbec007f3",
-    "run": 44651288686,
-    "job": 136012440839,
-    "commitAtUtc": "2026-11-20T01:25:37Z",
-    "readinessAtUtc": "2026-11-20T01:25:39Z",
+    "sourceSha": "8f6409b02178b795359ba96ad1e46f03514e3550",
+    "run": 44855700901,
+    "job": 136701219650,
+    "commitAtUtc": "2026-11-21T02:40:19Z",
+    "readinessAtUtc": "2026-11-21T02:40:21Z",
     "httpsStatus": 200,
     "publicGatePassed": false,
-    "note": "API e PostgreSQL prontos; o gate público reprovou pela versão do Nginx no cabeçalho Server. Aceite por perfil pendente."
+    "note": "API e PostgreSQL prontos. A verificação pública reprovou porque o cabeçalho Server expôs a versão do Nginx (#108). Aceite autenticado por perfil pendente."
   }
 }
