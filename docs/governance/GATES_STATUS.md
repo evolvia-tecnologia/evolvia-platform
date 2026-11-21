@@ -1,5 +1,15 @@
 # Estado dos Gates — 27/10/2026
 
+## Reconferência dos indicadores — 20/11/2026, após integrar #680
+
+**Implementação 94,3%**; **conclusão comprovada 71,0%**; **87/93** critérios integrados; **0/11 Gates encerrados**. Reconferidos conforme EVO-018 com 11 Gates de peso igual, sem recalcular por quantidade de PRs. Os dois critérios acrescidos desde a matriz de 27/10 são **G2.10** (compra múltipla, #471) e **G10.10** (permissões granulares do operador, #642), com evidências I/T/D já documentadas nesta PR.
+
+**Novo HEAD verificado:** `develop@8f6409b02178b795359ba96ad1e46f03514e3550` (após squash da [#680](https://github.com/evolvia-tecnologia/evolvia-platform/pull/680), em 20/11 São Paulo). A #680 melhora justificativas e a segurança da interface dos reembolsos, porém declara expressamente **“Não conclui G2.11”**. A [#694](https://github.com/evolvia-tecnologia/evolvia-platform/pull/694), também integrada, dispõe de simulação de estorno com `simulated:true` e `moneyReturned:false`; falta processamento/compensação financeira externa com prova sandbox, conforme contrato [#679](https://github.com/evolvia-tecnologia/evolvia-platform/issues/679). Portanto, **G2.11 permanece sem novo marco I/T/D/F**. As demais integrações #675 (Área Master), #678 (status de eventos), #693 (preparação financeira), #696 (correção de dependência) e #689 (infraestrutura) não acrescentam critérios novos do baseline de 93; aprimoram funcionalidades já contabilizadas ou fora do escopo da matriz.
+
+Os seis critérios sem I/T/D/F continuam: G2.11, G2.13, G2.14, G5.8, G6.8 e G7.4. G2.13 exige entrega verificável, G2.14 emissão fiscal (rascunho não basta), e G5.8/G6.8/G7.4 dependem de fluxo completo/aceite da comunicação científica. O índice não é “prontidão de produção”; homologação, acesso real e Gate público Nginx #108 permanecem independentes. **Nenhuma fonte verificável da EVO-018 nesta conferência sustenta percentual acima de 95%.** Preservar esse valor apenas como hipótese de outra métrica, não como avanço comprovado.
+
+**Estado do registro:** esta reconciliação está na PR documental #677, ainda pendente de integração em `develop`. A fonte-base das evidências para os dois novos critérios é o SHA `865bf03f2315642612c1e251559701bca87a993e`; o SHA novo acima identifica a leitura de continuidade, não atesta que todas as 93 jornadas foram homologadas nesse commit.
+
 ## Evidência conferida em 20/11
 
 A publicação de `6ca50702` registrou API e PostgreSQL prontos e HTTPS 200 às 22h25 de 19/11 em São Paulo. A versão exposta do Nginx manteve a #108 aberta. Esse deploy não acrescenta aceite funcional aos critérios. [Job de publicação](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/44651288686/job/136012440839).
