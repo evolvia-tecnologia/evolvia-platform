@@ -1,5 +1,16 @@
 # Backlog e ordem de execução — Modo Lançamento
 
+## Reconciliação de 19/11/2026
+
+Implementação **94,3%**; conclusão comprovada **71,0%**; **87/93** unidades integradas; **0/11 Gates encerrados**.
+
+Base integrada `865bf03f2315642612c1e251559701bca87a993e`. G2.10 e G10.10 têm integração, CI e publicação demonstrados. O aceite autenticado segue pendente. Ambos os jobs registraram a prontidão da API e do banco e depois reprovaram o cabeçalho Server. [Compra múltipla](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/42683330025/job/129390430705) · [Permissões de operador](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/42715129263/job/129500945850).
+
+
+## Prioridade operacional em 17/11/2026
+
+Work coordena a recuperação [#108](https://github.com/evolvia-tecnologia/evolvia-platform/issues/108) e o corte conjunto com a suíte [#686](https://github.com/evolvia-tecnologia/evolvia-platform/pull/686). O operador autorizado deve inspecionar a configuração carregada, aplicar o corte validado com backup e rollback e repetir a prova externa de versão do proxy. Para habilitar o aceite das jornadas, correlacionar o SHA solicitado, o informado pelo gateway e o identificado no serviço ativo. A execução anterior está no [job de publicação](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/44146606412/job/134271238197).
+
 ## Fila vigente — 06/11/2026
 
 Contrato [#571/6685989083](https://github.com/evolvia-tecnologia/evolvia-platform/issues/571#issuecomment-6685989083) e decisão EVO-021 substituem a distribuição histórica de 05/11 abaixo. Base integrada: `49aeae51` (#637 e #647). Handoffs exigem ACK com SHA e arquivos; não reimplementar código integrado nem disputar caminhos ativos.
@@ -444,3 +455,7 @@ rollback, Node 22/ARM64, PostgreSQL, Redis, WCAG 2.2 AA e PT-BR.
 - #497 continua reservado e serializado com #515/#516. Sem alterações em main, produção, infra ou secrets. Rollback de #541/#536: reversão da aplicação, sem migration/destruição de dados. Revisão do diff não é auditoria total.
 
 
+
+## Próximos desbloqueios propostos — fechamento 14/11/2026
+
+P0 Work: #676 corrigir identidade/autorização e cinco falhas CI43637885633; rodar HTTP/PostgreSQL e revisão. P0 Claude: #675 corrigir `Response.json` duplo, isolar delta de 1176 arquivos contra main, trazer PR limpo para develop, UI Master e migration aditiva controlada. P1 Cursor: #672 resolver 2 threads de foco/teclado, revalidar CI/320/390. P1 Codex: #491 Draft com conflitos e 10 threads, comprovar compensação sem dinheiro real. P1 Gemini: G7.4/G6.8 com autorização, isolamento e transporte simulado. P1 Work: revisão dos PRs encadeados #651/#662/#666/#663/#669. Referência: [fechamento 14/11](./CLOSING_2026-11-14_19H.md). Sem novo crédito de Gate.
