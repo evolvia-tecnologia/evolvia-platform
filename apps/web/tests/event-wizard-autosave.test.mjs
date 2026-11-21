@@ -414,6 +414,17 @@ test('Tudo salvo não aparece com edição pendente ou sem confirmação', () =>
   assert.equal(wizardSaveLabel({ hasEvent: false, saveState: 'saved', dirty: false }), 'Rascunho local');
 });
 
+test('Alterar datas do painel ainda usa o Wizard; evento publicado depende da rota #666', async () => {
+  const wizard = await readFile(new URL('../components/event-wizard.tsx', import.meta.url), 'utf8');
+  const flow = await readFile(new URL('../lib/event-flow.ts', import.meta.url), 'utf8');
+  const policy = await readFile(new URL('../../api/src/event-mutation-policy.service.ts', import.meta.url), 'utf8');
+  assert.match(flow, /eventDateReviewHref[\s\S]*review=foundation&step=identity/u);
+  assert.match(wizard, /\/event-wizard\/\$\{currentEventId\}/u);
+  assert.doesNotMatch(wizard, /\/events\/\$\{[^}]+\}\/schedule/u);
+  assert.match(policy, /FOUNDATION_MUTABLE_STATUSES[\s\S]*DRAFT[\s\S]*SETUP/u);
+  assert.match(policy, /INVALID_EVENT_STATE/u);
+});
+
 test('save sem nova edição na mesma etapa não repete PATCH', async () => {
   const { state, save } = harness({ name: 'Congresso Berg' }, async () => ({
     session: { revision: 4 }, answers: { name: 'Congresso Berg' },
