@@ -1,4 +1,8 @@
-# Estado dos Gates — 27/10/2026
+# Estado dos Gates
+
+## Conferência de 21/11/2026
+
+No `develop` publicado em `8f6409b0`, a matriz registra 87 critérios com integração, testes e publicação e um critério com aceite funcional. A média dos 11 Gates continua em 94,3% de implementação e 71,0% de conclusão I/T/D/F. As linhas G2.11, G2.13, G2.14, G5.8, G6.8 e G7.4 agora identificam as entregas parciais e os responsáveis pela próxima prova. A atualização de G1.6 inclui o ensaio público em três perfis. [Evidência da publicação](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/44855700901/job/136701219650).
 
 ## Reconferência dos indicadores — 20/11/2026, após integrar #680
 
@@ -373,7 +377,7 @@ Cada critério recebe I/T/D/F binários (25% cada). Percentual do Gate = marcos/
 | G1.3 — Identidade visual, mídias e editor de divulgação | Integrado | ✓ | ✓ | ✓ | — | #375/#398; apps/web/components/publication-editor.tsx; #584 publication-media-editor aguarda onChanged após POST/DELETE. Próximo: Upload e reflow autenticados no SHA implantado |
 | G1.4 — Checklist e transição de publicação | Integrado | ✓ | ✓ | ✓ | — | apps/api/src/event-publication/event-publication.service.ts; scripts/ci-smoke-v02.mjs Próximo: Publicar e despublicar fixture autorizada no ambiente |
 | G1.5 — Prévia privada sem publicar | Integrado | ✓ | ✓ | ✓ | — | apps/api/src/event-publication/event-publication-preview.service.ts; testes de preview Próximo: Validar ACL e prévia em homologação |
-| G1.6 — Página pública, URL, localização e ações por perfil | Integrado | ✓ | ✓ | ✓ | — | #388/#402; PR #405 comentário 04/10 18:31 UTC; ensaio público da feira; #584 alinha CTA/ingresso: ENTERTAINMENT ou (OTHER/null + Festival/Show); NON_TICKET_PROFILES nunca ingresso. Próximo: Ensaio público das ações por perfil no SHA implantado; F pendente |
+| G1.6 — Página pública, URL, localização e ações por perfil | Integrado | ✓ | ✓ | ✓ | — | #388/#402; PR #405 comentário 04/10 18:31 UTC; ensaio público da feira; #584 alinha CTA/ingresso: ENTERTAINMENT ou (OTHER/null + Festival/Show); NON_TICKET_PROFILES nunca ingresso. Em 21/11 o catálogo filtrado levou a páginas HTTPS 200 de corporativo, feira e científico, com local e links de participação. As consultas de entretenimento, social e outro perfil não forneceram amostra de evento para o mesmo ensaio. Próximo: Work deve completar as ações por perfil e o aceite funcional em homologação. |
 | G1.7 — Vitrine e catálogo de publicados | Integrado | ✓ | ✓ | ✓ | ✓ | #403; PR #405 comentário 04/10 18:31 UTC; catálogo recarregado com dois eventos; #481/#495 correções de hidratação; #584 HTML inicial idêntico CURRENT/PAST/ALL, currentSearch no servidor sem useSearchParams/Suspense; prova /eventos × 1366/768/390/320. F histórico, sem novo aceite Próximo: Prova de listagem no SHA implantado; sem novo F |
 | G1.8 — Ajuda, documentos e preferências de acessibilidade | Integrado | ✓ | ✓ | ✓ | — | #399/#403; runtime, espaçamento e árvore acessível CI; #461 tipos na EVA; #578 prova pública SC 1.4.12 integrada; #584 hidratação sem React 418 em PAST 320. #494/#498 ainda não integrados Próximo: WCAG humana completa e leitor de tela ainda pendentes |
 
@@ -391,10 +395,10 @@ Cada critério recebe I/T/D/F binários (25% cada). Percentual do Gate = marcos/
 | G2.8 — Participante/pagador/tomador e comprovante de pagamento | Integrado | ✓ | ✓ | ✓ | — | #358/#360/#361/#363 Próximo: Fluxo financeiro em sandbox; não equivale a NFS-e |
 | G2.9 — Fila de espera por lote | Integrado | ✓ | ✓ | ✓ | — | #468 integrado em e8aac41; UI/API/migration da fila; PostgreSQL concorrência no CI 37607144430; fonte atual CI/deploy 37837951585 Próximo: Ensaiar no SHA implantado: FIFO, última vaga, expiração, isolamento e aceite; sem aviso por e-mail. Reserva histórica limita reentrada. |
 | G2.10 — Compra com várias entradas e ficha por comprador | Pendente | — | — | — | — | operacao-do-evento.md, fatia 10 Próximo: Implementar sem duplicar identidade |
-| G2.11 — Regra de reembolso visível e fluxo correspondente | Pendente | — | — | — | — | operacao-do-evento.md, fatia 14 Próximo: Implementar política e compensação explícita |
+| G2.11 — Regra de reembolso visível e fluxo correspondente | Entrega parcial publicada | — | — | — | — | Reembolso individual e de compra múltipla preparado na #693. A #694 persiste a cobrança sandbox e a #680 integra a interface e valida a justificativa. Publicação 8f6409b0 no job 136701219650. A simulação registra moneyReturned=false. Próximo: Codex deve comprovar restituição integral e parcial no provedor sandbox, conciliação e replay idempotente. |
 | G2.12 — Troca de categoria de inscrição paga | Integrado | ✓ | ✓ | ✓ | — | #58986d66596; CI1762 e publicação da289784/job121056008408. Próximo: ensaio autenticado; diferenças de preço bloqueadas |
-| G2.13 — E-mail transacional entregue com confirmação/credencial | Pendente | — | — | — | — | #376; envio real ainda sem evidência conclusiva Próximo: Provar entrega, repetição/falha e privacidade |
-| G2.14 — Emissão fiscal NFS-e | Pendente | — | — | — | — | BACKLOG.md; responsável/comprovante não emite nota Próximo: Adaptador e homologação fiscal próprios |
+| G2.13 — E-mail transacional entregue com confirmação/credencial | Entrega parcial integrada | — | — | — | — | A #579 integrou a retomada da confirmação após a configuração do canal (0213c9e3). A regressão com transporte simulado está registrada na #571, comentário 7056044955. Próximo: Codex deve comprovar o recebimento da confirmação e da credencial por destinatário de teste autorizado. |
+| G2.14 — Emissão fiscal NFS-e | Prévia fiscal em revisão | — | — | — | — | A #613 em e4deefb6 protege a escrita do rascunho e registra auditoria. O candidato inclui teste PostgreSQL. Onze discussões aguardavam decisão independente na consulta. Próximo: Codex e revisor fiscal devem fechar a revisão da prévia. A emissão exige município e conta sandbox autorizada. |
 
 ## Gate 3 — Área reservada do inscrito
 
@@ -433,7 +437,7 @@ Cada critério recebe I/T/D/F binários (25% cada). Percentual do Gate = marcos/
 | G5.5 — Coautores, ordem, instituições e apresentador | Integrado | ✓ | ✓ | ✓ | — | #411/#445/#457; scientific-author.service.ts e scientific-author-panel.tsx Próximo: Ensaiar ordem, instituições, até dez coautores e apresentadores |
 | G5.6 — Upload de PDF na submissão | Integrado | ✓ | ✓ | ✓ | — | #497 integrado em 041f83b4 (HEAD 2d139026); CI pós-merge 38001809029: qualidade/PostgreSQL/ARM64 verdes. Publicação job 114064573887, Commit 041f83b4 em 09/10 23:10:11UTC e readiness API/PostgreSQL às 23:10:13 UTC; gate público falha Nginx/alias. PDF privado por versão, contexto assíncrono/anexo e compensação cobertos. Sem aceite autenticado. Próximo: Ensaiar envio/download PDF privado com duas contas/eventos; não inferir F de mocks ou deploy. |
 | G5.7 — Rascunho, correção e nova versão pelo autor | Integrado | ✓ | ✓ | ✓ | — | #567 integrado em fb8f991e5775de5e7810414f4484f4331cc28cbf; HEAD c45f4a7a3b902b5bb31754682b62a9aa9ff3a062; CI #1678/run39418005077 aprovado em qualidade, API/Web, PostgreSQL/fluxo funcional, migration idempotente, hidratação/acessibilidade runtime e ARM64 API/Web. Rascunhos persistentes, retomada/exclusão escopada, snapshots de autoria e trilha de versões; retry P2034 limitado na exclusão. Publicação do merge e aceite autenticado ainda sem comprovação. Deploy herdado comprovado no descendente c92853d6bcb463b1bbb24d3c40b933c53752ff34: run39705487242/job119587988438, Commit 22/10/2026 01:39:07 UTC, readiness API/PostgreSQL/HTTPS200 01:39:09 UTC. Compare GitHub ahead4/behind0 desde fb8f991e. Gate público falhou por Nginx/alias; F pendente. Próximo: Ensaiar salvar, retomar, excluir, submeter e corrigir com duas contas/eventos em desktop/mobile e teclado/leitor; aceite pendente. |
-| G5.8 — Aviso ao autor após submissão/correção | Pendente | — | — | — | — | #406 explicitamente exclui envio de e-mail Próximo: Provar entrega e idempotência |
+| G5.8 — Aviso ao autor após submissão/correção | Avisos em PR | — | — | — | — | A #610 em 6ba3ed58 implementa candidato para avisos ao autor com opt-in. O GitHub mantém a PR aberta. Próximo: Gemini deve revisar o delta atual e comprovar entrega autorizada, isolamento por evento e idempotência. |
 
 ## Gate 6 — Avaliação científica
 
@@ -446,7 +450,7 @@ Cada critério recebe I/T/D/F binários (25% cada). Percentual do Gate = marcos/
 | G6.5 — Área e identidade segura do avaliador | Integrado | ✓ | ✓ | ✓ | — | #411; scientific-reviewer.service.ts Próximo: Ensaiar token próprio, revogação, expiração e isolamento de atribuição |
 | G6.6 — Notas, conflito declarado, parecer e envio pelo avaliador | Integrado | ✓ | ✓ | ✓ | — | #411; scientific-reviewer.service.ts Próximo: Ensaiar notas, conflito, parecer e versão atribuída em homologação |
 | G6.7 — Retomar/reabrir parecer e rubrica versionada | Pendente | — | — | — | — | operação fatia 11 Próximo: Não zerar banca e auditar revisões |
-| G6.8 — Avisos, distribuição assistida e operação em lote | Pendente | — | — | — | — | operação fatia 11/benchmark Próximo: Comunicação real e ações auditáveis |
+| G6.8 — Avisos, distribuição assistida e operação em lote | Entrega parcial publicada | — | — | — | — | operação fatia 11/benchmark; #551/8bea955c integrado/publicado: distribuição assistida com cargas persistidas e locks, CI40466676636/89PG. Refinamento parcial não conclui o critério. Próximo: Gemini deve provar comunicação em lote com filtro, destinatário autorizado e prevenção de duplicatas. A distribuição assistida da #551 já está contabilizada como entrega parcial. |
 
 ## Gate 7 — Decisão científica
 
@@ -455,7 +459,7 @@ Cada critério recebe I/T/D/F binários (25% cada). Percentual do Gate = marcos/
 | G7.1 — Consolidação e quórum operacional | Integrado | ✓ | ✓ | ✓ | — | #421/#457; scientific-reviewer.service.ts; scientific-decision-quorum.test.mjs Próximo: Ensaiar quórum da versão atual; pareceres antigos não autorizam nova versão |
 | G7.2 — Aceite, recusa e aceite com alteração | Integrado | ✓ | ✓ | ✓ | — | #411/#421; scientific-reviewer.service.ts Próximo: Ensaiar aceite, recusa e aceite com alteração com atores distintos |
 | G7.3 — Resolução de divergência e intervenção do coordenador | Integrado | ✓ | ✓ | ✓ | — | #421; scientific-reviewer.service.ts; chair/identidade da comissão Próximo: Ensaiar coordenador autorizado e negativas da comissão |
-| G7.4 — Carta de aceite e comunicação ao autor | Parcial | — | — | — | — | Cartas configuráveis de aceite/recusa com editor, tags e consulta pelo próprio autor; envio e entrega de comunicação não comprovados. Próximo: Documento e entrega real |
+| G7.4 — Carta de aceite e comunicação ao autor | Entrega parcial e PR aberta | — | — | — | — | Cartas configuráveis e consulta pelo autor constam da matriz. A #518 em 657191fc propõe registrar entrega na área do autor. Próximo: Gemini deve verificar decisão, destinatário, entrega e leitura da carta pelo autor em homologação. |
 | G7.5 — Correção pós-parecer e nova decisão | Integrado | ✓ | ✓ | ✓ | — | #445/#457; nova versão + quórum por versionNumber Próximo: Ensaiar correção pós-parecer, redistribuição e nova decisão preservando histórico |
 | G7.6 — Desbloqueio condicionado do pós-aceite | Integrado | ✓ | ✓ | ✓ | — | #411/#450/#457; autorização do pós-aceite no servidor Próximo: Ensaiar bloqueio antes de aceite, fora do prazo e titular errado |
 

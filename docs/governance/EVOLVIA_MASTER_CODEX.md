@@ -1,5 +1,9 @@
 # Evolvia Master Codex
 
+## Conferência de 21/11/2026
+
+No `develop` publicado em `8f6409b0`, a matriz registra 87 critérios com integração, testes e publicação e um critério com aceite funcional. A média dos 11 Gates continua em 94,3% de implementação e 71,0% de conclusão I/T/D/F. As linhas G2.11, G2.13, G2.14, G5.8, G6.8 e G7.4 agora identificam as entregas parciais e os responsáveis pela próxima prova. A atualização de G1.6 inclui o ensaio público em três perfis. [Evidência da publicação](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/44855700901/job/136701219650).
+
 ## Reconciliação de 19/11/2026
 
 Implementação **94,3%**; conclusão comprovada **71,0%**; **87/93** unidades integradas; **0/11 Gates encerrados**.

@@ -87,8 +87,8 @@
           "ci": true,
           "deployed": true,
           "accepted": false,
-          "evidence": "#388/#402; PR #405 comentário 04/10 18:31 UTC; ensaio público da feira; #584 alinha CTA/ingresso: ENTERTAINMENT ou (OTHER/null + Festival/Show); NON_TICKET_PROFILES nunca ingresso.",
-          "next": "Ensaio público das ações por perfil no SHA implantado; F pendente",
+          "evidence": "#388/#402; PR #405 comentário 04/10 18:31 UTC; ensaio público da feira; #584 alinha CTA/ingresso: ENTERTAINMENT ou (OTHER/null + Festival/Show); NON_TICKET_PROFILES nunca ingresso. Em 21/11 o catálogo filtrado levou a páginas HTTPS 200 de corporativo, feira e científico, com local e links de participação. As consultas de entretenimento, social e outro perfil não forneceram amostra de evento para o mesmo ensaio.",
+          "next": "Work deve completar as ações por perfil e o aceite funcional em homologação.",
           "deployedSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2",
           "implementationState": "Integrado",
           "ciSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2"
@@ -268,9 +268,9 @@
           "ci": false,
           "deployed": false,
           "accepted": false,
-          "evidence": "operacao-do-evento.md, fatia 14",
-          "next": "Implementar política e compensação explícita",
-          "implementationState": "Pendente",
+          "evidence": "Reembolso individual e de compra múltipla preparado na #693. A #694 persiste a cobrança sandbox e a #680 integra a interface e valida a justificativa. Publicação 8f6409b0 no job 136701219650. A simulação registra moneyReturned=false.",
+          "next": "Codex deve comprovar restituição integral e parcial no provedor sandbox, conciliação e replay idempotente.",
+          "implementationState": "Entrega parcial publicada",
           "ciSourceSha": null
         },
         {
@@ -293,9 +293,9 @@
           "ci": false,
           "deployed": false,
           "accepted": false,
-          "evidence": "#376; envio real ainda sem evidência conclusiva",
-          "next": "Provar entrega, repetição/falha e privacidade",
-          "implementationState": "Pendente",
+          "evidence": "A #579 integrou a retomada da confirmação após a configuração do canal (0213c9e3). A regressão com transporte simulado está registrada na #571, comentário 7056044955.",
+          "next": "Codex deve comprovar o recebimento da confirmação e da credencial por destinatário de teste autorizado.",
+          "implementationState": "Entrega parcial integrada",
           "ciSourceSha": null
         },
         {
@@ -305,9 +305,9 @@
           "ci": false,
           "deployed": false,
           "accepted": false,
-          "evidence": "BACKLOG.md; responsável/comprovante não emite nota",
-          "next": "Adaptador e homologação fiscal próprios",
-          "implementationState": "Pendente",
+          "evidence": "A #613 em e4deefb6 protege a escrita do rascunho e registra auditoria. O candidato inclui teste PostgreSQL. Onze discussões aguardavam decisão independente na consulta.",
+          "next": "Codex e revisor fiscal devem fechar a revisão da prévia. A emissão exige município e conta sandbox autorizada.",
+          "implementationState": "Prévia fiscal em revisão",
           "ciSourceSha": null
         }
       ],
@@ -646,9 +646,9 @@
           "ci": false,
           "deployed": false,
           "accepted": false,
-          "evidence": "#406 explicitamente exclui envio de e-mail",
-          "next": "Provar entrega e idempotência",
-          "implementationState": "Pendente",
+          "evidence": "A #610 em 6ba3ed58 implementa candidato para avisos ao autor com opt-in. O GitHub mantém a PR aberta.",
+          "next": "Gemini deve revisar o delta atual e comprovar entrega autorizada, isolamento por evento e idempotência.",
+          "implementationState": "Avisos em PR",
           "ciSourceSha": null
         }
       ],
@@ -760,8 +760,8 @@
           "deployed": false,
           "accepted": false,
           "evidence": "operação fatia 11/benchmark; #551/8bea955c integrado/publicado: distribuição assistida com cargas persistidas e locks, CI40466676636/89PG. Refinamento parcial não conclui o critério.",
-          "next": "Comunicação real com canal/destinatário autorizado e aceite da operação completa; sem crédito adicional pela distribuição isolada.",
-          "implementationState": "Pendente",
+          "next": "Gemini deve provar comunicação em lote com filtro, destinatário autorizado e prevenção de duplicatas. A distribuição assistida da #551 já está contabilizada como entrega parcial.",
+          "implementationState": "Entrega parcial publicada",
           "ciSourceSha": null
         }
       ],
@@ -820,9 +820,9 @@
           "ci": false,
           "deployed": false,
           "accepted": false,
-          "evidence": "Cartas configuráveis de aceite/recusa com editor, tags e consulta pelo próprio autor; envio e entrega de comunicação não comprovados.",
-          "next": "Documento e entrega real",
-          "implementationState": "Parcial",
+          "evidence": "Cartas configuráveis e consulta pelo autor constam da matriz. A #518 em 657191fc propõe registrar entrega na área do autor.",
+          "next": "Gemini deve verificar decisão, destinatário, entrega e leitura da carta pelo autor em homologação.",
+          "implementationState": "Entrega parcial e PR aberta",
           "ciSourceSha": null
         },
         {
@@ -1344,7 +1344,7 @@
   "criteriaCount": 93,
   "methodNote": "Reconciliação de 19/11 validada novamente após a integração #680 em 20/11. G2.10 (#471) e G10.10 (#642) sustentam I/T/D. #680 melhora UX e declara que não conclui G2.11; #694 somente simulação (moneyReturned:false). Não dar novo crédito a G2.11/G2.13/G2.14/G5.8/G6.8/G7.4 nem a refinamentos de critérios existentes. Revisão do HEAD develop e evidências não equivale a homologação/Go de produção.",
   "lastCrossCheck": {
-    "localDate": "2026-11-20",
+    "localDate": "2026-11-21",
     "developSha": "8f6409b02178b795359ba96ad1e46f03514e3550",
     "latestMergeNumber": 680,
     "integratedCriteria": 87,
