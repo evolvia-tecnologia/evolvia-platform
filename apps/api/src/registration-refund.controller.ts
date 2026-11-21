@@ -2,11 +2,17 @@ import { Body, Controller, Get, Headers, Param, Post, Query, Req, UseGuards } fr
 import { AuthGuard, AuthenticatedRequest } from './auth.guard';
 import { RegistrationRefundService } from './registration-refund.service';
 
-@Controller('public/events/:slug/refund-policy')
+@Controller('public')
 export class RegistrationRefundPublicController {
   constructor(private readonly refunds: RegistrationRefundService) {}
 
-  @Get()
+  @Post('integrations/asaas/sandbox/refunds/webhook')
+  async sandboxWebhook(@Headers('asaas-access-token') token: string | undefined, @Body() body: unknown) {
+    await this.refunds.reconcileSandboxWebhook(token, body);
+    return { received: true };
+  }
+
+  @Get('events/:slug/refund-policy')
   policy(@Param('slug') slug: string) {
     return this.refunds.publicPolicy(slug);
   }

@@ -678,7 +678,7 @@ test('sandbox Pix preserva uma tentativa após timeout, concorrência e reiníci
   await refunds.prepare(people.owner.id, event.id, req.id, { amountCents: 750 });
   await prisma.registrationRefundRequest.update({ where: { id: req.id }, data: { sandboxPaymentId: paymentId } });
   const config = { ASAAS_REFUND_SANDBOX_ORGANIZATION_ID: organizationId,
-    ASAAS_REFUND_SANDBOX_EXECUTION_ORGANIZATION_ID: organizationId, ASAAS_REFUND_SANDBOX_TOKEN: 'fixture' };
+    ASAAS_REFUND_SANDBOX_EXECUTION_ORGANIZATION_ID: organizationId, ASAAS_REFUND_SANDBOX_WEBHOOK_TOKEN: 'webhook-fixture', ASAAS_REFUND_SANDBOX_TOKEN: 'fixture' };
   for (const [key, value] of Object.entries(config)) {
     const prior = process.env[key];
     process.env[key] = value;
@@ -706,7 +706,21 @@ test('sandbox Pix preserva uma tentativa após timeout, concorrência e reiníci
   assert.ok(results.every(result => result.processingStatus === 'PROCESSING'));
   assert.equal(posts, 1);
   const restarted = new RegistrationRefundService(prisma, new AuthorizationService(prisma));
+  const notification = { event: 'PAYMENT_PARTIALLY_REFUNDED', payment: { id: paymentId, status: 'REFUNDED' } };
+  const notify = (header = 'webhook-fixture') => restarted.reconcileSandboxWebhook(header, notification);
+  await rejects(notify('invalid'), 401);
+  await notify();
+  const localStatus = async () => (await prisma.$queryRaw`SELECT status FROM "SandboxRefundOperation" WHERE "requestId" = ${req.id}`)[0].status;
+  assert.equal(await localStatus(), 'PROCESSING');
   history[0].status = 'DONE';
+  process.env.ASAAS_REFUND_SANDBOX_ORGANIZATION_ID = 'org-other';
+  process.env.ASAAS_REFUND_SANDBOX_EXECUTION_ORGANIZATION_ID = 'org-other';
+  await notify();
+  assert.equal(await localStatus(), 'PROCESSING');
+  process.env.ASAAS_REFUND_SANDBOX_ORGANIZATION_ID = organizationId;
+  process.env.ASAAS_REFUND_SANDBOX_EXECUTION_ORGANIZATION_ID = organizationId;
+  await Promise.all([notify(), notify()]);
+  assert.equal(await localStatus(), 'RECONCILED');
   for (let i = 0; i < 2; i++) {
     const result = await run(restarted);
     assert.equal(result.processingStatus, 'RECONCILED');

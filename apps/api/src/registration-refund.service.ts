@@ -1,3 +1,4 @@
+import { createHash, timingSafeEqual } from 'node:crypto';
 import { inspectSandboxPayment, submitSandboxRefund } from './asaas-sandbox-refund';
 import { lookupSandboxRefundPayment } from './asaas-refund-payment-lookup';
 import { BadRequestException, ConflictException, Injectable, NotFoundException, UnauthorizedException, ServiceUnavailableException } from '@nestjs/common';
@@ -571,16 +572,58 @@ export class RegistrationRefundService {
       return inserted === 1 && !observed.matched;
     });
     const status = claim ? await submitSandboxRefund(op, token) : observed.status;
+    const saved = await this.saveSandboxStatus(organizationId, eventId, requestId, op.paymentId, op.amountCents, status);
+    return { requestId, environment: 'SANDBOX', processingStatus: saved.status, amountCents: op.amountCents,
+      sandboxRefundConfirmed: saved.status === 'RECONCILED', moneyReturned: false };
+  }
+
+  private async saveSandboxStatus(organizationId: string, eventId: string, requestId: string,
+    paymentId: string, amountCents: number, status: string) {
     const [saved] = await this.prisma.$queryRaw<{ status: string }[]>`
       UPDATE "SandboxRefundOperation" SET
         status = CASE WHEN status = 'RECONCILED' OR ${status} = 'RECONCILED' THEN 'RECONCILED'
                       WHEN status = 'FAILED' THEN status ELSE ${status} END,
         "reconciledAt" = CASE WHEN ${status} = 'RECONCILED' THEN COALESCE("reconciledAt", now()) ELSE "reconciledAt" END
       WHERE "requestId" = ${requestId} AND "organizationId" = ${organizationId} AND "eventId" = ${eventId}
-        AND "amountCents" = ${op.amountCents} AND "paymentId" = ${op.paymentId} RETURNING status`;
+        AND "amountCents" = ${amountCents} AND "paymentId" = ${paymentId} RETURNING status`;
     if (!saved) throw new ConflictException('Operação divergente do pedido preparado.');
-    return { requestId, environment: 'SANDBOX', processingStatus: saved.status, amountCents: op.amountCents,
-      sandboxRefundConfirmed: saved.status === 'RECONCILED', moneyReturned: false };
+    return saved;
+  }
+
+  async reconcileSandboxWebhook(header: string | undefined, input: unknown) {
+    const secret = process.env.ASAAS_REFUND_SANDBOX_WEBHOOK_TOKEN;
+    const org = process.env.ASAAS_REFUND_SANDBOX_ORGANIZATION_ID;
+    const token = process.env.ASAAS_REFUND_SANDBOX_TOKEN;
+    if (!secret?.trim() || !org || !token?.trim() || org !== process.env.ASAAS_REFUND_SANDBOX_EXECUTION_ORGANIZATION_ID) {
+      throw new ServiceUnavailableException('Conciliação sandbox desabilitada.');
+    }
+    const digest = (value: string) => createHash('sha256').update(value).digest();
+    if (typeof header !== 'string' || !timingSafeEqual(digest(header), digest(secret))) throw new UnauthorizedException();
+    const payload = input as { event?: unknown; payment?: { id?: unknown } } | null;
+    if (typeof payload?.event !== 'string') throw new BadRequestException('Evento inválido.');
+    if (!['PAYMENT_REFUNDED', 'PAYMENT_PARTIALLY_REFUNDED', 'PAYMENT_REFUND_IN_PROGRESS'].includes(payload.event)) return;
+    const paymentId = payload.payment?.id;
+    if (typeof paymentId !== 'string' || !/^pay_[a-zA-Z0-9_-]{1,196}$/.test(paymentId)) {
+      throw new BadRequestException('Referência de cobrança inválida.');
+    }
+    const rows = await this.prisma.$queryRaw<Array<{ requestId: string; eventId: string; amountCents: number;
+      checkoutId: string; checkoutCents: number }>>`
+      SELECT op."requestId", op."eventId", op."amountCents",
+        COALESCE(c."providerCheckoutId", g."providerCheckoutId") AS "checkoutId",
+        COALESCE(c."amountCents", g."amountCents") AS "checkoutCents"
+      FROM "SandboxRefundOperation" op JOIN "RegistrationRefundRequest" r ON r.id = op."requestId"
+        AND r."organizationId" = op."organizationId" AND r."eventId" = op."eventId"
+        AND r."sandboxPaymentId" = op."paymentId" AND r."preparedAmountCents" = op."amountCents"
+      LEFT JOIN "EventRegistrationCheckout" c ON c.id = r."preparedCheckoutId"
+        AND c."organizationId" = op."organizationId" AND c."eventId" = op."eventId"
+      LEFT JOIN "EventRegistrationOrderCheckout" g ON g.id = r."preparedOrderCheckoutId"
+        AND g."organizationId" = op."organizationId" AND g."eventId" = op."eventId"
+      WHERE op."organizationId" = ${org} AND op."paymentId" = ${paymentId} AND op.status <> 'RECONCILED'
+        AND ((c.id IS NULL) <> (g.id IS NULL))`;
+    for (const row of rows) {
+      const observed = await inspectSandboxPayment({ ...row, paymentId }, token);
+      if (observed.matched) await this.saveSandboxStatus(org, row.eventId, row.requestId, paymentId, row.amountCents, observed.status);
+    }
   }
 
   // Simulation requires an explicit opt-in and writes only a local receipt.
