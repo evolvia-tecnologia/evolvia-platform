@@ -98,11 +98,12 @@ function ScopedCommunication({ eventId }: { eventId: string }) {
   }
 
   const disabled = busy || !ready || !draft;
+  const showAudience = tab === 'write' || tab === 'preview';
   return <main className={styles.page}>
-    <header><p className={styles.eyebrow}>COMUNICAÇÃO</p><h1>Mensagens do evento</h1><p>Escreva, confira o público e acompanhe o histórico sem confundir aceite do servidor com entrega na caixa.</p></header>
+    <header><p className={styles.eyebrow}>COMUNICAÇÃO</p><h1>Mensagens do evento</h1><p>Escreva e confira destinatários. Salvar rascunho não envia e-mail; aceite do servidor não é entrega na caixa.</p></header>
     <p className={styles.notice}>{sendingAvailable
-      ? 'O transporte de envio está habilitado neste evento. Aceite do gateway não significa e-mail recebido; o histórico mostrará o resultado real.'
-      : 'Envio em lote ainda indisponível. Você pode escrever, salvar rascunhos e conferir destinatários. Salvar ou conferir não envia e-mail.'}</p>
+      ? 'O transporte de envio está sinalizado para este evento. Mesmo assim, aceite do gateway não significa e-mail recebido.'
+      : 'Envio em lote ainda indisponível na API. Você pode escrever, salvar rascunhos e conferir destinatários. Salvar ou conferir não envia e-mail.'}</p>
     <nav className={styles.actions} aria-label="Seções de comunicação">
       <button type="button" aria-pressed={tab === 'write'} onClick={() => setTab('write')}>Escrever</button>
       <button type="button" aria-pressed={tab === 'drafts'} onClick={() => setTab('drafts')}>Rascunhos ({drafts.length})</button>
@@ -126,11 +127,11 @@ function ScopedCommunication({ eventId }: { eventId: string }) {
       {!drafts.length && <p>Nenhum rascunho salvo neste evento.</p>}
       <ul className={styles.list}>{drafts.map((row) => <li key={row.id}><strong>{row.subject}</strong><span>Versão {row.revision} · {new Date(row.updatedAt).toLocaleString('pt-BR')}</span><button type="button" disabled={busy || dirty} onClick={() => void open(row.id)}>Abrir <span className={styles.srOnly}>{row.subject}</span></button></li>)}</ul>
     </section>}
-    {tab === 'preview' && <EventCommunicationAudience eventId={eventId} />}
+    {showAudience && <EventCommunicationAudience eventId={eventId} />}
     {tab === 'history' && <section className={styles.card} aria-label="Histórico de envios">
       <h2>Histórico de envios</h2>
-      <p role="status">Nenhum envio registrado neste evento. Aceite do servidor ou prévia de destinatários não contam como mensagem entregue.</p>
-      {!sendingAvailable && <p>Quando o transporte autorizado estiver disponível, falhas, retentativas e entregas aparecerão aqui sem marcar “enviado” sem confirmação.</p>}
+      <p role="status">A API ainda não publica histórico de disparos. Esta tela não consulta envios e não afirma “enviado” ou “entregue”.</p>
+      <p>Prévia de destinatários e rascunho salvo não contam como mensagem enviada. Quando o transporte e o histórico existirem, falhas, retentativas e resultados reais aparecerão aqui.</p>
     </section>}
   </main>;
 }
