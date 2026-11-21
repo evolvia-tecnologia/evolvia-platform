@@ -565,10 +565,10 @@ export class RegistrationRefundService {
       const current = await tx.registrationRefundRequest.findFirst({ where, select });
       if (!current || JSON.stringify(current) !== JSON.stringify(request)) throw new ConflictException('O pedido mudou.');
       const inserted = await tx.$executeRaw`
-        INSERT INTO "SandboxRefundOperation" ("requestId","organizationId","eventId","paymentId","amountCents")
-        VALUES (${requestId},${organizationId},${eventId},${op.paymentId},${op.amountCents}) ON CONFLICT ("requestId") DO NOTHING`;
-      if (inserted && (!observed.eligible || observed.matched)) throw new ConflictException('Cobrança indisponível para nova operação.');
-      return inserted === 1;
+        INSERT INTO "SandboxRefundOperation" ("requestId","organizationId","eventId","paymentId","amountCents","attempts")
+        VALUES (${requestId},${organizationId},${eventId},${op.paymentId},${op.amountCents},${observed.matched ? 0 : 1}) ON CONFLICT ("requestId") DO NOTHING`;
+      if (inserted && !observed.matched && !observed.eligible) throw new ConflictException('Cobrança indisponível para nova operação.');
+      return inserted === 1 && !observed.matched;
     });
     const status = claim ? await submitSandboxRefund(op, token) : observed.status;
     const [saved] = await this.prisma.$queryRaw<{ status: string }[]>`

@@ -718,4 +718,17 @@ test('sandbox Pix preserva uma tentativa após timeout, concorrência e reiníci
   assert.equal(record.amountCents, 750);
   assert.equal(record.attempts, 1);
   assert.ok(record.reconciledAt);
+  // Rebuild the local projection using the persisted provider history.
+  await prisma.$executeRaw`DELETE FROM "SandboxRefundOperation" WHERE "requestId" = ${req.id}`;
+  for (const invalid of [7.501, '7.50', 7.51, null]) {
+    history[0].value = invalid;
+    await rejects(run(restarted), 409);
+  }
+  history[0].value = 7.5;
+  const recovered = await Promise.all([run(restarted), run(refunds)]);
+  assert.ok(recovered.every(result => result.sandboxRefundConfirmed));
+  assert.equal(posts, 1);
+  const [restored] = await prisma.$queryRaw`SELECT * FROM "SandboxRefundOperation" WHERE "requestId" = ${req.id}`;
+  assert.equal(restored.attempts, 0);
+  assert.ok(restored.reconciledAt);
 });

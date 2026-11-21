@@ -4,6 +4,12 @@ export type SandboxRefund = {
   requestId: string; paymentId: string; checkoutId: string; amountCents: number; checkoutCents: number;
 };
 
+function hasAmount(value: unknown, expectedCents: number): boolean {
+  if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) return false;
+  const cents = Math.round(value * 100);
+  return Number.isSafeInteger(cents) && cents === expectedCents && cents / 100 === value;
+}
+
 async function callAsaas(paymentId: string, token: string, body?: object) {
   if (!/^pay_[a-zA-Z0-9_-]{1,196}$/.test(paymentId)) throw new ConflictException('Referência de cobrança inválida.');
   const url = new URL('/v3/payments/' + paymentId + (body ? '/refund' : ''), 'https://api-sandbox.asaas.com');
@@ -22,14 +28,14 @@ export async function inspectSandboxPayment(op: SandboxRefund, token: string) {
     payment = await response.json();
   } catch { throw new ServiceUnavailableException('Consulta ao sandbox indisponível.'); }
   if (payment?.id !== op.paymentId || payment.checkoutSession !== op.checkoutId ||
-      payment.billingType !== 'PIX' || payment.value !== op.checkoutCents / 100 ||
+      payment.billingType !== 'PIX' || !hasAmount(payment.value, op.checkoutCents) ||
       (payment.split != null && !(Array.isArray(payment.split) && payment.split.length === 0))) {
     throw new ConflictException('A cobrança não corresponde a um Pix sem split deste checkout.');
   }
   const refunds: unknown = payment.refunds ?? [];
   if (!Array.isArray(refunds)) throw new ConflictException('Histórico de estornos inválido.');
   const matches = refunds.filter(item => item?.description === 'Evolvia/' + op.requestId);
-  if (matches.length > 1 || (matches.length && matches[0].value !== op.amountCents / 100)) {
+  if (matches.length > 1 || (matches.length && !hasAmount(matches[0].value, op.amountCents))) {
     throw new ConflictException('Histórico ambíguo para este pedido.');
   }
   const state = matches[0]?.status;
