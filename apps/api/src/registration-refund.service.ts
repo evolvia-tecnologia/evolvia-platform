@@ -444,7 +444,8 @@ export class RegistrationRefundService {
     const { reservation } = request;
     const entry = reservation.orderEntry;
     const payment = entry ? entry.order.checkout : reservation.checkout;
-    const eligibleStatus = reservation.status === 'CONFIRMED' || reservation.status === 'CANCELLED';
+    const eligibleStatus = reservation.status === RegistrationReservationStatus.CONFIRMED
+      || reservation.status === RegistrationReservationStatus.CANCELLED;
     if (!eligibleStatus || !payment?.paidAt || payment.status !== 'PAID'
       || (entry && reservation.checkout?.status === 'PAID')) {
       throw new ConflictException('Não foi possível identificar um único checkout pago para a inscrição.');
