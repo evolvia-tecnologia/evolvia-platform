@@ -2,7 +2,9 @@ import type { PrismaService } from './prisma.service';
 
 export const SCIENTIFIC_NOTICE_MAX_ATTEMPTS = 3;
 const CLAIM_EXPIRY_MS = 2 * 60_000;
-const RETRY_DELAY_MS = 60_000;
+const RETRY_BASE_DELAY_MS = 60_000;
+// Backoff exponencial, baseado nas tentativas persistidas: 60s e 120s.
+// O limite de três tentativas impede crescimento sem teto.
 type Store = Pick<PrismaService, 'scientificNoticeDispatch'>;
 type Claim = {
   idempotencyKey: string;
@@ -64,13 +66,14 @@ export async function claimScientificNoticeDispatch(
     if (transitioned.count === 1) onUnknown?.();
     return false;
   }
+  const retryDelayMs = RETRY_BASE_DELAY_MS * 2 ** Math.max(0, existing.attempts - 1);
   if (existing.status !== 'FAILED' ||
       existing.attempts >= SCIENTIFIC_NOTICE_MAX_ATTEMPTS ||
-      existing.claimedAt.getTime() > now.getTime() - RETRY_DELAY_MS) return false;
+      existing.claimedAt.getTime() > now.getTime() - retryDelayMs) return false;
   const acquired = await store.scientificNoticeDispatch.updateMany({
     where: { idempotencyKey: input.idempotencyKey, status: 'FAILED',
       attempts: { lt: SCIENTIFIC_NOTICE_MAX_ATTEMPTS },
-      claimedAt: { lte: new Date(now.getTime() - RETRY_DELAY_MS) } },
+      claimedAt: { lte: new Date(now.getTime() - retryDelayMs) } },
     data: { status: 'PROCESSING', attempts: { increment: 1 }, claimedAt: now,
       completedAt: null },
   });
