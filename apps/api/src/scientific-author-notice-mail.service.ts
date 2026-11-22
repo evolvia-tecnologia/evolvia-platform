@@ -3,10 +3,10 @@ import { EventProfileCode, EventStatus, Prisma, RegistrationReservationStatus } 
 import { PrismaService } from './prisma.service';
 import { isDeliveryTimeout, readDeliveryConfig, readRegistrationEmail } from './registration-confirmation-mail.policy';
 import { scientificMailEnabled, scientificNoticeStart, scientificNoticeKey, scientificNoticeMessage, scientificNoticeRecipients } from './scientific-author-notice-mail.policy';
+import { claimScientificNoticeDispatch, completeScientificNoticeDispatch } from './scientific-notice-dispatch';
 
 const ACCEPTED = 'scientific.author_email_provider_accepted';
 const FAILED = 'scientific.author_email_provider_failed';
-const PROVIDER_ATTEMPTS = 3;
 type Post = (url: string, body: string, headers: Record<string, string>) => Promise<number>;
 type Scope = { organizationId: string; eventId: string; reservationId: string };
 
@@ -171,17 +171,20 @@ export class ScientificAuthorNoticeMailService implements OnModuleInit, OnModule
         ],
       } as Prisma.AuditLogWhereInput;
       if (await this.prisma.auditLog.findFirst({ where, select: { id: true } })) return;
-      const attempts = await this.prisma.auditLog.count({
-        where: { ...where, action: FAILED },
+      // O registro durável é a única autoridade para iniciar transporte.
+      // Uma réplica concorrente que perder o claim não chama a rede.
+      const acquired = await claimScientificNoticeDispatch(this.prisma, {
+        idempotencyKey: recipientHash, organizationId: scope.organizationId,
+        eventId: scope.eventId, submissionId, versionNumber,
       });
-      if (attempts >= PROVIDER_ATTEMPTS) return;
+      if (!acquired) return;
 
       const message = scientificNoticeMessage({
         eventName: submission.event.name, title: submission.title, submitterName,
         kind: notice.kind, versionNumber, recipient, sender: config.sender,
         publicBaseUrl: config.publicBaseUrl, slug: submission.event.slug,
       });
-      let reason: 'provider_accepted' | 'rejected' | 'timeout' = 'rejected';
+      let reason: 'provider_accepted' | 'rejected' | 'timeout' | 'uncertain' = 'uncertain';
       let httpStatus: number | null = null;
       try {
         const status = await post(config.endpoint, JSON.stringify(message), {
@@ -190,7 +193,16 @@ export class ScientificAuthorNoticeMailService implements OnModuleInit, OnModule
         });
         httpStatus = Number.isInteger(status) && status >= 100 && status <= 599 ? status : null;
         if (status >= 200 && status < 300) reason = 'provider_accepted';
-      } catch (error) { reason = isDeliveryTimeout(error) ? 'timeout' : 'rejected'; }
+        // Só rejeição explícita 4xx (exceto timeout/limite) permite retry controlado.
+        else if (status >= 400 && status < 500 && status !== 408 && status !== 429) reason = 'rejected';
+      } catch (error) { reason = isDeliveryTimeout(error) ? 'timeout' : 'uncertain'; }
+      // Primeiro grava o resultado durável. Se houver crash antes da auditoria,
+      // ACCEPTED não será enviado de novo. Se a gravação falhar após 2xx,
+      // PROCESSING expirará em UNKNOWN, sem reenvio cego.
+      await completeScientificNoticeDispatch(
+        this.prisma, recipientHash,
+        reason === 'provider_accepted' ? 'ACCEPTED' : reason === 'rejected' ? 'FAILED' : 'UNKNOWN',
+      );
       await this.prisma.auditLog.create({
         data: {
           organizationId: scope.organizationId, eventId: scope.eventId,
