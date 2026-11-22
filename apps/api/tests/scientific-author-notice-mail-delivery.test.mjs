@@ -26,7 +26,7 @@ function config() {
   } };
 }
 function harness({ scientific = true, confirmed = true, authors = null, pending = [] } = {}) {
-  const state = { audits: [], transport: [], reads: [], pending };
+  const state = { audits: [], transport: [], reads: [], pending, dispatches: new Map() };
   const prisma = {
     scientificAuthorNotice: {
       findFirst: async ({ where }) => {
@@ -52,6 +52,26 @@ function harness({ scientific = true, confirmed = true, authors = null, pending 
         ],
       } : null;
     } },
+    scientificNoticeDispatch: {
+      create: async ({ data }) => {
+        if (state.dispatches.has(data.idempotencyKey)) {
+          throw Object.assign(new Error('unique conflict'), { code: 'P2002' });
+        }
+        state.dispatches.set(data.idempotencyKey, { ...data });
+        return { ...data };
+      },
+      findUnique: async ({ where }) => state.dispatches.get(where.idempotencyKey) ?? null,
+      updateMany: async ({ where, data }) => {
+        const row = state.dispatches.get(where.idempotencyKey);
+        if (!row || (where.status && row.status !== where.status)) return { count: 0 };
+        if (where.attempts?.lt !== undefined && row.attempts >= where.attempts.lt) return { count: 0 };
+        if (where.claimedAt?.lte && row.claimedAt.getTime() > where.claimedAt.lte.getTime()) return { count: 0 };
+        Object.assign(row, data, {
+          attempts: data.attempts?.increment ? row.attempts + data.attempts.increment : row.attempts,
+        });
+        return { count: 1 };
+      },
+    },
     auditLog: {
       findFirst: async ({ where }) => state.audits.find((row) => row.action === where.action &&
         row.entityId === where.entityId && where.AND.every((filter) =>
@@ -95,16 +115,87 @@ test('após commit, entrega isoladamente a autor e coautor; repetições não re
   } finally { restore(); }
 });
 
-test('rejeições são auditadas, retentativas limitadas e não alegam recebimento', async () => {
+test('HTTP 503 torna resultado incerto e impede reenvio cego por outras instâncias', async () => {
   const restore = config();
   try {
     const h = harness();
     const rejected = async () => 503;
     for (let i = 0; i < 4; i += 1) await h.service.notify(scope, submissionId, 1, rejected);
-    assert.equal(h.state.audits.length, 6);
+    assert.equal(h.state.audits.length, 2, '503 pode ter sido aceito antes da resposta; sem retry automático');
+    assert.equal(h.state.dispatches.size, 2);
+    assert.ok([...h.state.dispatches.values()].every((entry) => entry.status === 'UNKNOWN'));
     assert.ok(h.state.audits.every((audit) => audit.action === 'scientific.author_email_provider_failed'));
     assert.ok(h.state.audits.every((audit) => audit.metadata.delivered === false));
     assert.ok(h.state.audits.every((audit) => audit.metadata.httpStatus === 503));
+  } finally { restore(); }
+});
+
+
+test('duas instâncias concorrentes reservam uma única entrega lógica no banco', async () => {
+  const restore = config();
+  try {
+    const h = harness();
+    const replica = new ScientificAuthorNoticeMailService(h.service.prisma);
+    await Promise.all([
+      h.service.notify(scope, submissionId, 1, h.poster),
+      replica.notify(scope, submissionId, 1, h.poster),
+    ]);
+    assert.equal(h.state.transport.length, 2, 'uma mensagem por autor, nunca duas por réplica');
+    assert.equal(h.state.audits.length, 2);
+    assert.equal(h.state.dispatches.size, 2);
+    assert.ok([...h.state.dispatches.values()].every((row) => row.status === 'ACCEPTED'));
+    await replica.notify(scope, submissionId, 1, h.poster);
+    assert.equal(h.state.transport.length, 2, 'replay continua idempotente');
+  } finally { restore(); }
+});
+
+test('timeout após possível aceite preserva UNKNOWN mesmo após reiniciar serviço', async () => {
+  const restore = config();
+  try {
+    const h = harness();
+    let calls = 0;
+    const ambiguous = async () => { calls += 1; throw Object.assign(new Error('timeout'), { name: 'TimeoutError' }); };
+    await h.service.notify(scope, submissionId, 1, ambiguous);
+    assert.equal(calls, 2);
+    const replica = new ScientificAuthorNoticeMailService(h.service.prisma);
+    await replica.notify(scope, submissionId, 1, ambiguous);
+    assert.equal(calls, 2, 'resposta perdida não autoriza segundo POST');
+    assert.ok([...h.state.dispatches.values()].every((row) => row.status === 'UNKNOWN'));
+    assert.ok(h.state.audits.every((row) => row.metadata.received === false));
+  } finally { restore(); }
+});
+
+test('crash antes de gravar resultado deixa PROCESSING que expira em UNKNOWN, nunca em retry', async () => {
+  const restore = config();
+  try {
+    const h = harness();
+    const original = h.service.prisma.scientificNoticeDispatch.updateMany;
+    h.service.prisma.scientificNoticeDispatch.updateMany = async () => { throw new Error('database lost after POST'); };
+    await h.service.notify(scope, submissionId, 1, h.poster);
+    assert.equal(h.state.transport.length, 2);
+    h.service.prisma.scientificNoticeDispatch.updateMany = original;
+    for (const row of h.state.dispatches.values()) row.claimedAt = new Date(0);
+    const replica = new ScientificAuthorNoticeMailService(h.service.prisma);
+    await replica.notify(scope, submissionId, 1, h.poster);
+    assert.equal(h.state.transport.length, 2);
+    assert.ok([...h.state.dispatches.values()].every((row) => row.status === 'UNKNOWN'));
+  } finally { restore(); }
+});
+
+test('rejeição 422 comprovada permite no máximo três tentativas com backoff e a mesma chave', async () => {
+  const restore = config();
+  try {
+    const h = harness();
+    let calls = 0;
+    const denied = async () => { calls += 1; return 422; };
+    for (let n = 0; n < 4; n += 1) {
+      for (const row of h.state.dispatches.values()) row.claimedAt = new Date(0);
+      await h.service.notify(scope, submissionId, 1, denied);
+    }
+    assert.equal(calls, 6);
+    assert.equal(h.state.dispatches.size, 2);
+    assert.ok([...h.state.dispatches.values()].every((row) => row.attempts === 3 && row.status === 'FAILED'));
+    assert.equal(h.state.audits.length, 6);
   } finally { restore(); }
 });
 
