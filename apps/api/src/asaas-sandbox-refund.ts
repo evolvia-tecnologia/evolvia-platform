@@ -20,13 +20,16 @@ async function callAsaas(paymentId: string, token: string, body?: object) {
   });
 }
 
-export async function inspectSandboxPayment(op: SandboxRefund, token: string) {
-  let payment;
+export async function readSandboxPayment(paymentId: string, token: string) {
   try {
-    const response = await callAsaas(op.paymentId, token);
+    const response = await callAsaas(paymentId, token);
     if (!response.ok) { await response.body?.cancel(); throw new Error(); }
-    payment = await response.json();
+    return await response.json() as { id?: unknown; checkoutSession?: unknown; billingType?: unknown; value?: unknown;
+      split?: unknown; refunds?: unknown; status?: unknown } | null;
   } catch { throw new ServiceUnavailableException('Consulta ao sandbox indisponível.'); }
+}
+
+export function inspectSandboxPayment(op: SandboxRefund, payment: Awaited<ReturnType<typeof readSandboxPayment>>) {
   if (payment?.id !== op.paymentId || payment.checkoutSession !== op.checkoutId ||
       payment.billingType !== 'PIX' || !hasAmount(payment.value, op.checkoutCents) ||
       (payment.split != null && !(Array.isArray(payment.split) && payment.split.length === 0))) {

@@ -768,3 +768,54 @@ test('sandbox Pix preserva uma tentativa após timeout, concorrência e reiníci
   assert.equal(restored.attempts, 0);
   assert.ok(restored.reconciledAt);
 });
+
+test('uma notificação de Pix concilia dois participantes a partir da mesma consulta', async t => {
+  const event = await insertEvent(organizationId);
+  const { lot, category } = await catalog(event);
+  const scope = { organizationId, eventId: event.id };
+  const order = await prisma.eventRegistrationOrder.create({ data: {
+    ...scope, idempotencyKeyHash: digest(), payloadHash: digest(), subtotalCents: 2000,
+  } });
+  const group = await prisma.eventRegistrationOrderCheckout.create({ data: {
+    ...scope, orderId:order.id, idempotencyKeyHash:digest(), requestHash:digest(),
+    providerCheckoutId: 'checkout_' + digest(), status:'PAID', paidAt:new Date(), expiresAt:new Date(), amountCents:1500,
+  } });
+  const requests = [];
+  for (const position of [0, 1]) {
+    const row = await reservation(event, lot, category, { status:'CONFIRMED', priceCents:1000, identityHash:digest(), emailHash:digest() });
+    await prisma.eventRegistrationOrderEntry.create({ data: {
+      ...scope, orderId:order.id, position, categoryId:category.id, lotId:lot.id,
+      identityHash:row.identityHash, emailHash:row.emailHash, reservationId:row.id, basePriceCents:1000, finalPriceCents:1000,
+    } });
+    requests.push(await prisma.registrationRefundRequest.create({ data: { ...scope, reservationId:row.id, reason, status:'APPROVED' } }));
+  }
+  const paymentId = 'pay_' + digest();
+  const config = { ASAAS_REFUND_SANDBOX_ORGANIZATION_ID: organizationId,
+    ASAAS_REFUND_SANDBOX_EXECUTION_ORGANIZATION_ID: organizationId,
+    ASAAS_REFUND_SANDBOX_WEBHOOK_TOKEN: 'fixture-hook', ASAAS_REFUND_SANDBOX_TOKEN: 'fixture-api' };
+  for (const [key, value] of Object.entries(config)) {
+    const prior = process.env[key];
+    process.env[key] = value;
+    t.after(() => { if (prior === undefined) delete process.env[key]; else process.env[key] = prior; });
+  }
+  for (const req of requests) {
+    await refunds.prepare(people.owner.id, event.id, req.id, { amountCents: 750 });
+    await prisma.registrationRefundRequest.update({ where: { id: req.id }, data: { sandboxPaymentId: paymentId } });
+    await prisma.$executeRaw`INSERT INTO "SandboxRefundOperation" ("requestId","organizationId","eventId","paymentId","amountCents")
+      VALUES (${req.id},${organizationId},${event.id},${paymentId},750)`;
+  }
+  let reads = 0;
+  t.mock.method(globalThis, 'fetch', async (url, init) => {
+    assert.equal(init.method, 'GET');
+    assert.equal(url.pathname, '/v3/payments/' + paymentId);
+    reads++;
+    return Response.json({ id: paymentId, billingType: 'PIX', checkoutSession: group.providerCheckoutId, value: 15,
+      refunds: requests.map((req, i) => ({ description: 'Evolvia/' + req.id, value: 7.5, status: i ? 'PENDING' : 'DONE' })) });
+  });
+  await refunds.reconcileSandboxWebhook('fixture-hook', { event: 'PAYMENT_PARTIALLY_REFUNDED', payment: { id: paymentId } });
+  assert.equal(reads, 1);
+  const rows = await prisma.$queryRaw`SELECT "requestId", status FROM "SandboxRefundOperation" WHERE "paymentId" = ${paymentId}`;
+  assert.deepEqual(Object.fromEntries(rows.map(row => [row.requestId, row.status])), {
+    [requests[0].id]: 'RECONCILED', [requests[1].id]: 'PROCESSING',
+  });
+});

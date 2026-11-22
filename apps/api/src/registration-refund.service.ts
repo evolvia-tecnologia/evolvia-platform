@@ -1,5 +1,5 @@
 import { createHash, timingSafeEqual } from 'node:crypto';
-import { inspectSandboxPayment, submitSandboxRefund } from './asaas-sandbox-refund';
+import { inspectSandboxPayment, readSandboxPayment, submitSandboxRefund } from './asaas-sandbox-refund';
 import { lookupSandboxRefundPayment } from './asaas-refund-payment-lookup';
 import { BadRequestException, ConflictException, Injectable, NotFoundException, UnauthorizedException, ServiceUnavailableException } from '@nestjs/common';
 import { EventStatus, MembershipRole, Prisma, RegistrationCheckoutStatus, RegistrationRefundRequestStatus, RegistrationReservationStatus } from '@prisma/client';
@@ -555,7 +555,7 @@ export class RegistrationRefundService {
     }
     const op = { requestId, paymentId: request.sandboxPaymentId, checkoutId: checkout.providerCheckoutId,
       amountCents: request.preparedAmountCents, checkoutCents: checkout.amountCents };
-    const observed = await inspectSandboxPayment(op, token);
+    const observed = inspectSandboxPayment(op, await readSandboxPayment(op.paymentId, token));
     const claim = await this.prisma.$transaction(async tx => {
       const owner = await tx.$queryRaw<{ id: string }[]>`
         SELECT id FROM "OrganizationMembership" WHERE "userId" = ${userId} AND "organizationId" = ${organizationId}
@@ -620,8 +620,10 @@ export class RegistrationRefundService {
         AND g."organizationId" = op."organizationId" AND g."eventId" = op."eventId"
       WHERE op."organizationId" = ${org} AND op."paymentId" = ${paymentId} AND op.status <> 'RECONCILED'
         AND ((c.id IS NULL) <> (g.id IS NULL))`;
+    if (!rows.length) return;
+    const payment = await readSandboxPayment(paymentId, token);
     for (const row of rows) {
-      const observed = await inspectSandboxPayment({ ...row, paymentId }, token);
+      const observed = inspectSandboxPayment({ ...row, paymentId }, payment);
       if (observed.matched) await this.saveSandboxStatus(org, row.eventId, row.requestId, paymentId, row.amountCents, observed.status);
     }
   }
