@@ -29,6 +29,7 @@ export async function claimScientificNoticeDispatch(
   store: Store,
   input: Claim,
   now = new Date(),
+  onUnknown?: () => void,
 ): Promise<boolean> {
   try {
     await store.scientificNoticeDispatch.create({
@@ -53,11 +54,14 @@ export async function claimScientificNoticeDispatch(
   }
   if (existing.status === 'PROCESSING' &&
       existing.claimedAt.getTime() <= now.getTime() - CLAIM_EXPIRY_MS) {
-    await store.scientificNoticeDispatch.updateMany({
+    const transitioned = await store.scientificNoticeDispatch.updateMany({
       where: { idempotencyKey: input.idempotencyKey, status: 'PROCESSING',
         claimedAt: { lte: new Date(now.getTime() - CLAIM_EXPIRY_MS) } },
       data: { status: 'UNKNOWN' },
     });
+    // Somente a instância que efetivou a transição emite o alerta.
+    // Não registrar chave, e-mail ou dados da submissão.
+    if (transitioned.count === 1) onUnknown?.();
     return false;
   }
   if (existing.status !== 'FAILED' ||
