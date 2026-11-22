@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { randomBytes } from 'node:crypto';
 import test from 'node:test';
 import { PrismaClient } from '@prisma/client';
-import { verifyConfirmationInbox } from '../scripts/verify-confirmation-inbox.mjs';
+import { verifyConfirmationInbox } from '../dist/verify-confirmation-inbox.js';
 import { credentialUrl } from '../dist/registration-confirmation-mail.policy.js';
 
 test('a leitura da caixa de teste é isolada, verifica a mensagem e persiste uma única evidência', async t => {
@@ -54,6 +54,9 @@ test('a leitura da caixa de teste é isolada, verifica a mensagem e persiste uma
   mail.to = [{ email: from }];
   await assert.rejects(verify(), /não comprova/);
   mail.to = [{ email: to }];
+  mail.bodyValues['1'].isEncodingProblem = true;
+  await assert.rejects(verify(), /não comprova/);
+  mail.bodyValues['1'].isEncodingProblem = false;
   const action = 'registration.confirmation_test_inbox_received';
   assert.equal(await prisma.auditLog.count({ where: { ...entity, action } }), 0);
   await Promise.all([verify(), verify()]);
