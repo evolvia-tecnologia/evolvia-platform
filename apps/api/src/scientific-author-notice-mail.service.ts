@@ -10,10 +10,19 @@ const FAILED = 'scientific.author_email_provider_failed';
 type Post = (url: string, body: string, headers: Record<string, string>) => Promise<number>;
 type Scope = { organizationId: string; eventId: string; reservationId: string };
 
+class NoticeRequestNotSent extends Error {}
+
 async function postDelivery(url: string, body: string, headers: Record<string, string>): Promise<number> {
-  const response = await fetch(url, {
-    method: 'POST', headers, body, signal: AbortSignal.timeout(10_000),
-  });
+  let request: Request;
+  try {
+    request = new Request(url, {
+      method: 'POST', headers, body, signal: AbortSignal.timeout(10_000), redirect: 'manual',
+    });
+  } catch {
+    // A construção é local: o transporte ainda não recebeu a requisição.
+    throw new NoticeRequestNotSent();
+  }
+  const response = await fetch(request);
   try { return response.status; }
   finally { await response.body?.cancel().catch(() => undefined); }
 }
@@ -184,7 +193,7 @@ export class ScientificAuthorNoticeMailService implements OnModuleInit, OnModule
         kind: notice.kind, versionNumber, recipient, sender: config.sender,
         publicBaseUrl: config.publicBaseUrl, slug: submission.event.slug,
       });
-      let reason: 'provider_accepted' | 'rejected' | 'timeout' | 'uncertain' = 'uncertain';
+      let reason: 'provider_accepted' | 'rejected' | 'not_sent' | 'timeout' | 'uncertain' = 'uncertain';
       let httpStatus: number | null = null;
       try {
         const status = await post(config.endpoint, JSON.stringify(message), {
@@ -195,13 +204,16 @@ export class ScientificAuthorNoticeMailService implements OnModuleInit, OnModule
         if (status >= 200 && status < 300) reason = 'provider_accepted';
         // Só rejeição explícita 4xx (exceto timeout/limite) permite retry controlado.
         else if (status >= 400 && status < 500 && status !== 408 && status !== 429) reason = 'rejected';
-      } catch (error) { reason = isDeliveryTimeout(error) ? 'timeout' : 'uncertain'; }
+      } catch (error) {
+        if (error instanceof NoticeRequestNotSent) reason = 'not_sent';
+        else reason = isDeliveryTimeout(error) ? 'timeout' : 'uncertain';
+      }
       // Primeiro grava o resultado durável. Se houver crash antes da auditoria,
       // ACCEPTED não será enviado de novo. Se a gravação falhar após 2xx,
       // PROCESSING expirará em UNKNOWN, sem reenvio cego.
       await completeScientificNoticeDispatch(
         this.prisma, recipientHash,
-        reason === 'provider_accepted' ? 'ACCEPTED' : reason === 'rejected' ? 'FAILED' : 'UNKNOWN',
+        reason === 'provider_accepted' ? 'ACCEPTED' : (reason === 'rejected' || reason === 'not_sent') ? 'FAILED' : 'UNKNOWN',
       );
       await this.prisma.auditLog.create({
         data: {

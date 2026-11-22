@@ -54,7 +54,16 @@ test('crash com resultado de transporte incerto vira UNKNOWN e não autoriza ret
   await a.scientificNoticeDispatch.update({
     where: { idempotencyKey: one.idempotencyKey }, data: { claimedAt: olderThanLease() },
   });
-  assert.equal(await claimScientificNoticeDispatch(b, one), false);
+  const alerts = [];
+  const onUnknown = (...args) => alerts.push(args);
+  const now = new Date();
+  assert.deepEqual(await Promise.all([
+    claimScientificNoticeDispatch(a, one, now, onUnknown),
+    claimScientificNoticeDispatch(b, one, now, onUnknown),
+  ]), [false, false]);
+  assert.deepEqual(alerts, [[]], 'apenas o vencedor alerta, sem identificadores');
+  assert.equal(await claimScientificNoticeDispatch(b, one, now, onUnknown), false);
+  assert.equal(alerts.length, 1);
   const row = await a.scientificNoticeDispatch.findUniqueOrThrow({
     where: { idempotencyKey: one.idempotencyKey },
   });

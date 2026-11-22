@@ -377,3 +377,31 @@ test('falha sistêmica registra apenas código Prisma permitido sem mensagem sen
     'scientific_notice_worker_failed code=unknown',
   ]);
 });
+
+
+test('falha local antes de fetch permite retry; erro de DNS após invocar fetch permanece incerto', async (t) => {
+  const restore = config();
+  try {
+    const h = harness({ authors: [{ person: { email: 'teste@example.test' } }] });
+    const transport = t.mock.method(globalThis, 'fetch', async (request) => {
+      assert.equal(request.redirect, 'manual');
+      throw Object.assign(new Error('rede'), { code: 'ENOTFOUND' });
+    });
+    const validToken = process.env.EVOLVIA_EMAIL_DELIVERY_TOKEN;
+    process.env.EVOLVIA_EMAIL_DELIVERY_TOKEN = 'teste\ninválido';
+    await h.service.notify(scope, submissionId, 1);
+    const [row] = h.state.dispatches.values();
+    assert.equal(transport.mock.callCount(), 0);
+    assert.equal(row.status, 'FAILED');
+    assert.equal(h.state.audits[0].metadata.reason, 'not_sent');
+    row.claimedAt = new Date(0);
+    process.env.EVOLVIA_EMAIL_DELIVERY_TOKEN = validToken;
+    await h.service.notify(scope, submissionId, 1);
+    assert.equal(transport.mock.callCount(), 1);
+    assert.equal(transport.mock.calls[0].arguments[0].redirect, 'manual');
+    assert.equal(h.state.audits[1].metadata.reason, 'uncertain');
+    assert.equal(row.status, 'UNKNOWN');
+    await h.service.notify(scope, submissionId, 1);
+    assert.equal(transport.mock.callCount(), 1);
+  } finally { restore(); }
+});
