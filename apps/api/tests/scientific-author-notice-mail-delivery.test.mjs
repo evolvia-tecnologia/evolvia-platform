@@ -25,7 +25,7 @@ function config() {
     else process.env[key] = value;
   } };
 }
-function harness({ scientific = true, confirmed = true, authors = null, pending = [] } = {}) {
+function harness({ scientific = true, confirmed = true, authors = null, pending = [], slug = 'congresso' } = {}) {
   const state = { audits: [], transport: [], reads: [], pending, dispatches: new Map() };
   const prisma = {
     scientificAuthorNotice: {
@@ -43,7 +43,7 @@ function harness({ scientific = true, confirmed = true, authors = null, pending 
       state.reads.push(where);
       return scientific ? {
         title: 'Pesquisa científica', currentVersion: 1,
-        event: { name: 'Congresso Evolvia', slug: 'congresso' },
+        event: { name: 'Congresso Evolvia', slug },
         ownerReservation: { registrationData: { full_name: 'Ana Pesquisadora' }, status: confirmed ? 'CONFIRMED' : 'CANCELLED' },
         authors: authors ?? [
           { person: { email: 'ana@example.test' } },
@@ -112,6 +112,27 @@ test('após commit, entrega isoladamente a autor e coautor; repetições não re
     assert.notEqual(h.state.transport[0].headers['Idempotency-Key'], h.state.transport[1].headers['Idempotency-Key']);
     await h.service.notify(scope, submissionId, 1, h.poster);
     assert.equal(h.state.transport.length, 2);
+  } finally { restore(); }
+});
+
+test('payload inválido não consome claim SQL nem bloqueia retry após correção', async () => {
+  const restore = config();
+  try {
+    const h = harness({ slug: 'slug inválido' });
+    await h.service.notify(scope, submissionId, 1, h.poster);
+    assert.equal(h.state.transport.length, 0);
+    assert.equal(h.state.dispatches.size, 0, 'nenhum PROCESSING sem mensagem válida');
+    assert.equal(h.state.audits.length, 0);
+    h.service.prisma.scientificSubmission.findFirst = async () => ({
+      title: 'Pesquisa científica', currentVersion: 1,
+      event: { name: 'Congresso Evolvia', slug: 'congresso' },
+      ownerReservation: { registrationData: { full_name: 'Ana Pesquisadora' }, status: 'CONFIRMED' },
+      authors: [{ person: { email: 'ana@example.test' } }],
+    });
+    await h.service.notify(scope, submissionId, 1, h.poster);
+    assert.equal(h.state.transport.length, 1, 'corrigir payload libera envio sem intervenção no banco');
+    assert.equal(h.state.dispatches.size, 1);
+    assert.ok([...h.state.dispatches.values()].every((row) => row.status === 'ACCEPTED'));
   } finally { restore(); }
 });
 
