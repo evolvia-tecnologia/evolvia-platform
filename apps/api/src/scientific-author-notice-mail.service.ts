@@ -176,7 +176,7 @@ export class ScientificAuthorNoticeMailService implements OnModuleInit, OnModule
       const acquired = await claimScientificNoticeDispatch(this.prisma, {
         idempotencyKey: recipientHash, organizationId: scope.organizationId,
         eventId: scope.eventId, submissionId, versionNumber,
-      });
+      }, new Date(), () => this.logger.warn('scientific_notice_claim_expired_unknown_reconciliation_required'));
       if (!acquired) return;
 
       const message = scientificNoticeMessage({
