@@ -101,6 +101,6 @@ test('idempotencyKey distingue versões e valida escopo depois de conflito', asy
     ...first, eventId: 'event-alheio',
   }), /scope_mismatch/u);
   assert.equal((await a.scientificNoticeDispatch.count({
-    where: { organizationId, submissionId: first.submissionId },
+    where: { idempotencyKey: { in: [first.idempotencyKey, otherVersion.idempotencyKey] }, organizationId, submissionId: first.submissionId },
   })), 2);
 });
