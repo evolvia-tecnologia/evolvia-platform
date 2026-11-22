@@ -99,3 +99,13 @@ CREATE TRIGGER "PlatformEventModerationEvent_sem_update"
 CREATE TRIGGER "PlatformEventModerationEvent_sem_delete"
   BEFORE DELETE ON "PlatformEventModerationEvent"
   FOR EACH ROW EXECUTE FUNCTION "platform_moderation_event_append_only"();
+
+-- E resiste a TRUNCATE. Gatilho de linha não dispara em TRUNCATE: sem este
+-- gatilho de statement, uma única instrução esvazia a trilha inteira sem
+-- violar nenhuma das recusas acima. Medido em PostgreSQL 16.15 antes deste
+-- reparo: o TRUNCATE apagou as linhas da trilha e não levantou erro. A tabela
+-- de estado segue truncável de propósito — ela não é append-only; só a trilha
+-- é a prova que a plataforma precisa guardar.
+CREATE TRIGGER "PlatformEventModerationEvent_sem_truncate"
+  BEFORE TRUNCATE ON "PlatformEventModerationEvent"
+  FOR EACH STATEMENT EXECUTE FUNCTION "platform_moderation_event_append_only"();

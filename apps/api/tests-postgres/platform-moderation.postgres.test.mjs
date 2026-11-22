@@ -1,7 +1,7 @@
 // Disposable CI database only; fixture rows are preserved.
 //
-// Três provas que nenhum teste com cliente falso consegue dar, porque dependem
-// do PostgreSQL avaliando as próprias regras:
+// Quatro provas que nenhum teste com cliente falso consegue dar, porque
+// dependem do PostgreSQL avaliando as próprias regras:
 //
 //  1. as CHECK e os gatilhos da migration recusam de fato o que a política
 //     nunca produz — até aqui isso era comparação de texto entre o SQL e o
@@ -13,7 +13,10 @@
 //     unitário;
 //  3. o ciclo inteiro devolve o status EXATO de partida, com escrita real nas
 //     três tabelas — é a propriedade que impede um rascunho suspenso de
-//     reaparecer publicado.
+//     reaparecer publicado;
+//  4. a trilha resiste a TRUNCATE. Gatilho de linha não dispara em TRUNCATE,
+//     então as recusas de UPDATE e DELETE não bastam: é uma propriedade do
+//     motor, invisível a qualquer teste que não fale com o banco de verdade.
 import assert from 'node:assert/strict';
 import test, { after } from 'node:test';
 import { randomUUID } from 'node:crypto';
@@ -179,4 +182,45 @@ test('o ciclo completo devolve o status EXATO e preserva a fotografia no upsert'
     where: { eventId: evento.id }, orderBy: { occurredAt: 'asc' }, select: { action: true },
   });
   assert.deepEqual(trilha.map((linha) => linha.action), ['SUSPENDER', 'REMOVER', 'RESTAURAR', 'LIBERAR']);
+});
+
+test('a trilha resiste a TRUNCATE: as recusas de UPDATE e DELETE não bastam', async () => {
+  // Gatilho FOR EACH ROW não dispara em TRUNCATE. Sem um gatilho de statement,
+  // uma única instrução esvazia a trilha inteira sem violar nenhuma das
+  // recusas acima — e a trilha existe justamente para ser a prova que a
+  // plataforma vai precisar numa disputa. Medido em PostgreSQL 16.15 antes do
+  // reparo: o TRUNCATE apagou as linhas e não levantou erro.
+  const { organizacao, evento } = await cenario();
+  await db.platformEventModerationEvent.create({
+    data: {
+      eventId: evento.id, organizationId: organizacao.id, action: 'SUSPENDER',
+      fromState: 'ATIVO', toState: 'SUSPENSO', eventStatusBefore: 'PUBLISHED', eventStatusAfter: 'SUSPENDED',
+      classification: 'CONDUTA', reason: 'sobrevive ao truncate', caseRef: 'CASO-PG-004',
+      actorUserId: 'master-1', correlationId: randomUUID(),
+    },
+  });
+  const antes = await db.platformEventModerationEvent.count();
+  assert.ok(antes > 0, 'trilha vazia: esta prova passaria por vacuidade');
+
+  // O TRUNCATE vai dentro de uma transação que termina em rollback de
+  // qualquer jeito, para que uma regressão aqui não leve consigo a trilha das
+  // outras suítes. `truncou` separa "o banco recusou" de "o banco aceitou e
+  // nós desfizemos", que é exatamente a diferença que esta prova mede.
+  let truncou = false;
+  await assert.rejects(
+    db.$transaction(async (tx) => {
+      // Constante literal, sem interpolação: não há entrada externa aqui.
+      await tx.$executeRawUnsafe('TRUNCATE TABLE "PlatformEventModerationEvent"');
+      truncou = true;
+      throw new Error('rollback deliberado');
+    }),
+    (erro) => {
+      assert.equal(truncou, false,
+        'TRUNCATE passou: uma instrução esvazia a trilha append-only inteira');
+      return /append-only/u.test(erro.message);
+    },
+  );
+
+  assert.equal(await db.platformEventModerationEvent.count(), antes,
+    'a trilha perdeu linhas');
 });
