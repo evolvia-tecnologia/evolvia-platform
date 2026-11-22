@@ -113,3 +113,29 @@ test('idempotencyKey distingue versões e valida escopo depois de conflito', asy
     where: { idempotencyKey: { in: [first.idempotencyKey, otherVersion.idempotencyKey] }, organizationId, submissionId: first.submissionId },
   })), 2);
 });
+
+test('backoff SQL: segunda falha espera 120s, sem claim prematuro em duas conexões', async () => {
+  const one = input('exponential-backoff');
+  const t0 = new Date('2026-11-22T00:00:00.000Z');
+  assert.equal(await claimScientificNoticeDispatch(a, one, t0), true);
+  await completeScientificNoticeDispatch(a, one.idempotencyKey, 'FAILED');
+  assert.equal(await claimScientificNoticeDispatch(b, one, new Date(t0.getTime() + 59_999)), false);
+  assert.equal(await claimScientificNoticeDispatch(b, one, new Date(t0.getTime() + 60_000)), true);
+  await completeScientificNoticeDispatch(b, one.idempotencyKey, 'FAILED');
+  const t1 = new Date(t0.getTime() + 60_000);
+  const premature = await Promise.all([
+    claimScientificNoticeDispatch(a, one, new Date(t1.getTime() + 119_999)),
+    claimScientificNoticeDispatch(b, one, new Date(t1.getTime() + 119_999)),
+  ]);
+  assert.deepEqual(premature, [false, false]);
+  const onTime = await Promise.all([
+    claimScientificNoticeDispatch(a, one, new Date(t1.getTime() + 120_000)),
+    claimScientificNoticeDispatch(b, one, new Date(t1.getTime() + 120_000)),
+  ]);
+  assert.deepEqual(onTime.slice().sort(), [false, true]);
+  const row = await a.scientificNoticeDispatch.findUniqueOrThrow({
+    where: { idempotencyKey: one.idempotencyKey },
+  });
+  assert.equal(row.attempts, 3);
+  assert.equal(row.status, 'PROCESSING');
+});
