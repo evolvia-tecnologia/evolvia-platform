@@ -180,6 +180,15 @@ export class ScientificAuthorNoticeMailService implements OnModuleInit, OnModule
         ],
       } as Prisma.AuditLogWhereInput;
       if (await this.prisma.auditLog.findFirst({ where, select: { id: true } })) return;
+      // Validar e construir a mensagem ANTES do claim durável: um erro local
+      // (slug, endereço ou URL inválidos) não pode consumir a reserva SQL
+      // nem deixar PROCESSING expirar como UNKNOWN sem tentativa de envio.
+      const message = scientificNoticeMessage({
+        eventName: submission.event.name, title: submission.title, submitterName,
+        kind: notice.kind, versionNumber, recipient, sender: config.sender,
+        publicBaseUrl: config.publicBaseUrl, slug: submission.event.slug,
+      });
+
       // O registro durável é a única autoridade para iniciar transporte.
       // Uma réplica concorrente que perder o claim não chama a rede.
       const acquired = await claimScientificNoticeDispatch(this.prisma, {
@@ -188,11 +197,6 @@ export class ScientificAuthorNoticeMailService implements OnModuleInit, OnModule
       }, new Date(), () => this.logger.warn('scientific_notice_claim_expired_unknown_reconciliation_required'));
       if (!acquired) return;
 
-      const message = scientificNoticeMessage({
-        eventName: submission.event.name, title: submission.title, submitterName,
-        kind: notice.kind, versionNumber, recipient, sender: config.sender,
-        publicBaseUrl: config.publicBaseUrl, slug: submission.event.slug,
-      });
       let reason: 'provider_accepted' | 'rejected' | 'not_sent' | 'timeout' | 'uncertain' = 'uncertain';
       let httpStatus: number | null = null;
       try {
