@@ -47,6 +47,24 @@ const PRECO_INDIVIDUAL = 15000;
 const PRECO_AGRUPADO_UM = 9000;
 const PRECO_AGRUPADO_DOIS = 12000;
 
+/**
+ * Forma que a constraint `RefundSandbox_reference_shape` exige do identificador
+ * de pagamento do sandbox, copiada da migration
+ * `20261119110000_refund_sandbox_payment_reference`:
+ *
+ *     CHECK ("sandboxPaymentId" IS NULL OR
+ *            ("preparedAmountCents" IS NOT NULL
+ *             AND "sandboxPaymentId" ~ '^pay_[A-Za-z0-9_-]+$'))
+ *
+ * A primeira versão desta fixture gerava `sandbox-<hex>`, sem o prefixo `pay_`,
+ * e derrubava os três casos deste arquivo de uma vez. Medido no PostgreSQL
+ * 16.15, com o próprio operador do banco: `sandbox-9f3a2b1c4d5e` dá falso,
+ * `pay_9f3a2b1c4d5e6f78` dá verdadeiro, e `pay_` sozinho dá falso — o sufixo
+ * tem de existir.
+ */
+const FORMA_DO_PAGAMENTO_SANDBOX = /^pay_[A-Za-z0-9_-]+$/u;
+const pagamentoSandbox = () => `pay_${randomBytes(10).toString('hex')}`;
+
 /** Organização, evento, catálogo, categoria e lote. */
 async function palco(status = 'PUBLISHED') {
   const chave = randomUUID();
@@ -152,8 +170,21 @@ async function pedidoAgrupadoPago(palcoAtual) {
   return { pedido, entradas, checkout };
 }
 
-/** Reembolso APROVADO, com recibo emitido. */
+/**
+ * Reembolso APROVADO, com recibo emitido.
+ *
+ * `RefundPreparation_shape` exige, quando há valor preparado: `status` APROVADO,
+ * `preparedAmountCents > 0` e EXATAMENTE um dos dois checkouts. Avaliei a
+ * expressão com estes valores no próprio PostgreSQL antes de escrever: a cena
+ * satisfaz a constraint por ser a certa, e não por acidente.
+ *
+ * O recibo carrega o MESMO `pay_...` do pedido, de propósito. Antes ele
+ * inventava um identificador próprio, e dois identificadores para um único
+ * pagamento é o tipo de coisa que atravessa uma conciliação e ninguém entende
+ * depois.
+ */
 async function reembolsoAprovado(inscricao, checkout) {
+  const pagamento = pagamentoSandbox();
   const pedido = await db.registrationRefundRequest.create({
     data: {
       reservationId: inscricao.id, eventId: inscricao.eventId,
@@ -165,18 +196,18 @@ async function reembolsoAprovado(inscricao, checkout) {
       decidedAt: new Date('2026-10-03T09:00:00.000Z'),
       preparedCheckoutId: checkout.id,
       preparedAmountCents: checkout.amountCents,
-      sandboxPaymentId: `sandbox-${randomBytes(6).toString('hex')}`,
+      sandboxPaymentId: pagamento,
     },
   });
   const recibo = await db.mockRefundReceipt.create({
     data: {
       requestId: pedido.id,
-      paymentId: `sandbox-pay-${randomBytes(6).toString('hex')}`,
+      paymentId: pagamento,
       amountCents: checkout.amountCents,
       issuedAt: new Date('2026-10-03T09:05:00.000Z'),
     },
   });
-  return { pedido, recibo };
+  return { pedido, recibo, pagamento };
 }
 
 /**
@@ -294,6 +325,14 @@ test('suspender e liberar não alteram um centavo, e o status volta exato', { ti
   assert.equal(reembolso.mockReceipt.amountCents, PRECO_INDIVIDUAL);
   assert.equal(await db.mockRefundReceipt.count({ where: { requestId: reembolso.id } }), 1,
     'o recibo foi duplicado');
+
+  // A forma que a constraint exige, presa aqui para que uma fixture fora do
+  // padrão falhe dizendo o que está errado — e não com erro cru do banco em
+  // três casos de uma vez, que foi o que aconteceu na primeira versão.
+  assert.match(reembolso.sandboxPaymentId, FORMA_DO_PAGAMENTO_SANDBOX,
+    'RefundSandbox_reference_shape exige ^pay_[A-Za-z0-9_-]+$ no identificador do sandbox');
+  assert.equal(reembolso.mockReceipt.paymentId, reembolso.sandboxPaymentId,
+    'recibo e pedido descrevem o MESMO pagamento: dois identificadores atravessam a conciliação e ninguém entende');
 
   // E a moderação de fato aconteceu — senão tudo acima estaria preservado por
   // nada ter sido feito.

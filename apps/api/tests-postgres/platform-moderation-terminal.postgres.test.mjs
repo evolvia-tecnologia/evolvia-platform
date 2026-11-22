@@ -20,8 +20,13 @@ import assert from 'node:assert/strict';
 import test, { after } from 'node:test';
 import { randomUUID } from 'node:crypto';
 import { PrismaClient } from '@prisma/client';
-import { decidirModeracao } from '../src/platform-moderation-policy.ts';
-import { aplicarPlano, planejarGravacao } from '../src/platform-moderation-transaction.ts';
+// De `dist`, e NÃO de `src`: a workflow monta apenas `apps/api/tests-postgres`
+// em `/app/tests-postgres`, e a imagem da API carrega `dist`, não `src`. Um
+// import `../src/...` resolve para `/app/src/...`, que não existe no contêiner,
+// e derruba o arquivo inteiro antes do primeiro caso. Era o desvio deste
+// arquivo: os demais de `tests-postgres` sempre importaram de `dist`.
+import { decidirModeracao } from '../dist/platform-moderation-policy.js';
+import { aplicarPlano, planejarGravacao } from '../dist/platform-moderation-transaction.js';
 
 const prisma = new PrismaClient();
 after(() => prisma.$disconnect());
