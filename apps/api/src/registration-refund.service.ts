@@ -1,7 +1,7 @@
 import { createHash, timingSafeEqual } from 'node:crypto';
 import { inspectSandboxPayment, readSandboxPayment, submitSandboxRefund } from './asaas-sandbox-refund';
 import { lookupSandboxRefundPayment } from './asaas-refund-payment-lookup';
-import { BadRequestException, ConflictException, Injectable, NotFoundException, UnauthorizedException, ServiceUnavailableException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, Logger, NotFoundException, UnauthorizedException, ServiceUnavailableException } from '@nestjs/common';
 import { EventStatus, MembershipRole, Prisma, RegistrationCheckoutStatus, RegistrationRefundRequestStatus, RegistrationReservationStatus } from '@prisma/client';
 import { AuthorizationService } from './authorization.service';
 import { participantHash, normalizeParticipantToken } from './participant-area-policy';
@@ -40,6 +40,48 @@ function policyError(error: unknown): never {
 @Injectable()
 export class RegistrationRefundService {
   constructor(private readonly prisma: PrismaService, private readonly authorization: AuthorizationService) {}
+
+  private recoveryTimer?: NodeJS.Timeout;
+  private readonly logger = new Logger(RegistrationRefundService.name);
+
+  onModuleInit() {
+    if (!this.sandboxRecoveryAccount()) return;
+    this.recoveryTimer = setInterval(() => {
+      void this.recoverSandboxRefund().catch(() => this.logger.warn('Falha na consulta de conciliação Pix sandbox.'));
+    }, 30_000);
+    this.recoveryTimer.unref();
+  }
+
+  onModuleDestroy() {
+    clearInterval(this.recoveryTimer);
+  }
+
+  private sandboxRecoveryAccount() {
+    const org = process.env.ASAAS_REFUND_SANDBOX_ORGANIZATION_ID;
+    const token = process.env.ASAAS_REFUND_SANDBOX_TOKEN?.trim();
+    return org && token && org === process.env.ASAAS_REFUND_SANDBOX_EXECUTION_ORGANIZATION_ID ? { org, token } : null;
+  }
+
+  async recoverSandboxRefund() {
+    const account = this.sandboxRecoveryAccount();
+    if (!account) return;
+    const { org, token } = account;
+    // Reserve the next read across instances, committing before contacting Asaas.
+    const paymentId = await this.prisma.$transaction(async tx => {
+      const [lock] = await tx.$queryRaw<{ acquired: boolean }[]>`
+        SELECT pg_try_advisory_xact_lock(hashtextextended(${'sandbox-refund-recovery/' + org}, 0)) AS acquired`;
+      if (!lock.acquired) return;
+      const [due] = await tx.$queryRaw<{ paymentId: string }[]>`
+        SELECT "paymentId" FROM "SandboxRefundOperation"
+        WHERE "organizationId" = ${org} AND status = 'PROCESSING' AND "nextCheckAt" <= now()
+        ORDER BY "nextCheckAt", "paymentId" LIMIT 1`;
+      if (!due) return;
+      await tx.$executeRaw`UPDATE "SandboxRefundOperation" SET "nextCheckAt" = now() + interval '5 minutes'
+        WHERE "organizationId" = ${org} AND "paymentId" = ${due.paymentId} AND status = 'PROCESSING'`;
+      return due.paymentId;
+    });
+    if (paymentId) await this.reconcileSandboxPayment(org, paymentId, token);
+  }
 
   async publicPolicy(slugValue: string, now = new Date()) {
     const event = await this.publishedEvent(slugValue);
@@ -606,6 +648,10 @@ export class RegistrationRefundService {
     if (typeof paymentId !== 'string' || !/^pay_[a-zA-Z0-9_-]{1,196}$/.test(paymentId)) {
       throw new BadRequestException('Referência de cobrança inválida.');
     }
+    await this.reconcileSandboxPayment(org, paymentId, token);
+  }
+
+  private async reconcileSandboxPayment(org: string, paymentId: string, token: string) {
     const rows = await this.prisma.$queryRaw<Array<{ requestId: string; eventId: string; amountCents: number;
       checkoutId: string; checkoutCents: number }>>`
       SELECT op."requestId", op."eventId", op."amountCents",

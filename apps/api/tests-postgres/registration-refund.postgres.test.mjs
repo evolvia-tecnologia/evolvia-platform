@@ -819,3 +819,52 @@ test('uma notificação de Pix concilia dois participantes a partir da mesma con
     [requests[0].id]: 'RECONCILED', [requests[1].id]: 'PROCESSING',
   });
 });
+
+test('sem callback, duas conexões retomam uma confirmação tardia sem reenviar o Pix', async t => {
+  const { id: organizationId } = await prisma.organization.create({ data: {
+    name: 'Recuperação', slug: 'recuperacao-' + digest(), createdById: people.owner.id,
+  } });
+  await prisma.organizationMembership.create({ data: { organizationId, userId: people.owner.id, role: 'OWNER' } });
+  const event = await insertEvent(organizationId);
+  const { lot, category } = await catalog(event);
+  const row = await reservation(event, lot, category, { status: 'CONFIRMED', priceCents: 1200, identityHash: digest(), emailHash: digest() });
+  const checkoutRow = await checkout(row, 'PAID');
+  const checkoutId = 'checkout_' + digest();
+  const paymentId = 'pay_' + digest();
+  await prisma.eventRegistrationCheckout.update({ where: { id: checkoutRow.id }, data: { providerCheckoutId: checkoutId } });
+  const req = await prisma.registrationRefundRequest.create({ data: {
+    organizationId, eventId: event.id, reservationId: row.id, reason, status: 'APPROVED',
+  } });
+  await refunds.prepare(people.owner.id, event.id, req.id, { amountCents: 750 });
+  await prisma.registrationRefundRequest.update({ where: { id: req.id }, data: { sandboxPaymentId: paymentId } });
+  const config = { ASAAS_REFUND_SANDBOX_ORGANIZATION_ID: organizationId,
+    ASAAS_REFUND_SANDBOX_EXECUTION_ORGANIZATION_ID: organizationId, ASAAS_REFUND_SANDBOX_WEBHOOK_TOKEN: 'webhook-fixture', ASAAS_REFUND_SANDBOX_TOKEN: 'fixture' };
+  for (const [key, value] of Object.entries(config)) {
+    const prior = process.env[key];
+    process.env[key] = value;
+    t.after(() => { if (prior === undefined) delete process.env[key]; else process.env[key] = prior; });
+  }
+  const independent = new PrismaClient();
+  t.after(() => independent.$disconnect());
+  const replacement = new RegistrationRefundService(independent, new AuthorizationService(independent));
+  let posts = 0;
+  let reads = 0;
+  let confirmed = false;
+  t.mock.method(globalThis, 'fetch', async (_url, init) => {
+    if (init.method === 'POST') {
+      posts++;
+      throw new Error('timeout depois do aceite');
+    }
+    reads++;
+    return Response.json({ id: paymentId, checkoutSession: checkoutId, billingType: 'PIX', value: 12,
+      status: 'RECEIVED', refunds: confirmed ? [{ description: 'Evolvia/' + req.id, value: 7.5, status: 'DONE' }] : [] });
+  });
+  assert.equal((await refunds.processSandboxRefund(people.owner.id, event.id, req.id)).processingStatus, 'PROCESSING');
+  confirmed = true;
+  await Promise.all([refunds.recoverSandboxRefund(), replacement.recoverSandboxRefund()]);
+  await replacement.recoverSandboxRefund();
+  assert.equal(posts, 1);
+  assert.equal(reads, 2);
+  const [stored] = await independent.$queryRaw`SELECT status, attempts FROM "SandboxRefundOperation" WHERE "requestId" = ${req.id}`;
+  assert.deepEqual(stored, { status: 'RECONCILED', attempts: 1 });
+});

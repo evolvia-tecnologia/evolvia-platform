@@ -2553,4 +2553,7 @@ model SandboxRefundOperation {
   status         String                    @default("PROCESSING")
   createdAt      DateTime                  @default(now()) @db.Timestamptz(6)
   reconciledAt   DateTime?                 @db.Timestamptz(6)
+  nextCheckAt    DateTime                  @default(now()) @db.Timestamptz(6)
+
+  @@index([organizationId, status, nextCheckAt, paymentId], map: "SandboxRefundOperation_recovery_idx")
 }
