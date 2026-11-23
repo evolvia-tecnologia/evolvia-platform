@@ -910,9 +910,22 @@ test('sandbox Pix permite uma única reiteração explícita após HTTP 400 defi
   }
   let posts = 0;
   let history = [];
+  let reads = 0;
+  const firstReading = Promise.withResolvers();
+  const bothReading = Promise.withResolvers();
+  const releaseSecond = Promise.withResolvers();
   t.mock.method(globalThis, 'fetch', async (url, init) => {
     assert.equal(url.origin, 'https://api-sandbox.asaas.com');
     if (init.method === 'GET') {
+      const sequence = ++reads;
+      if (sequence === 1) {
+        firstReading.resolve();
+        await bothReading.promise;
+      }
+      if (sequence === 2) {
+        bothReading.resolve();
+        await releaseSecond.promise;
+      }
       assert.equal(url.pathname, '/v3/payments/' + paymentId);
       return Response.json({ id: paymentId, checkoutSession: checkoutId,
         billingType: 'PIX', value: 12, status: 'RECEIVED', refunds: history });
@@ -921,10 +934,16 @@ test('sandbox Pix permite uma única reiteração explícita após HTTP 400 defi
     posts++;
     assert.deepEqual(JSON.parse(init.body), { value: 7.5, description: 'Evolvia/' + req.id });
     if (posts === 1) return new Response('saldo insuficiente - não expor', { status: 400 });
-    return Response.json({ id: paymentId, status: 'PROCESSING' });
+    return new Response(null, { status: 503 });
   });
   const execute = () => refunds.processSandboxRefund(people.owner.id, event.id, req.id);
-  const first = await execute();
+  const initial = execute();
+  await firstReading.promise;
+  const duplicate = execute();
+  const first = await initial;
+  releaseSecond.resolve();
+  assert.equal((await duplicate).processingStatus, 'FAILED');
+  assert.equal(posts, 1);
   assert.equal(first.processingStatus, 'FAILED');
   assert.equal(first.moneyReturned, false);
   const failed = await prisma.sandboxRefundOperation.findUniqueOrThrow({ where: { requestId: req.id } });
