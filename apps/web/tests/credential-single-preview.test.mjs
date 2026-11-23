@@ -111,3 +111,21 @@ test('edição não salva usa a MESMA prévia, com alerta antes de afetar a impr
   assert.match(stringify(edited.tree), /Rascunho não salvo/u);
   assert.equal(nodes(edited.tree).filter((node) => node.type === 'credential-label').length, 1);
 });
+
+test('uma categoria histórica não ativa modelo novo sem prévia explícita e confirmação de salvamento', () => {
+  state.reset();
+  const original = draw(data);
+  const buttons = nodes(original.tree).filter((node) => node.type === 'button');
+  const save = buttons.find((node) => stringify(node) === 'Salvar modelo da categoria');
+  assert.ok(save);
+  assert.equal(save.props.disabled, true, 'não ativar um layout que não foi visto no editor');
+  const prepare = buttons.find((node) => stringify(node) === 'Preparar modelo padrão desta categoria');
+  assert.ok(prepare);
+  prepare.props.onClick();
+  const draft = draw(data);
+  assert.ok(draft.label.orderedContent, 'o rascunho deve aparecer na mesma prévia');
+  assert.match(stringify(draft.tree), /Rascunho não salvo/u);
+  const enabled = nodes(draft.tree).find((node) => node.type === 'button'
+    && stringify(node) === 'Salvar modelo da categoria');
+  assert.equal(enabled.props.disabled, false, 'salvamento só habilita após o modelo estar visível');
+});
