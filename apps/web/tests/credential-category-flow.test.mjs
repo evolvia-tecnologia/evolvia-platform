@@ -149,7 +149,8 @@ test('campos customizados com nome constructor não herdam amostras ou estilos d
   assert.match(editor, /Object\.prototype\.hasOwnProperty\.call\(current, code\) \? current\[code\] : DEFAULT_STYLE/u);
   assert.match(editor, /chosen\.flatMap\(\(code\): \[string, LabelFieldStyle\]\[\] =>/u);
   assert.match(editor, /return style \? \[\[code, style\]\] : \[\]/u);
-  assert.match(editor, /style: ownStyle\(code\)/u);
+  assert.match(editor, /style: Object\.prototype\.hasOwnProperty\.call\(visibleTemplate\.styles \?\? \{\}, code\)/u,
+    'a única prévia deve usar somente estilos próprios do modelo efetivo');
   assert.doesNotMatch(editor, /SAMPLES\[code\] \?\? display\(code\)/u);
 
   const samples = { preferred_name: 'Ana Pesquisadora' };
@@ -194,7 +195,9 @@ test('troca de evento/categoria durante POST não bloqueia nova sessão nem libe
   assert.ok(editor.includes('session.current += 1;'));
   assert.ok(editor.includes('inFlight.current = null;'));
   assert.ok(editor.includes('setBusy(false);'));
-  assert.ok(editor.includes('if (inFlight.current === currentSession || !organizer || !categoryId) return;'));
+  assert.ok(editor.includes('if (inFlight.current === currentSession || !organizer || !categoryId || !isEditing) return;'));
+  assert.match(editor, /disabled=\{busy \|\| !organizer \|\| !isEditing\} onClick=\{\(\) => void save\(\)\}/u,
+    'evitar ativar uma etiqueta que o organizador não pré-visualizou');
   assert.ok(editor.includes('if (inFlight.current === currentSession) {'));
   assert.ok(!editor.includes('inFlight.current = false;'));
   // Simulação determinística: A pendente, B iniciada, A conclui depois.
@@ -222,8 +225,8 @@ test('troca de evento/categoria durante POST não bloqueia nova sessão nem libe
 
 test('desmontar editor de etiquetas invalida POST antigo antes de onSaved de outro evento', async () => {
   const editor = await read('../components/credential-category-templates.tsx');
-  const effect = editor.match(/useEffect\(\(\) => \{[\s\S]*?\}, \[eventId, categoryId, templates\]\);/u)?.[0];
-  assert.ok(effect, 'efeito deve acompanhar evento, categoria e templates');
+  const effect = editor.match(/useEffect\(\(\) => \{[\s\S]*?\}, \[eventId, categoryId, savedTemplate\]\);/u)?.[0];
+  assert.ok(effect, 'efeito deve acompanhar evento, categoria e modelo efetivamente salvo');
   assert.match(effect, /return \(\) => \{\s*[\s\S]*?session\.current \+= 1;\s*inFlight\.current = null;\s*\};/u,
     'cleanup do unmount precisa invalidar sessão e lock de POST');
   assert.match(editor, /if \(currentSession !== session\.current \|\| targetId !== categoryId\) return;/u);
