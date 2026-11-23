@@ -1342,15 +1342,15 @@
   },
   "integratedCriteria": 89,
   "criteriaCount": 93,
-  "methodNote": "Reconciliação de 19/11 validada novamente após a integração #680 em 20/11. G2.10 (#471) e G10.10 (#642) sustentam I/T/D. #680 melhora UX e declara que não conclui G2.11; #694 somente simulação (moneyReturned:false). Não dar novo crédito a G2.11/G2.13/G2.14/G5.8/G6.8 nem a refinamentos de critérios existentes; para G7.4 vale a reconciliação pontual comprovada após #518. Revisão do HEAD develop e evidências não equivale a homologação/Go de produção.\nReconciliação pontual após merge #518: G7.4 recebeu SOMENTE I e T por código integrado + CI PostgreSQL/ARM64. D=0/F=0 porque gate público #108 falhou após publicação e não há jornada autenticada/aceite do autor. Evidências PR #518 e workflows 44958147485 / 45086466534. 0/11 Gates encerrados; sem Go.",
+  "methodNote": "Reconciliação de 19/11 validada novamente após a integração #680 em 20/11. G2.10 (#471) e G10.10 (#642) sustentam I/T/D. #680 melhora UX e declara que não conclui G2.11; #694 somente simulação (moneyReturned:false). Não dar novo crédito a G2.11/G2.13/G2.14/G5.8/G6.8 nem a refinamentos de critérios existentes; para G7.4 vale a reconciliação pontual comprovada após #518. Revisão do HEAD develop e evidências não equivale a homologação/Go de produção.\nReconciliação pontual após merge #518: G7.4 recebeu SOMENTE I e T por código integrado + CI PostgreSQL/ARM64. D=0/F=0 porque gate público #108 falhou após publicação e não há jornada autenticada/aceite do autor. Evidências PR #518 e workflows 44958147485 / 45086466534. 0/11 Gates encerrados; sem Go.\nReconciliação de 23/11 após merge da #708: a restrição histórica de NÃO creditar G5.8 foi superada exclusivamente para I/T. O serviço de avisos científicos e claim durável PostgreSQL de #610/#708 passaram no CI 45105953160; D/F continuam sem evidência de entrega real ou aceite. Permanecem sem crédito adicional G2.11, G2.13, G2.14, G6.8. Histórico acima mantido.",
   "lastCrossCheck": {
-    "localDate": "2026-11-22",
-    "developSha": "e46268121378b77343231366922fd6a6b723830d",
-    "latestMergeNumber": 518,
-    "integratedCriteria": 88,
+    "localDate": "2026-11-23",
+    "developSha": "393ab9930d205dcb592cbf283b55c3fd1d2d86e3",
+    "latestMergeNumber": 708,
+    "integratedCriteria": 89,
     "criteriaCount": 93,
-    "implementationPercent": 95.77922077922076,
-    "verifiedPercent": 71.73971861471863,
+    "implementationPercent": 96.9155844155844,
+    "verifiedPercent": 72.30790043290044,
     "gateClosure": "0/11",
     "noAdditionalCredit": [
       680,
@@ -1359,9 +1359,10 @@
       675,
       678,
       696,
-      689
+      689,
+      706
     ],
-    "limitation": "#518: somente I/T; D/F não comprovados. O workflow pós-merge 45086466534 publicou o app, mas o gate público falhou no Server Nginx; sem jornada autenticada do autor. Outros critérios abertos permanecem sem novo crédito."
+    "limitation": "G5.8: I/T comprovados com #610 e #708, CI 45105953160; D/F não comprovados. Deploy develop 45107963987 reprovou gate Nginx #108 (Server expõe versão). Sem envio real, inbox, SHA público correlacionado ou aceite do autor. G2.11/G2.13/G2.14/G6.8 continuam abertos."
   },
   "integrationCiRun": null,
   "technicalValidation": {
