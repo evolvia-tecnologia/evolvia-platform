@@ -897,6 +897,7 @@ function EventDeskSession({ eventId }: { eventId: string }) {
         templates={context.categoryLabelTemplates ?? []}
         widthMm={context.label.widthMm}
         heightMm={context.label.heightMm}
+        labelConfig={context.label}
         onSaved={(template) => {
           setContext((current) => current ? {
             ...current, categoryLabelTemplates: [
