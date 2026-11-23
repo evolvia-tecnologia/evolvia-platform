@@ -640,3 +640,26 @@ test('capacidade de simulação da página exige OWNER ativo e ambas as configur
     process.env[key]=original;
   }
 });
+
+test('cancelar uma inscrição paga preserva a preparação do reembolso aprovado', async () => {
+  const event = await insertEvent(organizationId);
+  const { lot, category } = await catalog(event);
+  const row = await reservation(event, lot, category, {
+    status: 'CONFIRMED', priceCents: 1200, identityHash: digest(), emailHash: digest(),
+  });
+  const paid = await checkout(row, 'PAID');
+  const request = await prisma.registrationRefundRequest.create({ data: {
+    organizationId, eventId: event.id, reservationId: row.id, reason, status: 'APPROVED',
+  } });
+  await prisma.eventRegistrationReservation.update({ where: { id: row.id }, data: { status: 'CANCELLED' } });
+  const prepare = () => refunds.prepare(people.owner.id, event.id, request.id, { amountCents: 1200 });
+  await prisma.eventRegistrationCheckout.update({ where: { id: paid.id }, data: { paidAt: null } });
+  await rejects(prepare(), 409);
+  await prisma.eventRegistrationCheckout.update({ where: { id: paid.id }, data: { paidAt: paid.paidAt } });
+  const first = await prepare();
+  assert.equal(first.moneyReturned, false);
+  assert.deepEqual(await prepare(), first);
+  assert.equal(await prisma.auditLog.count({ where: { entityId: request.id, action: 'refund.prepared' } }), 1);
+  const saved = await prisma.eventRegistrationReservation.findUniqueOrThrow({ where: { id: row.id } });
+  assert.equal(saved.status, 'CANCELLED');
+});
