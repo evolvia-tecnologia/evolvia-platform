@@ -9,8 +9,9 @@ export function communicationAudienceInput(raw: unknown) {
   if (Object.keys(row).some(key => !['categoryIds', 'payment', 'page', 'audience', 'submissionStatus', 'filterMode'].includes(key))) throw new Error('Filtro de destinatários desconhecido.');
   const audience = row.audience ?? 'CONFIRMED_REGISTRATIONS';
   if (audience !== 'CONFIRMED_REGISTRATIONS' && audience !== 'CORRESPONDING_AUTHORS' && audience !== 'ALL_SCIENTIFIC_AUTHORS') throw new Error('Público inválido.');
-  const filterMode = row.filterMode;
-  if (filterMode !== undefined && filterMode !== 'AND' && filterMode !== 'OR') throw new Error('Combinação de filtros inválida.');
+  const requestedMode = row.filterMode;
+  if (requestedMode !== undefined && requestedMode !== 'AND' && requestedMode !== 'OR') throw new Error('Combinação de filtros inválida.');
+  const filterMode: 'AND' | 'OR' | undefined = requestedMode;
   if (audience !== 'CONFIRMED_REGISTRATIONS' && filterMode === 'OR') throw new Error('A combinação OU só se aplica aos inscritos.');
   const submissionStatus = row.submissionStatus ?? 'ALL';
   if (typeof submissionStatus !== 'string' || (submissionStatus !== 'ALL' && !COMMUNICATION_SCIENTIFIC_STATUSES.some(status => status === submissionStatus))) throw new Error('Situação científica inválida.');
