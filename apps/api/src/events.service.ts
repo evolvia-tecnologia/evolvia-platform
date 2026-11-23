@@ -3,10 +3,12 @@ import { randomBytes } from 'node:crypto';
 import { EventStatus, MembershipStatus, Prisma, WizardSessionStatus } from '@prisma/client';
 import { AuthorizationService } from './authorization.service';
 import { CreateEventDto } from './dto';
+import { type FormatoDoEvento, planejarAlteracaoDeAgenda } from './event-schedule-policy';
 import { EVENT_EDITOR_ROLES } from './membership-policy';
 import { PrismaService } from './prisma.service';
 import { eventPublicSlug } from './slug';
 import { normalizeEventTimeZone } from './time-zone-policy';
+import { getWizardSaveIssues } from './wizard-save-policy';
 import {
   WIZARD_FLOW_VERSION,
   getWizardCompletion,
@@ -14,6 +16,9 @@ import {
   normalizeWizardAnswers,
   parseSubjectAreas,
 } from './wizard-policy';
+
+/** Campos aceitos por `updateSchedule`. Qualquer outro é recusado. */
+const CAMPOS_DA_AGENDA = ['expectedUpdatedAt', 'motivo', 'startDate', 'endDate', 'timeZone', 'venue'] as const;
 
 @Injectable()
 export class EventsService {
@@ -144,6 +149,155 @@ export class EventsService {
         },
       });
       return event;
+    });
+  }
+
+  /**
+   * Agenda de evento JÁ PUBLICADO: datas, fuso e local. Contrato #661 (C-05).
+   *
+   * Delimitado de propósito. `assertFoundationMutable` NÃO foi ampliada: os
+   * demais campos e os demais estados seguem com a regra de hoje, e este
+   * comando recusa qualquer estado que não seja PUBLISHED, nomeando o estado.
+   *
+   * Escreve em UMA tabela, `Event`, mais a auditoria. Lote, inscrição,
+   * submissão, programação e financeiro não são tocados — por construção, não
+   * por intenção.
+   */
+  async updateSchedule(userId: string, eventId: string, input: unknown) {
+    const event = await this.prisma.event.findUnique({
+      where: { id: eventId },
+      select: { id: true, organizationId: true, ownerId: true },
+    });
+    if (!event) throw new NotFoundException('Evento não encontrado.');
+    if (event.organizationId) {
+      await this.authorization.requireRole(userId, event.organizationId, EVENT_EDITOR_ROLES);
+    } else if (event.ownerId !== userId) {
+      throw new NotFoundException('Evento não encontrado.');
+    }
+    const organizationId = event.organizationId;
+    if (!organizationId) {
+      throw new BadRequestException('O evento precisa estar vinculado a uma organização.');
+    }
+
+    if (!input || typeof input !== 'object' || Array.isArray(input)) {
+      throw new BadRequestException('Pedido inválido.');
+    }
+    const corpo = input as Record<string, unknown>;
+
+    // Campo desconhecido é RECUSADO, não ignorado. Sem isto, quem mandasse
+    // `status` junto veria 200 e concluiria que mudou o estado do evento.
+    const desconhecidos = Object.keys(corpo).filter(
+      (chave) => !(CAMPOS_DA_AGENDA as readonly string[]).includes(chave),
+    );
+    if (desconhecidos.length > 0) {
+      throw new BadRequestException(
+        `Esta alteração aceita apenas datas, fuso e local. Campo não aceito: ${desconhecidos.sort().join(', ')}.`,
+      );
+    }
+
+    const esperado = typeof corpo.expectedUpdatedAt === 'string' ? corpo.expectedUpdatedAt : null;
+    if (!esperado) {
+      throw new BadRequestException(
+        'Informe expectedUpdatedAt com o valor recebido na última leitura do evento.',
+      );
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      // Mesma trava que `updateSubjectAreas` usa: serializa com o save/complete
+      // do Wizard e com outra chamada desta rota.
+      const [atual] = await tx.$queryRaw<Array<{
+        status: EventStatus;
+        startDate: Date | null;
+        endDate: Date | null;
+        timeZone: string | null;
+        venue: string | null;
+        format: FormatoDoEvento;
+        updatedAt: Date;
+      }>>`
+        SELECT "status", "startDate", "endDate", "timeZone", "venue", "format", "updatedAt"
+        FROM "Event" WHERE "id" = ${event.id} FOR UPDATE`;
+      if (!atual) throw new NotFoundException('Evento não encontrado.');
+
+      if (atual.status !== EventStatus.PUBLISHED) {
+        throw new ConflictException({
+          code: 'INVALID_EVENT_STATE',
+          message: 'Esta alteração vale apenas para evento publicado. Use a configuração do evento enquanto ele não estiver publicado.',
+          context: { eventStatus: atual.status },
+        });
+      }
+
+      // Confirmação otimista por cima da trava: a trava serializa, mas só o
+      // `expectedUpdatedAt` conta ao organizador que a tela dele estava velha.
+      // É o caso das duas abas.
+      if (atual.updatedAt.toISOString() !== esperado) {
+        throw new ConflictException({
+          code: 'VERSION_CONFLICT',
+          message: 'Este evento foi alterado em outra sessão. Recarregue para ver os valores atuais antes de salvar.',
+        });
+      }
+
+      const plano = planejarAlteracaoDeAgenda(
+        {
+          startDate: atual.startDate,
+          endDate: atual.endDate,
+          timeZone: atual.timeZone,
+          venue: atual.venue,
+          format: atual.format,
+        },
+        {
+          startDate: corpo.startDate as string | null | undefined,
+          endDate: corpo.endDate as string | null | undefined,
+          timeZone: corpo.timeZone as string | null | undefined,
+          venue: corpo.venue as string | null | undefined,
+          motivo: corpo.motivo,
+        },
+      );
+      if (!plano.ok) throw new BadRequestException(plano.erros);
+
+      // O intervalo é avaliado sobre o RESULTADO, não sobre o que veio no
+      // corpo: mandar só o término compara com o início já gravado. Mesma regra
+      // do Wizard, chamada e não copiada.
+      const intervalo = getWizardSaveIssues(plano.depois);
+      if (intervalo.length > 0) throw new BadRequestException(intervalo);
+
+      const atualizado = await tx.event.update({
+        where: { id: event.id },
+        data: {
+          startDate: plano.depois.startDate ? new Date(plano.depois.startDate) : null,
+          endDate: plano.depois.endDate ? new Date(plano.depois.endDate) : null,
+          timeZone: plano.depois.timeZone,
+          venue: plano.depois.venue,
+        },
+        select: { startDate: true, endDate: true, timeZone: true, venue: true, updatedAt: true },
+      });
+
+      await tx.auditLog.create({
+        data: {
+          organizationId,
+          actorUserId: userId,
+          eventId: event.id,
+          action: 'event.schedule_updated',
+          entityType: 'Event',
+          entityId: event.id,
+          metadata: {
+            motivo: plano.motivo,
+            alterados: plano.alterados,
+            antes: plano.antes,
+            depois: plano.depois,
+          } as Prisma.InputJsonObject,
+        },
+      });
+
+      // `updatedAt` volta para a tela usar como próximo `expectedUpdatedAt`, e
+      // `alterados` permite confirmar o que mudou sem adivinhar.
+      return {
+        startDate: atualizado.startDate?.toISOString() ?? null,
+        endDate: atualizado.endDate?.toISOString() ?? null,
+        timeZone: atualizado.timeZone,
+        venue: atualizado.venue,
+        updatedAt: atualizado.updatedAt.toISOString(),
+        alterados: plano.alterados,
+      };
     });
   }
 
