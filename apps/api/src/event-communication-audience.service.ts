@@ -40,8 +40,22 @@ export class EventCommunicationAudienceService {
       const categories = await this.prisma.eventRegistrationCategory.count({ where: { ...scope, id: { in: input.categoryIds } } });
       if (categories !== input.categoryIds.length) throw new BadRequestException('Uma categoria selecionada não pertence a este evento.');
     }
+    // Compra múltipla (#471) guarda o pagamento no pedido, não no checkout
+    // individual da reserva. Uma vaga gratuita no mesmo pedido NÃO é "PAID".
+    // O escopo deve acompanhar cada relação para impedir cruzamento de tenants.
+    const paidCheckout = { ...scope, status: 'PAID' as const, paidAt: { not: null }, amountCents: { gt: 0 } };
     const payment: Prisma.EventRegistrationReservationWhereInput = input.payment === 'PAID'
-      ? { checkout: { is: { ...scope, status: 'PAID', paidAt: { not: null }, amountCents: { gt: 0 } } } }
+      ? {
+          finalPriceCents: { gt: 0 },
+          OR: [
+            { checkout: { is: paidCheckout } },
+            { orderEntry: { is: {
+              ...scope,
+              finalPriceCents: { gt: 0 },
+              order: { is: { ...scope, checkout: { is: paidCheckout } } },
+            } } },
+          ],
+        }
       : input.payment === 'ZERO' ? { finalPriceCents: 0 } : {};
     const filters: Prisma.EventRegistrationReservationWhereInput[] = [];
     if (input.payment !== 'ALL') filters.push(payment);
