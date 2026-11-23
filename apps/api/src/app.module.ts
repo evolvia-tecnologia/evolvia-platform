@@ -29,6 +29,11 @@ import { ExhibitorIdentityController } from './exhibitor-identity.controller';
 import { ExhibitorIdentityService } from './exhibitor-identity.service';
 import { ExhibitorService } from './exhibitor.service';
 import { EventDeskService } from './event-desk.service';
+import { PlatformMasterController } from './platform-master.controller';
+import { PlatformMasterGuard, PlatformSessionGuard } from './platform-master.guard';
+import { PlatformMasterRepository } from './platform-master.repository';
+import { PlatformMasterService } from './platform-master.service';
+import { PlatformWebAuthnService } from './platform-webauthn';
 import { OperatorCapabilityController } from './operator-capability.controller';
 import { OperatorCapabilityGuard } from './operator-capability.guard';
 import { OperatorCapabilityRepository } from './operator-capability.repository';
@@ -178,6 +183,7 @@ import { TransmissionService } from './transmission.service';
     ActivityEnrollmentLimitController,
     ActivityPreferenceController,
     EventDeskController,
+    PlatformMasterController,
     OperatorCapabilityController,
     CredentialPrintConfirmationController,
     ExhibitorController,
@@ -254,6 +260,11 @@ import { TransmissionService } from './transmission.service';
     ActivityEnrollmentLimitService,
     ActivityPreferenceService,
     EventDeskService,
+    PlatformMasterRepository,
+    PlatformMasterService,
+    PlatformWebAuthnService,
+    PlatformSessionGuard,
+    PlatformMasterGuard,
     OperatorCapabilityRepository,
     OperatorCapabilityGuard,
     OperatorCapabilityService,
