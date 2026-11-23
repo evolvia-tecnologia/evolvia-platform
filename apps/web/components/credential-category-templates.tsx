@@ -159,8 +159,8 @@ export default function CredentialCategoryTemplates({
 
   return <section className={styles.section} aria-labelledby="category-badge-title">
     <header>
-      <h3 id="category-badge-title">Modelos de etiquetas por categoria</h3>
-      <p>Defina o que será impresso no crachá de cada categoria. Você não precisa ter participantes inscritos para configurar.</p>
+      <h3 id="category-badge-title">Conteúdo por categoria</h3>
+      <p>Monte os campos do crachá desta categoria. A prévia ao lado é a única desta página e usa o tamanho do papel definido acima.</p>
     </header>
     {categories.length === 0
       ? <p role="status">Crie uma categoria em Inscrições e vendas para configurar sua etiqueta.</p>
@@ -174,11 +174,10 @@ export default function CredentialCategoryTemplates({
           <div className={styles.editor}>
             <h4>Campos da etiqueta</h4>
             {!templates.some((item) => item.categoryId === categoryId) && <p role="status">
-              Esta categoria ainda usa a etiqueta histórica configurada em Papel, dimensões e códigos.
-              A prévia abaixo mostra o novo modelo em edição; ele só substituirá o histórico
-              desta categoria depois de salvar. Os outros modelos e o tamanho do papel não serão alterados.
+              Esta categoria ainda não tem modelo próprio: na impressão vale o conteúdo padrão legado (recolhido em Papel e códigos).
+              A prévia ao lado já mostra o modelo em edição; ele só substitui o legado desta categoria depois de salvar.
             </p>}
-            <p>Organize de cima para baixo com as setas. Em cada campo, escolha alinhamento, negrito, cor, família e tamanho da fonte. A prévia acompanha as mudanças.</p>
+            <p>Organize de cima para baixo com as setas. Em cada campo, escolha alinhamento, negrito, cor, família e tamanho da fonte.</p>
             {draft.length === 0 && <p>Nenhum campo selecionado. Adicione um campo abaixo.</p>}
             <ol className={styles.fields}>
               {draft.map((code, index) => <li key={code}>
@@ -245,9 +244,9 @@ export default function CredentialCategoryTemplates({
               </button>
             </div>
           </div>
-          <aside className={styles.preview} aria-label="Prévia do crachá da categoria">
-            <h4>Prévia do modelo em edição · {categories.find((item) => item.id === categoryId)?.name}</h4>
-            <p>Dados fictícios apenas para visualização; dimensão {widthMm / 10} × {heightMm / 10} cm.</p>
+          <aside className={styles.preview} aria-label="Prévia da etiqueta">
+            <h4>Prévia da etiqueta · {categories.find((item) => item.id === categoryId)?.name}</h4>
+            <p>Única prévia desta página · {widthMm / 10} × {heightMm / 10} cm · dados de exemplo</p>
             <CredentialLabel label={preview} preview />
           </aside>
         </div>

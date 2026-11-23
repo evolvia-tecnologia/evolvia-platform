@@ -4,6 +4,7 @@ import test from 'node:test';
 
 const desk = await readFile(new URL('../components/event-desk.tsx', import.meta.url), 'utf8');
 const labelSettings = await readFile(new URL('../components/credential-label-settings.tsx', import.meta.url), 'utf8');
+const categoryTemplates = await readFile(new URL('../components/credential-category-templates.tsx', import.meta.url), 'utf8');
 const kiosk = await readFile(new URL('../components/self-service-kiosk.tsx', import.meta.url), 'utf8');
 const page = await readFile(new URL('../app/eventos/[id]/painel/check-in/page.tsx', import.meta.url), 'utf8');
 const deskCss = await readFile(new URL('../components/event-desk.module.css', import.meta.url), 'utf8');
@@ -86,7 +87,7 @@ test('a portaria segue recursos ativos e não o perfil do evento', () => {
   assert.match(kiosk, /Este link de autoatendimento não é válido/u);
   assert.doesNotMatch(kiosk, /Imprima sua etiqueta/u);
   assert.match(desk, /CredentialLabelSettings/u);
-  assert.match(labelSettings, /Etiqueta térmica/u);
+  assert.match(labelSettings, /Papel e códigos do evento/u);
   assert.match(labelSettings, /4×2 cm/u);
   assert.match(labelSettings, /10×5 cm/u);
   assert.match(labelSettings, /Personalizada/u);
@@ -115,11 +116,18 @@ test('posto e autoatendimento usam tokens e alvos de toque', () => {
 });
 
 
-test('configuração de etiquetas unifica modelos por categoria e papel sem ocultar as configurações legadas', () => {
+test('configuração de etiquetas unifica papel e modelo com uma única prévia', () => {
   assert.match(desk, /\['labels', 'Configurar etiquetas'\]/u);
   assert.doesNotMatch(desk, /\['settings', 'Configurações'\]/u);
   assert.match(desk, /mode === 'labels' \|\| mode === 'settings'/u);
-  assert.match(desk, /1\. Modelos e campos por categoria[\s\S]*<CredentialCategoryTemplates[\s\S]*2\. Papel, dimensões e códigos[\s\S]*<CredentialLabelSettings/u);
+  assert.match(desk, /1\. Papel e códigos[\s\S]*<CredentialLabelSettings[\s\S]*2\. Conteúdo e prévia por categoria[\s\S]*<CredentialCategoryTemplates/u);
+  assert.match(desk, /onDraftChange=\{setLabelPaperDraft\}/u);
+  assert.match(desk, /widthMm=\{\(labelPaperDraft \?\? context\.label\)\.widthMm\}/u);
   assert.match(desk, /categoryLabelTemplates: \[/u);
   assert.match(desk, /\{ \.\.\.current, label \}/u);
+  assert.doesNotMatch(labelSettings, /Prévia da etiqueta/u);
+  assert.doesNotMatch(labelSettings, /from '\.\/credential-label'/u);
+  assert.doesNotMatch(labelSettings, /aria-label="Prévia da etiqueta"/u);
+  assert.match(categoryTemplates, /aria-label="Prévia da etiqueta"/u);
+  assert.equal([...categoryTemplates.matchAll(/aria-label="Prévia da etiqueta"/gu)].length, 1);
 });

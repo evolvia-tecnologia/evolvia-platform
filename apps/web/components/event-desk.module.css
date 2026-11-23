@@ -192,3 +192,8 @@
 .participantTableScroll .kitActions label { display: grid; gap: 6px; min-width: min(100%, 300px); }
 .participantTableScroll input { min-height: 40px; border: 1px solid var(--color-border-strong); background: var(--color-surface); color: var(--color-text); border-radius: var(--radius-control); padding: 8px 10px; font: inherit; }
 @media (max-width: 700px) { .participantTableScroll .kitActions button { width: auto; flex: 1 1 auto; } }
+
+/* Etiquetas: um fluxo vertical (papel → conteúdo) com uma única prévia no segundo bloco. */
+.labelConfig { display: grid; gap: var(--space-16); min-width: 0; }
+.labelConfig > header { display: grid; gap: var(--space-8); }
+.labelConfig > h4 { margin: 0; color: var(--color-text-strong); font-size: var(--font-size-md); }

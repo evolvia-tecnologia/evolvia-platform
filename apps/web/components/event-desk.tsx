@@ -353,6 +353,7 @@ function EventDeskSession({ eventId }: { eventId: string }) {
   const editFormRef = useRef<HTMLFormElement>(null);
   const printButtonRef = useRef<HTMLButtonElement>(null);
   const [context, setContext] = useState<Context | null>(null);
+  const [labelPaperDraft, setLabelPaperDraft] = useState<LabelSettings | null>(null);
   const [notice, setNotice] = useState('');
   const [error, setError] = useState('');
   const [kind, setKind] = useState<'NAME' | 'EMAIL' | 'DOCUMENT' | 'PROTOCOL'>('NAME');
@@ -448,8 +449,9 @@ function EventDeskSession({ eventId }: { eventId: string }) {
       return;
     }
     let active = true;
+    setLabelPaperDraft(null);
     api<Context>(`/events/${encodeURIComponent(eventId)}/desk`)
-      .then((result) => { if (active) { setContext(result); setSelfService(result.selfService); setTotemLink(result.totemLink); } })
+      .then((result) => { if (active) { setContext(result); setSelfService(result.selfService); setTotemLink(result.totemLink); setLabelPaperDraft(result.label); } })
       .catch((reason) => { if (active) setError(reason instanceof Error ? reason.message : 'Não foi possível abrir a portaria.'); });
     return () => { active = false; };
   }, [eventId]);
@@ -882,12 +884,27 @@ function EventDeskSession({ eventId }: { eventId: string }) {
         </div>
       </fieldset>}
 
-      {(mode === 'labels' || mode === 'settings') && organizer && capabilities.has('credential') && <section aria-label="Configuração das etiquetas">
+      {(mode === 'labels' || mode === 'settings') && organizer && capabilities.has('credential') && <section aria-label="Configuração das etiquetas" className={styles.labelConfig}>
         <header>
           <h3>Configuração de etiquetas</h3>
-          <p>Configure os campos e a impressão no mesmo lugar. Os modelos são específicos de cada categoria; o papel e os códigos valem para o credenciamento do evento.</p>
+          <p>Um único fluxo: papel e códigos do evento, depois o conteúdo por categoria. A prévia aparece só no bloco do modelo em edição.</p>
         </header>
-        <h4>1. Modelos e campos por categoria</h4>
+        <h4>1. Papel e códigos</h4>
+        <CredentialLabelSettings
+          key={eventId}
+          eventId={eventId}
+          initial={context.label}
+          fields={context.labelFields}
+          onDraftChange={setLabelPaperDraft}
+          onSaved={(message, label) => {
+            setLabelPaperDraft(label);
+            setContext((current) => current ? { ...current, label } : current);
+            setNotice(message);
+            setError('');
+          }}
+          onError={(message) => { setError(message); setNotice(''); }}
+        />
+        <h4>2. Conteúdo e prévia por categoria</h4>
         <CredentialCategoryTemplates
         key={eventId}
         eventId={eventId}
@@ -895,8 +912,8 @@ function EventDeskSession({ eventId }: { eventId: string }) {
         categories={context.categories}
         fields={context.labelFields}
         templates={context.categoryLabelTemplates ?? []}
-        widthMm={context.label.widthMm}
-        heightMm={context.label.heightMm}
+        widthMm={(labelPaperDraft ?? context.label).widthMm}
+        heightMm={(labelPaperDraft ?? context.label).heightMm}
         onSaved={(template) => {
           setContext((current) => current ? {
             ...current, categoryLabelTemplates: [
@@ -908,15 +925,6 @@ function EventDeskSession({ eventId }: { eventId: string }) {
           setError('');
         }}
         onError={(message) => { setError(message); setNotice(''); }}
-        />
-        <h4>2. Papel, dimensões e códigos</h4>
-        <CredentialLabelSettings
-          key={eventId}
-          eventId={eventId}
-          initial={context.label}
-          fields={context.labelFields}
-          onSaved={(message, label) => { setContext((current) => current ? { ...current, label } : current); setNotice(message); setError(''); }}
-          onError={(message) => { setError(message); setNotice(''); }}
         />
       </section>}
       {(mode === 'labels' || mode === 'settings') && !organizer && <p>Somente o organizador pode configurar as etiquetas. Utilize Lista para impressão.</p>}
