@@ -46,5 +46,5 @@ export function uniqueCommunicationContacts(rows: { registrationData: unknown }[
 // a bulk campaign (transactional confirmation/author notices use other policies).
 export function hasCommunicationOptIn(registrationData: unknown): boolean {
   return Boolean(registrationData && typeof registrationData === 'object' && !Array.isArray(registrationData)
-    && (registrationData as Record<string, unknown>).communication_opt_in === true);
+    && (registrationData as Record<string, unknown>).event_communications_consent === true);
 }

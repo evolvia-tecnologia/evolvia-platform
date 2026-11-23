@@ -45,19 +45,19 @@ test('G6.8 criptografa destinatários com envelope autenticado, sem email em tex
 });
 
 test('G6.8 opt-in é estritamente boolean true: ausente, string e recusado nunca autorizam lote', () => {
-  for (const input of [null,undefined,[],{}, {communication_opt_in:false},
-    {communication_opt_in:'true'}, {communication_opt_in:1}]) {
+  for (const input of [null,undefined,[],{}, {event_communications_consent:false},
+    {event_communications_consent:'true'}, {event_communications_consent:1}]) {
     assert.equal(hasCommunicationOptIn(input),false);
   }
-  assert.equal(hasCommunicationOptIn({ email:'one@example.test', communication_opt_in:true }), true);
+  assert.equal(hasCommunicationOptIn({ email:'one@example.test', event_communications_consent:true }), true);
 });
 
 test('G6.8 snapshot completo conserva prévia, mas lote só usa inscrições consentidas no evento', async () => {
   const rows = [
-    { registrationData: { full_name:'Ana', email:'ana@example.test', communication_opt_in:true } },
+    { registrationData: { full_name:'Ana', email:'ana@example.test', event_communications_consent:true } },
     { registrationData: { full_name:'Sem aceite', email:'nao@example.test' } },
-    { registrationData: { full_name:'Recusou', email:'recusou@example.test', communication_opt_in:false } },
-    { registrationData: { full_name:'Duplicada', email:'ANA@example.test', communication_opt_in:true } },
+    { registrationData: { full_name:'Recusou', email:'recusou@example.test', event_communications_consent:false } },
+    { registrationData: { full_name:'Duplicada', email:'ANA@example.test', event_communications_consent:true } },
   ];
   let reads=0;
   const service = new EventCommunicationAudienceService({

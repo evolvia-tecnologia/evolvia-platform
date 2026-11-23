@@ -20,7 +20,7 @@ const ESSENTIAL_FIELDS: PublicRegistrationField[] = [
   // Separate, freely given permission: accepting registration terms does NOT
   // authorize promotional/event e-mails. The checkbox defaults to unchecked
   // in the public registration UI and is preserved in registrationData.
-  { code: 'communication_opt_in', label: 'Autorizo receber comunicações deste evento por e-mail (opcional)', type: 'CONSENT', required: false,
+  { code: 'event_communications_consent', label: 'Autorizo receber comunicações deste evento por e-mail (opcional)', type: 'CONSENT', required: false,
     help: 'O aceite é opcional, separado dos termos de inscrição e pode ser revogado.' },
 ];
 const ESSENTIAL_BY_CODE = new Map(ESSENTIAL_FIELDS.map((field) => [field.code, field]));
@@ -40,7 +40,7 @@ export function publicRegistrationFields(value: unknown, categoryId?: string): P
     if (essential) {
       fields.set(field.code, {
         ...essential,
-        ...(typeof field.help === 'string' ? { help: field.help } : {}),
+        ...(essential.code !== 'event_communications_consent' && typeof field.help === 'string' ? { help: field.help } : {}),
       });
       continue;
     }
@@ -75,8 +75,8 @@ export function validateCategoryAnswers(
   }
   // Consent must be a real boolean. Strings such as "true", "yes" or "on"
   // are never evidence of freely given opt-in in the communication outbox.
-  if (allowed.has('communication_opt_in') && answers.communication_opt_in !== undefined
-      && typeof answers.communication_opt_in !== 'boolean') {
+  if (allowed.has('event_communications_consent') && answers.event_communications_consent !== undefined
+      && typeof answers.event_communications_consent !== 'boolean') {
     throw new RegistrationCategoryValidationError('O consentimento de comunicação deve ser verdadeiro ou falso.');
   }
   if (answers.registration_type !== undefined && answers.registration_type !== categoryId) {
