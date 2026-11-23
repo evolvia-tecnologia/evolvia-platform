@@ -4,6 +4,8 @@ import { EventCommunicationAudienceController } from './event-communication-audi
 import { EventCommunicationAudienceService } from './event-communication-audience.service';
 import { EventCommunicationController } from './event-communication.controller';
 import { EventCommunicationService } from './event-communication.service';
+import { EventCommunicationBatchService } from './event-communication-batch.service';
+import { EventCommunicationBatchController } from './event-communication-batch.controller';
 import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
 import { JWT_SIGN_OPTIONS, jwtSecret } from './access-shield';
@@ -191,6 +193,7 @@ import { TransmissionService } from './transmission.service';
     ExhibitorIdentityController,
     EventCommunicationAudienceController,
     EventCommunicationController,
+    EventCommunicationBatchController,
     EventEvaluationOrganizerController,
     EventEvaluationParticipantController,
     ShowOperationsController,
@@ -278,6 +281,7 @@ import { TransmissionService } from './transmission.service';
     },
     EventCommunicationAudienceService,
     EventCommunicationService,
+    EventCommunicationBatchService,
     EventEvaluationService,
     ShowOperationsService,
     TurnstileService,
