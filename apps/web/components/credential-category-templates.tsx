@@ -23,6 +23,7 @@ const FALLBACK: Field[] = [
   { code: 'institution', label: 'Empresa' },
   { code: 'city_state', label: 'Cidade / Estado' },
   { code: 'qr', label: 'Código QR' },
+  { code: 'barcode', label: 'Código de barras' },
   { code: 'job_title', label: 'Cargo / função' },
 ];
 const SAMPLES: Record<string, string> = {
@@ -78,7 +79,23 @@ export default function CredentialCategoryTemplates({
     .filter((field) =>
       !field.appliesToCategoryIds?.length || field.appliesToCategoryIds.includes(categoryId))
     .filter((field, index, all) => all.findIndex((candidate) => candidate.code === field.code) === index);
-  const available = choices.filter((field) => !draft.includes(field.code));
+  const available = choices.filter((field) => !draft.includes(field.code) && field.code !== 'qr' && field.code !== 'barcode');
+  const hasQr = draft.includes('qr');
+  const hasBarcode = draft.includes('barcode');
+  const categoryCodeMode = hasQr && hasBarcode ? 'BOTH' : hasQr ? 'QR' : hasBarcode ? 'BARCODE' : 'NONE';
+  function changeCodeMode(mode: 'QR' | 'BARCODE' | 'BOTH' | 'NONE') {
+    const codes = mode === 'BOTH' ? ['qr', 'barcode'] : mode === 'QR' ? ['qr'] : mode === 'BARCODE' ? ['barcode'] : [];
+    const firstCode = draft.findIndex((field) => field === 'qr' || field === 'barcode');
+    const withoutCodes = draft.filter((field) => field !== 'qr' && field !== 'barcode');
+    if (withoutCodes.length + codes.length > 12) {
+      onError('A etiqueta admite até 12 itens. Remova um campo antes de selecionar dois códigos.');
+      return;
+    }
+    const index = firstCode < 0 ? Math.min(3, withoutCodes.length) : Math.min(firstCode, withoutCodes.length);
+    setDraft([...withoutCodes.slice(0, index), ...codes, ...withoutCodes.slice(index)]);
+    setSelectedField('');
+    setIsEditing(true);
+  }
   const move = (index: number, step: number) => {
     setIsEditing(true);
     setDraft((current) => {
@@ -117,10 +134,10 @@ export default function CredentialCategoryTemplates({
     eventName: 'Exemplo de evento', name: null, company: null, lines: [], category: null,
     protocol: 'EXEMPLO-0001',
     qr: visibleTemplate.fields.includes('qr') ? 'EVQ1.preview' : null,
-    barcode: null, widthMm, heightMm,
+    barcode: visibleTemplate.fields.includes('barcode') ? 'EVB1.preview' : null, widthMm, heightMm,
     orderedContent: visibleTemplate.fields.map((code) => ({
-      code, kind: code === 'qr' ? 'qr' as const : 'text' as const,
-      value: code === 'qr' ? '' : sample(code),
+      code, kind: code === 'qr' ? 'qr' as const : code === 'barcode' ? 'barcode' as const : 'text' as const,
+      value: code === 'qr' || code === 'barcode' ? '' : sample(code),
       style: Object.prototype.hasOwnProperty.call(visibleTemplate.styles ?? {}, code)
         ? visibleTemplate.styles?.[code] : undefined,
     })),
@@ -213,6 +230,19 @@ export default function CredentialCategoryTemplates({
             {!savedTemplate && !isEditing && <button type="button" disabled={busy || !organizer}
               onClick={() => setIsEditing(true)}>Preparar modelo padrão desta categoria</button>}
             <p>Organize de cima para baixo com as setas. Em cada campo, escolha alinhamento, negrito, cor, família e tamanho da fonte. A prévia acompanha as mudanças.</p>
+            <fieldset className={styles.codeChoices}>
+              <legend>Códigos da etiqueta (campo 4 do modelo padrão)</legend>
+              <p>Escolha o que será impresso na mesma prévia e no crachá real da categoria.</p>
+              <label>Tipo de código
+                <select aria-label="Códigos da etiqueta da categoria" value={categoryCodeMode} disabled={busy || !organizer}
+                  onChange={(event) => changeCodeMode(event.target.value as 'QR' | 'BARCODE' | 'BOTH' | 'NONE')}>
+                  <option value="QR">Somente QR Code</option>
+                  <option value="BARCODE">Somente código de barras</option>
+                  <option value="BOTH">Código de barras e QR Code</option>
+                  <option value="NONE">Sem código (modelo excepcional)</option>
+                </select>
+              </label>
+            </fieldset>
             {draft.length === 0 && <p>Nenhum campo selecionado. Adicione um campo abaixo.</p>}
             <ol className={styles.fields}>
               {draft.map((code, index) => <li key={code}>
@@ -228,12 +258,12 @@ export default function CredentialCategoryTemplates({
                 </div>
                 <div className={styles.formatBar} role="group" aria-label={`Formatação de ${display(code)}`}>
                   <label>Alinhamento
-                    <select aria-label={`Alinhamento de ${display(code)}`} value={(ownStyle(code) ?? (code === 'qr' ? DEFAULT_QR_STYLE : DEFAULT_STYLE)).align}
+                    <select aria-label={`Alinhamento de ${display(code)}`} value={(ownStyle(code) ?? (code === 'qr' || code === 'barcode' ? DEFAULT_QR_STYLE : DEFAULT_STYLE)).align}
                       disabled={busy || !organizer} onChange={(event) => changeStyle(code, { align: event.target.value as LabelFieldStyle['align'] })}>
                       <option value="left">À esquerda</option><option value="center">Centralizado</option><option value="right">À direita</option>
                     </select>
                   </label>
-                  {code !== 'qr' && <>
+                  {code !== 'qr' && code !== 'barcode' && <>
                     <label className={styles.boldOption}><input type="checkbox" aria-label={`Negrito de ${display(code)}`} disabled={busy || !organizer}
                       checked={(ownStyle(code) ?? DEFAULT_STYLE).bold} onChange={(event) => changeStyle(code, { bold: event.target.checked })} /> Negrito</label>
                     <label>Cor do texto
