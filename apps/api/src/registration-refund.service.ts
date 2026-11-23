@@ -603,8 +603,12 @@ export class RegistrationRefundService {
         SELECT id FROM "OrganizationMembership" WHERE "userId" = ${userId} AND "organizationId" = ${organizationId}
         AND role = 'OWNER' AND status = 'ACTIVE' FOR SHARE`;
       if (!owner.length) throw new NotFoundException('Pedido não encontrado.');
-      await tx.$queryRaw`SELECT id FROM "RegistrationRefundRequest"
-        WHERE id = ${requestId} AND "eventId" = ${eventId} AND "organizationId" = ${organizationId} FOR SHARE`;
+      // Lock the refund request, not just the operation insert: concurrent owners
+      // must serialize while claims and prepared payment references are rechecked.
+      // Never turn a conflicted claim into another provider POST after a timeout.
+      const locked = await tx.$queryRaw<Array<{ id: string }>>`SELECT id FROM "RegistrationRefundRequest"
+        WHERE id = ${requestId} AND "eventId" = ${eventId} AND "organizationId" = ${organizationId} FOR UPDATE`;
+      if (!locked.length) throw new NotFoundException('Pedido não encontrado.');
       const current = await tx.registrationRefundRequest.findFirst({ where, select });
       if (!current || JSON.stringify(current) !== JSON.stringify(request)) throw new ConflictException('O pedido mudou.');
       const inserted = await tx.$executeRaw`
