@@ -80,3 +80,17 @@ test('todos autores preservam ACL, teto explícito e paginação após deduplica
   overflow=true;await assert.rejects(service.preview('u','evt-a',{audience:'ALL_SCIENTIFIC_AUTHORS'}),/Nenhuma lista parcial/);
 });
 
+test('OR combina somente categoria e pagamento, dentro do escopo e das inscrições confirmadas', async () => {
+  const h = harness();
+  await h.service.preview('u', 'evt-a', { filterMode: 'OR', categoryIds: ['cat-a'], payment: 'ZERO' });
+  assert.deepEqual(h.queries[0].where.AND, [
+    { eventId: 'evt-a', organizationId: 'org-a' }, { status: 'CONFIRMED' },
+    { OR: [{ finalPriceCents: 0 }, { categoryId: { in: ['cat-a'] } }] },
+  ]);
+  await h.service.preview('u', 'evt-a', { filterMode: 'OR', categoryIds: ['cat-a'] });
+  assert.deepEqual(h.queries[1].where.AND.slice(2), [{ categoryId: { in: ['cat-a'] } }]);
+  h.crossCategory();
+  await assert.rejects(h.service.preview('u', 'evt-a', { filterMode: 'OR', categoryIds: ['other'], payment: 'ZERO' }), /não pertence/);
+  assert.throws(() => communicationAudienceInput({ filterMode: 'XOR' }));
+  assert.throws(() => communicationAudienceInput({ audience: 'ALL_SCIENTIFIC_AUTHORS', filterMode: 'OR' }));
+});

@@ -43,8 +43,12 @@ export class EventCommunicationAudienceService {
     const payment: Prisma.EventRegistrationReservationWhereInput = input.payment === 'PAID'
       ? { checkout: { is: { ...scope, status: 'PAID', paidAt: { not: null }, amountCents: { gt: 0 } } } }
       : input.payment === 'ZERO' ? { finalPriceCents: 0 } : {};
+    const filters: Prisma.EventRegistrationReservationWhereInput[] = [];
+    if (input.payment !== 'ALL') filters.push(payment);
+    if (input.categoryIds.length) filters.push({ categoryId: { in: input.categoryIds } });
+    const predicates = input.filterMode === 'OR' && filters.length > 1 ? [{ OR: filters }] : filters;
     const rows = await this.prisma.eventRegistrationReservation.findMany({
-      where: { AND: [scope, { status: 'CONFIRMED' }, payment, ...(input.categoryIds.length ? [{ categoryId: { in: input.categoryIds } }] : [])] },
+      where: { AND: [scope, { status: 'CONFIRMED' }, ...predicates] },
       select: { registrationData: true }, orderBy: { id: 'asc' }, take: 5001,
     });
     if (rows.length > 5000) throw new ConflictException('Esta prévia suporta até 5000 inscrições. Selecione categorias para reduzir o público. Nenhuma lista parcial foi gerada.');
@@ -52,4 +56,3 @@ export class EventCommunicationAudienceService {
     return { eventId, audience: 'CONFIRMED_REGISTRATIONS', filters: input, total: contacts.length, matchedRegistrations: rows.length, missingEmail, duplicates, page: input.page, pageSize: 50, items: contacts.slice((input.page - 1) * 50, input.page * 50), sendingAvailable: false };
   }
 }
-
