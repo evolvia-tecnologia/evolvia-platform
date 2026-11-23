@@ -1,0 +1,19 @@
+// G5.8: reserva durável de aviso por destinatário, escopo e versão.
+// Independente de ScientificAuthorNotice (outbox da submissão) e de AuditLog (trilha).
+// A chave SHA-256 inclui organização, evento, trabalho, versão e destinatário.
+model ScientificNoticeDispatch {
+  idempotencyKey String   @id @db.VarChar(64)
+  organizationId String
+  eventId        String
+  submissionId   String
+  versionNumber  Int
+  status         String   @default("PROCESSING") @db.VarChar(16)
+  attempts       Int      @default(1)
+  claimedAt      DateTime @default(now())
+  completedAt    DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([organizationId, eventId, submissionId, versionNumber], map: "ScientificNoticeDispatch_scope_idx")
+  @@index([status, claimedAt], map: "ScientificNoticeDispatch_status_claimed_idx")
+}

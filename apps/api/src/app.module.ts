@@ -29,6 +29,11 @@ import { ExhibitorIdentityController } from './exhibitor-identity.controller';
 import { ExhibitorIdentityService } from './exhibitor-identity.service';
 import { ExhibitorService } from './exhibitor.service';
 import { EventDeskService } from './event-desk.service';
+import { PlatformMasterController } from './platform-master.controller';
+import { PlatformMasterGuard, PlatformSessionGuard } from './platform-master.guard';
+import { PlatformMasterRepository } from './platform-master.repository';
+import { PlatformMasterService } from './platform-master.service';
+import { PlatformWebAuthnService } from './platform-webauthn';
 import { OperatorCapabilityController } from './operator-capability.controller';
 import { OperatorCapabilityGuard } from './operator-capability.guard';
 import { OperatorCapabilityRepository } from './operator-capability.repository';
@@ -105,6 +110,7 @@ import { ActivityWaitlistService } from './activity-waitlist.service';
 import { ParticipantAreaService } from './participant-area.service';
 import { ScientificAuthorController } from './scientific-author.controller';
 import { ScientificAuthorService } from './scientific-author.service';
+import { ScientificAuthorNoticeMailService } from './scientific-author-notice-mail.service';
 import { ScientificEventCentralController } from './scientific-event-central.controller';
 import { ScientificEventCentralService } from './scientific-event-central.service';
 import { ScientificGuestsController, ScientificInvitationController } from './scientific-guests.controller';
@@ -177,6 +183,7 @@ import { TransmissionService } from './transmission.service';
     ActivityEnrollmentLimitController,
     ActivityPreferenceController,
     EventDeskController,
+    PlatformMasterController,
     OperatorCapabilityController,
     CredentialPrintConfirmationController,
     ExhibitorController,
@@ -253,6 +260,11 @@ import { TransmissionService } from './transmission.service';
     ActivityEnrollmentLimitService,
     ActivityPreferenceService,
     EventDeskService,
+    PlatformMasterRepository,
+    PlatformMasterService,
+    PlatformWebAuthnService,
+    PlatformSessionGuard,
+    PlatformMasterGuard,
     OperatorCapabilityRepository,
     OperatorCapabilityGuard,
     OperatorCapabilityService,
@@ -270,6 +282,7 @@ import { TransmissionService } from './transmission.service';
     ShowOperationsService,
     TurnstileService,
     ScientificAuthorService,
+    ScientificAuthorNoticeMailService,
     ScientificEventCentralService,
     ScientificStructureService,
     ScientificGuestsService,
