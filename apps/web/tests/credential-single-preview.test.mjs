@@ -129,3 +129,19 @@ test('uma categoria histórica não ativa modelo novo sem prévia explícita e c
     && stringify(node) === 'Salvar modelo da categoria');
   assert.equal(enabled.props.disabled, false, 'salvamento só habilita após o modelo estar visível');
 });
+
+test('configuração histórica incompleta não quebra a única prévia', () => {
+  state.reset();
+  const { label } = draw({ ...data, labelConfig: null });
+  assert.equal(label.codeMode, 'QR');
+  assert.deepEqual(label.lines, []);
+  assert.equal(label.name, 'Ana Pesquisadora');
+  assert.equal(label.barcode, null);
+  assert.ok(label.qr);
+});
+
+test('reset do editor depende do template selecionado, não de nova referência do array', () => {
+  const editor = source('../components/credential-category-templates.tsx');
+  assert.match(editor, /\}, \[eventId, categoryId, savedTemplate\]\);/u);
+  assert.doesNotMatch(editor, /\}, \[eventId, categoryId, templates\]\);/u);
+});
