@@ -90,9 +90,6 @@ test('G6.8: consentimento de e-mail é opcional, não pré-selecionado e imposs�
     assert.doesNotThrow(() => validateCategoryAnswers({ ...base, communication_opt_in: false }, fields, id));
     assert.doesNotThrow(() => validateCategoryAnswers({ ...base, communication_opt_in: true }, fields, id));
     for (const invalid of ['true', 'yes', 'on', 1, null, { consent: true }, []]) {
-      // null is not a valid grant; even if stored as absent in older data,
-      // only the literal boolean true can qualify for future sending.
-      if (invalid === null) continue;
       assert.throws(() => validateCategoryAnswers({ ...base, communication_opt_in: invalid }, fields, id), /verdadeiro ou falso/);
     }
     assert.throws(() => validateCategoryAnswers({ ...base, terms_acceptance: false, communication_opt_in: true }, fields, id), /obrigatório/);
