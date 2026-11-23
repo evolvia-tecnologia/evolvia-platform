@@ -24,7 +24,7 @@ test('a leitura da caixa de teste é isolada, verifica a mensagem e persiste uma
   const protocol = 'EVO-' + hex().slice(0, 16).toUpperCase();
   const row = await prisma.eventRegistrationReservation.create({ data: { ...scope, categoryId: category.id, lotId: lot.id,
     protocol, idempotencyKeyHash: hex(), payloadHash: hex(), identityHash: hex(), emailHash: hex(),
-    registrationData: { email: to }, basePriceCents: 750, finalPriceCents: 750, status: 'CONFIRMED' } });
+    registrationData: { email: to }, basePriceCents: 750, finalPriceCents: 750, status: 'CONFIRMED', confirmedAt: new Date() } });
   const env = { EVOLVIA_TEST_MAIL_ORGANIZATION_ID: org.id, EVOLVIA_TEST_MAIL_RECIPIENT: to,
     EVOLVIA_TEST_MAIL_ACCOUNT_ID: 'test', EVOLVIA_TEST_MAIL_INBOX_ID: 'inbox', EVOLVIA_TEST_MAIL_TOKEN: 'fixture',
     EVOLVIA_TEST_MAIL_JMAP_URL: 'https://inbox.example.invalid/api', EVOLVIA_EMAIL_FROM: from,
