@@ -8,6 +8,13 @@ delivery_mode: "Modo Lançamento — EVO-015"
 active_phase: "Operação de inscrição e aceitação pública em homologação"
 ---
 
+## Reconciliação pós-merge #518 — 22/11/2026 (G7.4 somente I/T)
+
+Implementação **95,8%**; conclusão comprovada **71,7%**; **88/93** unidades integradas; **0/11 Gates encerrados**.
+
+Fonte canônica da matriz: `865bf03f2315642612c1e251559701bca87a993e`. A PR #518 foi integrada em `develop@e46268121378b77343231366922fd6a6b723830d`; os testes PostgreSQL e CI foram comprovados. G7.4: I=true, T=true, D=false, F=false. A publicação teve gate público reprovado pelo cabeçalho Nginx (#108); faltam correção autorizada, correlação do SHA servido, jornada autenticada e aceite humano. Os registros históricos abaixo são preservados.
+
+
 ## Reconciliação de 19/11/2026
 
 Implementação **94,3%**; conclusão comprovada **71,0%**; **87/93** unidades integradas; **0/11 Gates encerrados**.

@@ -192,17 +192,23 @@ test('Wizard inicia rascunho privado para um tipo canônico', async () => {
 test('limpar só o término grava endDate null no Event sem apagar o início', async () => {
   const service = serviceWith(async () => {});
   const changes = [];
+  let stored = {
+    startDate: new Date('2026-10-16T12:00:00.000Z'),
+    endDate: new Date('2026-10-18T12:00:00.000Z'),
+  };
   const tx = {
     event: {
       findUnique: async () => ({ slug: 'congresso-abc123def456' }),
       update: async ({ data }) => {
         changes.push(data);
-        return { id: 'evt-1' };
+        if (Object.prototype.hasOwnProperty.call(data, 'startDate')) stored.startDate = data.startDate;
+        if (Object.prototype.hasOwnProperty.call(data, 'endDate')) stored.endDate = data.endDate;
+        return { id: 'evt-1', ...stored };
       },
     },
   };
 
-  await service.persistEventData(tx, 'evt-1', {
+  const cleared = await service.persistEventData(tx, 'evt-1', {
     startDate: '2026-10-16T12:00:00.000Z',
     endDate: null,
     datesPending: false,
@@ -210,18 +216,24 @@ test('limpar só o término grava endDate null no Event sem apagar o início', a
   });
   assert.equal(changes[0].startDate.toISOString(), '2026-10-16T12:00:00.000Z');
   assert.equal(changes[0].endDate, null);
+  assert.equal(cleared.endDate, null);
+  assert.equal(cleared.startDate, '2026-10-16T12:00:00.000Z');
 
-  await service.persistEventData(tx, 'evt-1', { name: 'Só o nome' });
+  const omitted = await service.persistEventData(tx, 'evt-1', { name: 'Só o nome' });
   assert.equal(changes[1].startDate, undefined);
   assert.equal(changes[1].endDate, undefined);
+  assert.equal(omitted.startDate, '2026-10-16T12:00:00.000Z');
+  assert.equal(omitted.endDate, null);
 
-  await service.persistEventData(tx, 'evt-1', { datesPending: true });
+  const pending = await service.persistEventData(tx, 'evt-1', { datesPending: true });
   assert.equal(changes[2].startDate, null);
   assert.equal(changes[2].endDate, null);
+  assert.equal(pending.startDate, null);
+  assert.equal(pending.endDate, null);
 });
 
-test('save persiste endDate null no Event e na sessão Wizard juntos', async () => {
-  const eventRow = {
+function draftEventRow(overrides = {}) {
+  return {
     id: 'evt-1',
     ownerId: 'user-1',
     organizationId: 'org-1',
@@ -239,15 +251,25 @@ test('save persiste endDate null no Event e na sessão Wizard juntos', async () 
     organization: { id: 'org-1', name: 'Org', slug: 'org', status: 'ACTIVE' },
     capabilities: [{ code: 'registration' }, { code: 'scientific' }],
     updatedAt: new Date('2026-10-01T00:00:00.000Z'),
+    ...overrides,
   };
+}
+
+function saveHarness(eventRow) {
   let eventPatch = null;
   let sessionPatch = null;
+  let storedDates = { startDate: eventRow.startDate, endDate: eventRow.endDate };
   const prisma = {
     event: { findUnique: async () => eventRow },
     $transaction: async (operation) => operation({
       event: {
         findUnique: async () => ({ slug: eventRow.slug }),
-        update: async ({ data }) => { eventPatch = data; return { id: eventRow.id }; },
+        update: async ({ data }) => {
+          eventPatch = data;
+          if (Object.prototype.hasOwnProperty.call(data, 'startDate')) storedDates.startDate = data.startDate;
+          if (Object.prototype.hasOwnProperty.call(data, 'endDate')) storedDates.endDate = data.endDate;
+          return { id: eventRow.id, ...storedDates };
+        },
       },
       eventCapability: { upsert: async () => ({}) },
       eventWizardSession: {
@@ -259,9 +281,19 @@ test('save persiste endDate null no Event e na sessão Wizard juntos', async () 
   const authorization = { requireRole: async () => ({ role: 'OWNER' }) };
   const mutationPolicy = { assertFoundationMutable: () => undefined };
   const service = new EventWizardService(prisma, authorization, mutationPolicy);
-  service.get = async () => ({ event: { id: 'evt-1' }, answers: { endDate: null } });
+  service.get = async () => ({ event: { id: 'evt-1' }, answers: sessionPatch?.answers ?? {} });
+  return {
+    service,
+    get eventPatch() { return eventPatch; },
+    get sessionPatch() { return sessionPatch; },
+  };
+}
 
-  await service.save('user-1', 'evt-1', {
+test('save persiste endDate null no Event e na sessão Wizard juntos', async () => {
+  const eventRow = draftEventRow();
+  const harness = saveHarness(eventRow);
+
+  await harness.service.save('user-1', 'evt-1', {
     currentStep: 'identity',
     revision: 3,
     answers: {
@@ -279,10 +311,87 @@ test('save persiste endDate null no Event e na sessão Wizard juntos', async () 
     },
   });
 
-  assert.equal(eventPatch.endDate, null);
-  assert.equal(eventPatch.startDate.toISOString(), '2026-10-16T12:00:00.000Z');
-  assert.equal(sessionPatch.answers.endDate, null);
-  assert.equal(sessionPatch.answers.startDate, '2026-10-16T12:00:00.000Z');
+  assert.equal(harness.eventPatch.endDate, null);
+  assert.equal(harness.eventPatch.startDate.toISOString(), '2026-10-16T12:00:00.000Z');
+  assert.equal(harness.sessionPatch.answers.endDate, null);
+  assert.equal(harness.sessionPatch.answers.startDate, '2026-10-16T12:00:00.000Z');
+});
+
+test('save que omite endDate preserva término no Event e no JSON da sessão', async () => {
+  const eventRow = draftEventRow();
+  const harness = saveHarness(eventRow);
+
+  await harness.service.save('user-1', 'evt-1', {
+    currentStep: 'identity',
+    revision: 4,
+    answers: {
+      eventType: eventRow.eventType,
+      name: eventRow.name,
+      format: 'IN_PERSON',
+      startDate: '2026-10-16T12:00:00.000Z',
+      // endDate omitido de propósito
+      timeZone: 'America/Sao_Paulo',
+      datesPending: false,
+      venue: 'Centro',
+      registrationMode: 'FREE',
+      capabilities: ['registration', 'scientific'],
+      subjectAreas: ['saude'],
+    },
+  });
+
+  assert.equal(harness.eventPatch.endDate, undefined);
+  assert.equal(harness.sessionPatch.answers.endDate, '2026-10-18T12:00:00.000Z');
+  assert.equal(harness.sessionPatch.answers.startDate, '2026-10-16T12:00:00.000Z');
+});
+
+test('save com revisão divergente responde 409 sem gravar sessão', async () => {
+  const eventRow = draftEventRow();
+  let sessionWrites = 0;
+  const prisma = {
+    event: { findUnique: async () => eventRow },
+    $transaction: async (operation) => operation({
+      event: {
+        findUnique: async () => ({ slug: eventRow.slug }),
+        update: async ({ data }) => ({
+          id: eventRow.id,
+          startDate: Object.prototype.hasOwnProperty.call(data, 'startDate') ? data.startDate : eventRow.startDate,
+          endDate: Object.prototype.hasOwnProperty.call(data, 'endDate') ? data.endDate : eventRow.endDate,
+        }),
+      },
+      eventCapability: { upsert: async () => ({}) },
+      eventWizardSession: {
+        updateMany: async () => { sessionWrites += 1; return { count: 0 }; },
+      },
+      auditLog: { create: async () => ({}) },
+    }),
+  };
+  const service = new EventWizardService(
+    prisma,
+    { requireRole: async () => ({ role: 'OWNER' }) },
+    { assertFoundationMutable: () => undefined },
+  );
+
+  await assert.rejects(
+    () => service.save('user-1', 'evt-1', {
+      currentStep: 'identity',
+      revision: 1,
+      answers: {
+        eventType: eventRow.eventType,
+        name: eventRow.name,
+        format: 'IN_PERSON',
+        startDate: '2026-10-16T12:00:00.000Z',
+        endDate: '2026-10-18T12:00:00.000Z',
+        timeZone: 'America/Sao_Paulo',
+        datesPending: false,
+        venue: 'Centro',
+        registrationMode: 'FREE',
+        capabilities: ['registration', 'scientific'],
+        subjectAreas: ['saude'],
+      },
+    }),
+    (error) => error?.response?.code === 'VERSION_CONFLICT' || error?.getResponse?.()?.code === 'VERSION_CONFLICT',
+  );
+  assert.equal(sessionWrites, 1);
 });
 
 test('Autosave mantém rascunho privado; conclusão gera sigla e código público estável', async () => {
@@ -295,7 +404,7 @@ test('Autosave mantém rascunho privado; conclusão gera sigla e código públic
       update: async ({ data }) => {
         changes.push(data);
         if (data.slug) currentSlug = data.slug;
-        return { id: 'evt-1' };
+        return { id: 'evt-1', startDate: null, endDate: null };
       },
     },
   };

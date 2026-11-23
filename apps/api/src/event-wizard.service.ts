@@ -152,7 +152,7 @@ export class EventWizardService {
     const answers = this.normalizeAnswersForEvent(event, dto.answers);
 
     await this.prisma.$transaction(async (tx) => {
-      await this.persistEventData(tx, event.id, answers);
+      const sessionAnswers = await this.persistEventData(tx, event.id, answers);
       await this.auditTimeZoneChange(tx, userId, event, answers);
       await this.syncCapabilities(tx, event.id, answers.capabilities ?? []);
 
@@ -165,8 +165,8 @@ export class EventWizardService {
         },
         data: {
           currentStep: dto.currentStep,
-          answers: answers as Prisma.InputJsonValue,
-          completionPercent: getWizardCompletion(answers),
+          answers: sessionAnswers as Prisma.InputJsonValue,
+          completionPercent: getWizardCompletion(sessionAnswers),
           status: WizardSessionStatus.ACTIVE,
           lastSavedAt: new Date(),
           revision: { increment: 1 },
@@ -192,7 +192,7 @@ export class EventWizardService {
     if (issues.length > 0) throw new BadRequestException(issues);
 
     await this.prisma.$transaction(async (tx) => {
-      await this.persistEventData(tx, event.id, answers, true);
+      const sessionAnswers = await this.persistEventData(tx, event.id, answers, true);
       await this.auditTimeZoneChange(tx, userId, event, answers);
       await this.syncCapabilities(tx, event.id, answers.capabilities ?? []);
 
@@ -205,7 +205,7 @@ export class EventWizardService {
         },
         data: {
           currentStep: 'review',
-          answers: answers as Prisma.InputJsonValue,
+          answers: sessionAnswers as Prisma.InputJsonValue,
           completionPercent: 100,
           status: WizardSessionStatus.COMPLETED,
           lastSavedAt: new Date(),
@@ -379,7 +379,7 @@ export class EventWizardService {
     eventId: string,
     answers: WizardAnswers,
     publishSlug = false,
-  ) {
+  ): Promise<WizardAnswers> {
     const data: Prisma.EventUpdateInput = {};
     if (answers.eventType) data.eventType = answers.eventType;
     if (answers.profileCode) data.profileCode = answers.profileCode;
@@ -412,7 +412,18 @@ export class EventWizardService {
     }
     if (answers.registrationMode) data.registrationMode = answers.registrationMode;
     data.subjectAreas = answers.subjectAreas ?? [];
-    await tx.event.update({ where: { id: eventId }, data });
+    // Sessão Wizard deve espelhar as datas efetivas do Event (omitir no PATCH não apaga o JSON).
+    const effective = await tx.event.update({
+      where: { id: eventId },
+      data,
+      select: { startDate: true, endDate: true },
+    });
+    return {
+      ...answers,
+      startDate: effective.startDate?.toISOString() ?? null,
+      endDate: effective.endDate?.toISOString() ?? null,
+      datesPending: answers.datesPending === true,
+    };
   }
 
   private async auditTimeZoneChange(
