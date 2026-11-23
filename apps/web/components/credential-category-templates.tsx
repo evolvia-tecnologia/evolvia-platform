@@ -135,7 +135,7 @@ export default function CredentialCategoryTemplates({
 
   async function save() {
     const currentSession = session.current;
-    if (inFlight.current === currentSession || !organizer || !categoryId) return;
+    if (inFlight.current === currentSession || !organizer || !categoryId || !isEditing) return;
     inFlight.current = currentSession;
     setBusy(true);
     const targetId = categoryId;
@@ -207,6 +207,8 @@ export default function CredentialCategoryTemplates({
               Esta categoria utiliza a etiqueta histórica enquanto não existir modelo personalizado salvo.
               Configure os campos aqui e salve para ativar o modelo da categoria. O tamanho do papel permanece compartilhado.
             </p>}
+            {!savedTemplate && !isEditing && <button type="button" disabled={busy || !organizer}
+              onClick={() => setIsEditing(true)}>Preparar modelo padrão desta categoria</button>}
             <p>Organize de cima para baixo com as setas. Em cada campo, escolha alinhamento, negrito, cor, família e tamanho da fonte. A prévia acompanha as mudanças.</p>
             {draft.length === 0 && <p>Nenhum campo selecionado. Adicione um campo abaixo.</p>}
             <ol className={styles.fields}>
@@ -269,7 +271,7 @@ export default function CredentialCategoryTemplates({
             <div className={styles.footer}>
               <button type="button" disabled={busy || !organizer}
                 onClick={() => { setIsEditing(true); setDraft([...DEFAULT]); setFormat({}); }}>Restaurar padrão</button>
-              <button type="button" disabled={busy || !organizer} onClick={() => void save()}>
+              <button type="button" disabled={busy || !organizer || !isEditing} onClick={() => void save()}>
                 {busy ? 'Salvando…' : 'Salvar modelo da categoria'}
               </button>
             </div>
