@@ -1342,7 +1342,7 @@
   },
   "integratedCriteria": 88,
   "criteriaCount": 93,
-  "methodNote": "Reconciliação de 19/11 validada novamente após a integração #680 em 20/11. G2.10 (#471) e G10.10 (#642) sustentam I/T/D. #680 melhora UX e declara que não conclui G2.11; #694 somente simulação (moneyReturned:false). Não dar novo crédito a G2.11/G2.13/G2.14/G5.8/G6.8/G7.4 nem a refinamentos de critérios existentes. Revisão do HEAD develop e evidências não equivale a homologação/Go de produção.\nReconciliação pontual após merge #518: G7.4 recebeu SOMENTE I e T por código integrado + CI PostgreSQL/ARM64. D=0/F=0 porque gate público #108 falhou após publicação e não há jornada autenticada/aceite do autor. Evidências PR #518 e workflows 44958147485 / 45086466534. 0/11 Gates encerrados; sem Go.",
+  "methodNote": "Reconciliação de 19/11 validada novamente após a integração #680 em 20/11. G2.10 (#471) e G10.10 (#642) sustentam I/T/D. #680 melhora UX e declara que não conclui G2.11; #694 somente simulação (moneyReturned:false). Não dar novo crédito a G2.11/G2.13/G2.14/G5.8/G6.8 nem a refinamentos de critérios existentes; para G7.4 vale a reconciliação pontual comprovada após #518. Revisão do HEAD develop e evidências não equivale a homologação/Go de produção.\nReconciliação pontual após merge #518: G7.4 recebeu SOMENTE I e T por código integrado + CI PostgreSQL/ARM64. D=0/F=0 porque gate público #108 falhou após publicação e não há jornada autenticada/aceite do autor. Evidências PR #518 e workflows 44958147485 / 45086466534. 0/11 Gates encerrados; sem Go.",
   "lastCrossCheck": {
     "localDate": "2026-11-22",
     "developSha": "e46268121378b77343231366922fd6a6b723830d",
