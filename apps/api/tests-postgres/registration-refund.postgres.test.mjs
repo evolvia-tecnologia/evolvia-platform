@@ -640,3 +640,231 @@ test('capacidade de simulação da página exige OWNER ativo e ambas as configur
     process.env[key]=original;
   }
 });
+
+test('cancelar uma inscrição paga preserva a preparação do reembolso aprovado', async () => {
+  const event = await insertEvent(organizationId);
+  const { lot, category } = await catalog(event);
+  const row = await reservation(event, lot, category, {
+    status: 'CONFIRMED', priceCents: 1200, identityHash: digest(), emailHash: digest(),
+  });
+  const paid = await checkout(row, 'PAID');
+  const request = await prisma.registrationRefundRequest.create({ data: {
+    organizationId, eventId: event.id, reservationId: row.id, reason, status: 'APPROVED',
+  } });
+  await prisma.eventRegistrationReservation.update({ where: { id: row.id }, data: { status: 'CANCELLED' } });
+  const prepare = () => refunds.prepare(people.owner.id, event.id, request.id, { amountCents: 1200 });
+  await prisma.eventRegistrationCheckout.update({ where: { id: paid.id }, data: { paidAt: null } });
+  await rejects(prepare(), 409);
+  await prisma.eventRegistrationCheckout.update({ where: { id: paid.id }, data: { paidAt: paid.paidAt } });
+  const first = await prepare();
+  assert.equal(first.moneyReturned, false);
+  assert.deepEqual(await prepare(), first);
+  assert.equal(await prisma.auditLog.count({ where: { entityId: request.id, action: 'refund.prepared' } }), 1);
+  const saved = await prisma.eventRegistrationReservation.findUniqueOrThrow({ where: { id: row.id } });
+  assert.equal(saved.status, 'CANCELLED');
+});
+
+test('sandbox Pix preserva uma tentativa após timeout, concorrência e reinício', async t => {
+  const event = await insertEvent(organizationId);
+  const { lot, category } = await catalog(event);
+  const row = await reservation(event, lot, category, { status: 'CONFIRMED', priceCents: 1200, identityHash: digest(), emailHash: digest() });
+  const checkoutRow = await checkout(row, 'PAID');
+  const checkoutId = 'checkout_' + digest();
+  const paymentId = 'pay_' + digest();
+  await prisma.eventRegistrationCheckout.update({ where: { id: checkoutRow.id }, data: { providerCheckoutId: checkoutId } });
+  const req = await prisma.registrationRefundRequest.create({ data: {
+    organizationId, eventId: event.id, reservationId: row.id, reason, status: 'APPROVED',
+  } });
+  await refunds.prepare(people.owner.id, event.id, req.id, { amountCents: 750 });
+  await prisma.registrationRefundRequest.update({ where: { id: req.id }, data: { sandboxPaymentId: paymentId } });
+  const config = { ASAAS_REFUND_SANDBOX_ORGANIZATION_ID: organizationId,
+    ASAAS_REFUND_SANDBOX_EXECUTION_ORGANIZATION_ID: organizationId, ASAAS_REFUND_SANDBOX_WEBHOOK_TOKEN: 'webhook-fixture', ASAAS_REFUND_SANDBOX_TOKEN: 'fixture' };
+  for (const [key, value] of Object.entries(config)) {
+    const prior = process.env[key];
+    process.env[key] = value;
+    t.after(() => { if (prior === undefined) delete process.env[key]; else process.env[key] = prior; });
+  }
+  let posts = 0;
+  let history = [];
+  t.mock.method(globalThis, 'fetch', async (url, init) => {
+    assert.equal(url.origin, 'https://api-sandbox.asaas.com');
+    if (init.method === 'GET') {
+      assert.equal(url.pathname, '/v3/payments/' + paymentId);
+      return Response.json({ id: paymentId, checkoutSession: checkoutId, billingType: 'PIX', value: 12,
+        status: 'RECEIVED', refunds: history });
+    }
+    assert.equal(url.pathname, '/v3/payments/' + paymentId + '/refund');
+    posts++;
+    const body = JSON.parse(init.body);
+    assert.deepEqual(body, { value: 7.5, description: 'Evolvia/' + req.id });
+    history = [{ ...body, status: 'PENDING' }];
+    throw new Error('timeout após recebimento');
+  });
+  const run = service => service.processSandboxRefund(people.owner.id, event.id, req.id);
+  await rejects(refunds.processSandboxRefund(people.outsider.id, event.id, req.id), 404);
+  const results = await Promise.all([run(refunds), run(refunds)]);
+  assert.ok(results.every(result => result.processingStatus === 'PROCESSING'));
+  assert.equal(posts, 1);
+  const restarted = new RegistrationRefundService(prisma, new AuthorizationService(prisma));
+  const notification = { event: 'PAYMENT_PARTIALLY_REFUNDED', payment: { id: paymentId, status: 'REFUNDED' } };
+  const notify = (header = 'webhook-fixture') => restarted.reconcileSandboxWebhook(header, notification);
+  const { NestFactory } = await import('@nestjs/core');
+  const { Module } = await import('@nestjs/common');
+  const { RegistrationRefundPublicController } = await import('../dist/registration-refund.controller.js');
+  const { request: httpRequest } = await import('node:http');
+  class WebhookTestModule {}
+  Module({ controllers: [RegistrationRefundPublicController], providers: [
+    { provide: RegistrationRefundService, useValue: restarted },
+  ] })(WebhookTestModule);
+  const app = await NestFactory.create(WebhookTestModule, { logger: false });
+  await app.listen(0, '127.0.0.1');
+  t.after(() => app.close());
+  const webhookUrl = new URL('/public/integrations/asaas/sandbox/refunds/webhook', await app.getUrl());
+  const postWebhook = header => new Promise((resolve, reject) => {
+    const call = httpRequest(webhookUrl, { method: 'POST', headers: {
+      'content-type': 'application/json', 'asaas-access-token': header,
+    } }, response => {
+      response.resume();
+      response.on('end', () => resolve(response.statusCode));
+    });
+    call.on('error', reject);
+    call.end(JSON.stringify(notification));
+  });
+  assert.equal(await postWebhook('invalid'), 401);
+  await notify();
+  const localStatus = async () => (await prisma.$queryRaw`SELECT status FROM "SandboxRefundOperation" WHERE "requestId" = ${req.id}`)[0].status;
+  assert.equal(await localStatus(), 'PROCESSING');
+  history[0].status = 'DONE';
+  process.env.ASAAS_REFUND_SANDBOX_ORGANIZATION_ID = 'org-other';
+  process.env.ASAAS_REFUND_SANDBOX_EXECUTION_ORGANIZATION_ID = 'org-other';
+  await notify();
+  assert.equal(await localStatus(), 'PROCESSING');
+  process.env.ASAAS_REFUND_SANDBOX_ORGANIZATION_ID = organizationId;
+  process.env.ASAAS_REFUND_SANDBOX_EXECUTION_ORGANIZATION_ID = organizationId;
+  assert.deepEqual(await Promise.all([postWebhook('webhook-fixture'), postWebhook('webhook-fixture')]), [200, 200]);
+  assert.equal(await localStatus(), 'RECONCILED');
+  for (let i = 0; i < 2; i++) {
+    const result = await run(restarted);
+    assert.equal(result.processingStatus, 'RECONCILED');
+    assert.equal(result.sandboxRefundConfirmed, true);
+    assert.equal(result.moneyReturned, false);
+  }
+  assert.equal(posts, 1);
+  const [record] = await prisma.$queryRaw`SELECT * FROM "SandboxRefundOperation" WHERE "requestId" = ${req.id}`;
+  assert.equal(record.amountCents, 750);
+  assert.equal(record.attempts, 1);
+  assert.ok(record.reconciledAt);
+  // Rebuild the local projection using the persisted provider history.
+  await prisma.$executeRaw`DELETE FROM "SandboxRefundOperation" WHERE "requestId" = ${req.id}`;
+  for (const invalid of [7.501, '7.50', 7.51, null]) {
+    history[0].value = invalid;
+    await rejects(run(restarted), 409);
+  }
+  history[0].value = 7.5;
+  const recovered = await Promise.all([run(restarted), run(refunds)]);
+  assert.ok(recovered.every(result => result.sandboxRefundConfirmed));
+  assert.equal(posts, 1);
+  const [restored] = await prisma.$queryRaw`SELECT * FROM "SandboxRefundOperation" WHERE "requestId" = ${req.id}`;
+  assert.equal(restored.attempts, 0);
+  assert.ok(restored.reconciledAt);
+});
+
+test('uma notificação de Pix concilia dois participantes a partir da mesma consulta', async t => {
+  const event = await insertEvent(organizationId);
+  const { lot, category } = await catalog(event);
+  const scope = { organizationId, eventId: event.id };
+  const order = await prisma.eventRegistrationOrder.create({ data: {
+    ...scope, idempotencyKeyHash: digest(), payloadHash: digest(), subtotalCents: 2000,
+  } });
+  const group = await prisma.eventRegistrationOrderCheckout.create({ data: {
+    ...scope, orderId:order.id, idempotencyKeyHash:digest(), requestHash:digest(),
+    providerCheckoutId: 'checkout_' + digest(), status:'PAID', paidAt:new Date(), expiresAt:new Date(), amountCents:1500,
+  } });
+  const requests = [];
+  for (const position of [0, 1]) {
+    const row = await reservation(event, lot, category, { status:'CONFIRMED', priceCents:1000, identityHash:digest(), emailHash:digest() });
+    await prisma.eventRegistrationOrderEntry.create({ data: {
+      ...scope, orderId:order.id, position, categoryId:category.id, lotId:lot.id,
+      identityHash:row.identityHash, emailHash:row.emailHash, reservationId:row.id, basePriceCents:1000, finalPriceCents:1000,
+    } });
+    requests.push(await prisma.registrationRefundRequest.create({ data: { ...scope, reservationId:row.id, reason, status:'APPROVED' } }));
+  }
+  const paymentId = 'pay_' + digest();
+  const config = { ASAAS_REFUND_SANDBOX_ORGANIZATION_ID: organizationId,
+    ASAAS_REFUND_SANDBOX_EXECUTION_ORGANIZATION_ID: organizationId,
+    ASAAS_REFUND_SANDBOX_WEBHOOK_TOKEN: 'fixture-hook', ASAAS_REFUND_SANDBOX_TOKEN: 'fixture-api' };
+  for (const [key, value] of Object.entries(config)) {
+    const prior = process.env[key];
+    process.env[key] = value;
+    t.after(() => { if (prior === undefined) delete process.env[key]; else process.env[key] = prior; });
+  }
+  for (const req of requests) {
+    await refunds.prepare(people.owner.id, event.id, req.id, { amountCents: 750 });
+    await prisma.registrationRefundRequest.update({ where: { id: req.id }, data: { sandboxPaymentId: paymentId } });
+    await prisma.$executeRaw`INSERT INTO "SandboxRefundOperation" ("requestId","organizationId","eventId","paymentId","amountCents")
+      VALUES (${req.id},${organizationId},${event.id},${paymentId},750)`;
+  }
+  let reads = 0;
+  t.mock.method(globalThis, 'fetch', async (url, init) => {
+    assert.equal(init.method, 'GET');
+    assert.equal(url.pathname, '/v3/payments/' + paymentId);
+    reads++;
+    return Response.json({ id: paymentId, billingType: 'PIX', checkoutSession: group.providerCheckoutId, value: 15,
+      refunds: requests.map((req, i) => ({ description: 'Evolvia/' + req.id, value: 7.5, status: i ? 'PENDING' : 'DONE' })) });
+  });
+  await refunds.reconcileSandboxWebhook('fixture-hook', { event: 'PAYMENT_PARTIALLY_REFUNDED', payment: { id: paymentId } });
+  assert.equal(reads, 1);
+  const rows = await prisma.$queryRaw`SELECT "requestId", status FROM "SandboxRefundOperation" WHERE "paymentId" = ${paymentId}`;
+  assert.deepEqual(Object.fromEntries(rows.map(row => [row.requestId, row.status])), {
+    [requests[0].id]: 'RECONCILED', [requests[1].id]: 'PROCESSING',
+  });
+});
+
+test('sem callback, duas conexões retomam uma confirmação tardia sem reenviar o Pix', async t => {
+  const { id: organizationId } = await prisma.organization.create({ data: {
+    name: 'Recuperação', slug: 'recuperacao-' + digest(), createdById: people.owner.id,
+  } });
+  await prisma.organizationMembership.create({ data: { organizationId, userId: people.owner.id, role: 'OWNER' } });
+  const event = await insertEvent(organizationId);
+  const { lot, category } = await catalog(event);
+  const row = await reservation(event, lot, category, { status: 'CONFIRMED', priceCents: 1200, identityHash: digest(), emailHash: digest() });
+  const checkoutRow = await checkout(row, 'PAID');
+  const checkoutId = 'checkout_' + digest();
+  const paymentId = 'pay_' + digest();
+  await prisma.eventRegistrationCheckout.update({ where: { id: checkoutRow.id }, data: { providerCheckoutId: checkoutId } });
+  const req = await prisma.registrationRefundRequest.create({ data: {
+    organizationId, eventId: event.id, reservationId: row.id, reason, status: 'APPROVED',
+  } });
+  await refunds.prepare(people.owner.id, event.id, req.id, { amountCents: 750 });
+  await prisma.registrationRefundRequest.update({ where: { id: req.id }, data: { sandboxPaymentId: paymentId } });
+  const config = { ASAAS_REFUND_SANDBOX_ORGANIZATION_ID: organizationId,
+    ASAAS_REFUND_SANDBOX_EXECUTION_ORGANIZATION_ID: organizationId, ASAAS_REFUND_SANDBOX_WEBHOOK_TOKEN: 'webhook-fixture', ASAAS_REFUND_SANDBOX_TOKEN: 'fixture' };
+  for (const [key, value] of Object.entries(config)) {
+    const prior = process.env[key];
+    process.env[key] = value;
+    t.after(() => { if (prior === undefined) delete process.env[key]; else process.env[key] = prior; });
+  }
+  const independent = new PrismaClient();
+  t.after(() => independent.$disconnect());
+  const replacement = new RegistrationRefundService(independent, new AuthorizationService(independent));
+  let posts = 0;
+  let reads = 0;
+  let confirmed = false;
+  t.mock.method(globalThis, 'fetch', async (_url, init) => {
+    if (init.method === 'POST') {
+      posts++;
+      throw new Error('timeout depois do aceite');
+    }
+    reads++;
+    return Response.json({ id: paymentId, checkoutSession: checkoutId, billingType: 'PIX', value: 12,
+      status: 'RECEIVED', refunds: confirmed ? [{ description: 'Evolvia/' + req.id, value: 7.5, status: 'DONE' }] : [] });
+  });
+  assert.equal((await refunds.processSandboxRefund(people.owner.id, event.id, req.id)).processingStatus, 'PROCESSING');
+  confirmed = true;
+  await Promise.all([refunds.recoverSandboxRefund(), replacement.recoverSandboxRefund()]);
+  await replacement.recoverSandboxRefund();
+  assert.equal(posts, 1);
+  assert.equal(reads, 2);
+  const [stored] = await independent.$queryRaw`SELECT status, attempts FROM "SandboxRefundOperation" WHERE "requestId" = ${req.id}`;
+  assert.deepEqual(stored, { status: 'RECONCILED', attempts: 1 });
+});
