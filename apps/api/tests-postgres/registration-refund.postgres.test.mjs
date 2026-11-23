@@ -664,7 +664,7 @@ test('cancelar uma inscrição paga preserva a preparação do reembolso aprovad
   assert.equal(saved.status, 'CANCELLED');
 });
 
-test('sandbox Pix preserva uma tentativa após timeout, concorrência e reinício', async t => {
+async function verifyRefundRecovery(t, amountCents, refundEvent) {
   const event = await insertEvent(organizationId);
   const { lot, category } = await catalog(event);
   const row = await reservation(event, lot, category, { status: 'CONFIRMED', priceCents: 1200, identityHash: digest(), emailHash: digest() });
@@ -675,7 +675,7 @@ test('sandbox Pix preserva uma tentativa após timeout, concorrência e reiníci
   const req = await prisma.registrationRefundRequest.create({ data: {
     organizationId, eventId: event.id, reservationId: row.id, reason, status: 'APPROVED',
   } });
-  await refunds.prepare(people.owner.id, event.id, req.id, { amountCents: 750 });
+  await refunds.prepare(people.owner.id, event.id, req.id, { amountCents });
   await prisma.registrationRefundRequest.update({ where: { id: req.id }, data: { sandboxPaymentId: paymentId } });
   const config = { ASAAS_REFUND_SANDBOX_ORGANIZATION_ID: organizationId,
     ASAAS_REFUND_SANDBOX_EXECUTION_ORGANIZATION_ID: organizationId, ASAAS_REFUND_SANDBOX_WEBHOOK_TOKEN: 'webhook-fixture', ASAAS_REFUND_SANDBOX_TOKEN: 'fixture' };
@@ -696,7 +696,7 @@ test('sandbox Pix preserva uma tentativa após timeout, concorrência e reiníci
     assert.equal(url.pathname, '/v3/payments/' + paymentId + '/refund');
     posts++;
     const body = JSON.parse(init.body);
-    assert.deepEqual(body, { value: 7.5, description: 'Evolvia/' + req.id });
+    assert.deepEqual(body, { value: amountCents / 100, description: 'Evolvia/' + req.id });
     history = [{ ...body, status: 'PENDING' }];
     throw new Error('timeout após recebimento');
   });
@@ -706,7 +706,7 @@ test('sandbox Pix preserva uma tentativa após timeout, concorrência e reiníci
   assert.ok(results.every(result => result.processingStatus === 'PROCESSING'));
   assert.equal(posts, 1);
   const restarted = new RegistrationRefundService(prisma, new AuthorizationService(prisma));
-  const notification = { event: 'PAYMENT_PARTIALLY_REFUNDED', payment: { id: paymentId, status: 'REFUNDED' } };
+  const notification = { event: refundEvent, payment: { id: paymentId, status: 'REFUNDED' } };
   const notify = (header = 'webhook-fixture') => restarted.reconcileSandboxWebhook(header, notification);
   const { NestFactory } = await import('@nestjs/core');
   const { Module } = await import('@nestjs/common');
@@ -743,6 +743,10 @@ test('sandbox Pix preserva uma tentativa após timeout, concorrência e reiníci
   process.env.ASAAS_REFUND_SANDBOX_EXECUTION_ORGANIZATION_ID = organizationId;
   assert.deepEqual(await Promise.all([postWebhook('webhook-fixture'), postWebhook('webhook-fixture')]), [200, 200]);
   assert.equal(await localStatus(), 'RECONCILED');
+  notification.event = 'PAYMENT_REFUND_IN_PROGRESS';
+  history[0].status = 'PENDING';
+  assert.equal(await postWebhook('webhook-fixture'), 200);
+  assert.equal(await localStatus(), 'RECONCILED');
   for (let i = 0; i < 2; i++) {
     const result = await run(restarted);
     assert.equal(result.processingStatus, 'RECONCILED');
@@ -751,23 +755,30 @@ test('sandbox Pix preserva uma tentativa após timeout, concorrência e reiníci
   }
   assert.equal(posts, 1);
   const [record] = await prisma.$queryRaw`SELECT * FROM "SandboxRefundOperation" WHERE "requestId" = ${req.id}`;
-  assert.equal(record.amountCents, 750);
+  assert.equal(record.amountCents, amountCents);
   assert.equal(record.attempts, 1);
   assert.ok(record.reconciledAt);
+  history[0].status = 'DONE';
   // Rebuild the local projection using the persisted provider history.
   await prisma.$executeRaw`DELETE FROM "SandboxRefundOperation" WHERE "requestId" = ${req.id}`;
-  for (const invalid of [7.501, '7.50', 7.51, null]) {
+  for (const invalid of [(amountCents + 0.1) / 100, (amountCents / 100).toFixed(2), (amountCents + 1) / 100, null]) {
     history[0].value = invalid;
     await rejects(run(restarted), 409);
   }
-  history[0].value = 7.5;
+  history[0].value = amountCents / 100;
   const recovered = await Promise.all([run(restarted), run(refunds)]);
   assert.ok(recovered.every(result => result.sandboxRefundConfirmed));
   assert.equal(posts, 1);
   const [restored] = await prisma.$queryRaw`SELECT * FROM "SandboxRefundOperation" WHERE "requestId" = ${req.id}`;
   assert.equal(restored.attempts, 0);
   assert.ok(restored.reconciledAt);
-});
+}
+
+test('sandbox Pix preserva uma tentativa após timeout, concorrência e reinício', t =>
+  verifyRefundRecovery(t, 750, 'PAYMENT_PARTIALLY_REFUNDED'));
+
+test('estorno integral de Pix concilia uma vez e resiste a webhook atrasado', t =>
+  verifyRefundRecovery(t, 1200, 'PAYMENT_REFUNDED'));
 
 test('uma notificação de Pix concilia dois participantes a partir da mesma consulta', async t => {
   const event = await insertEvent(organizationId);
