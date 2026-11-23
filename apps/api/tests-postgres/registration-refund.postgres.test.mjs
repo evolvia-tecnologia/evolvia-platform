@@ -805,18 +805,35 @@ test('uma notificação de Pix concilia dois participantes a partir da mesma con
       VALUES (${req.id},${organizationId},${event.id},${paymentId},750)`;
   }
   let reads = 0;
+  let denied = false;
   t.mock.method(globalThis, 'fetch', async (url, init) => {
     assert.equal(init.method, 'GET');
     assert.equal(url.pathname, '/v3/payments/' + paymentId);
     reads++;
     return Response.json({ id: paymentId, billingType: 'PIX', checkoutSession: group.providerCheckoutId, value: 15,
-      refunds: requests.map((req, i) => ({ description: 'Evolvia/' + req.id, value: 7.5, status: i ? 'PENDING' : 'DONE' })) });
+      refunds: requests.map((req, i) => ({ description: 'Evolvia/' + req.id, value: 7.5, status: i ? (denied ? 'CANCELLED' : 'PENDING') : 'DONE' })) });
   });
   await refunds.reconcileSandboxWebhook('fixture-hook', { event: 'PAYMENT_PARTIALLY_REFUNDED', payment: { id: paymentId } });
   assert.equal(reads, 1);
   const rows = await prisma.$queryRaw`SELECT "requestId", status FROM "SandboxRefundOperation" WHERE "paymentId" = ${paymentId}`;
   assert.deepEqual(Object.fromEntries(rows.map(row => [row.requestId, row.status])), {
     [requests[0].id]: 'RECONCILED', [requests[1].id]: 'PROCESSING',
+  });
+  // O Asaas envia PAYMENT_REFUND_DENIED ao cancelar estorno Pix. O evento
+  // autenticado deve consultar o histórico, sem confiar no status do payload.
+  denied = true;
+  const denial = { event: 'PAYMENT_REFUND_DENIED', payment: { id: paymentId, status: 'REFUNDED' } };
+  await refunds.reconcileSandboxWebhook('fixture-hook', denial);
+  assert.equal(reads, 2, 'negação precisa consultar o Asaas antes de atualizar estados');
+  const deniedRows = await prisma.$queryRaw`SELECT "requestId", status FROM "SandboxRefundOperation" WHERE "paymentId" = ${paymentId}`;
+  assert.deepEqual(Object.fromEntries(deniedRows.map(row => [row.requestId, row.status])), {
+    [requests[0].id]: 'RECONCILED', [requests[1].id]: 'FAILED',
+  });
+  await refunds.reconcileSandboxWebhook('fixture-hook', denial);
+  assert.equal(reads, 3);
+  const replay = await prisma.$queryRaw`SELECT "requestId", status FROM "SandboxRefundOperation" WHERE "paymentId" = ${paymentId}`;
+  assert.deepEqual(Object.fromEntries(replay.map(row => [row.requestId, row.status])), {
+    [requests[0].id]: 'RECONCILED', [requests[1].id]: 'FAILED',
   });
 });
 
