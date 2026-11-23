@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { api } from '../lib/api';
 import CredentialLabel, { type CredentialLabelData } from './credential-label';
+import type { LabelSettings } from './credential-label-settings';
 import styles from './credential-category-templates.module.css';
 
 export type LabelFieldStyle = { align: 'left' | 'center' | 'right'; bold: boolean; color: string; fontFamily?: 'sans' | 'serif' | 'mono'; fontSizeMm?: number };
@@ -30,7 +31,7 @@ const SAMPLES: Record<string, string> = {
 };
 
 export default function CredentialCategoryTemplates({
-  eventId, categories, fields, templates, widthMm, heightMm, organizer, onSaved, onError,
+  eventId, categories, fields, templates, widthMm, heightMm, labelConfig, organizer, onSaved, onError,
 }: {
   eventId: string;
   categories: Category[];
@@ -38,6 +39,7 @@ export default function CredentialCategoryTemplates({
   templates: CategoryLabelTemplate[];
   widthMm: number;
   heightMm: number;
+  labelConfig: LabelSettings;
   organizer: boolean;
   onSaved: (template: CategoryLabelTemplate) => void;
   onError: (message: string) => void;
@@ -47,6 +49,7 @@ export default function CredentialCategoryTemplates({
   const [selectedField, setSelectedField] = useState('');
   const [format, setFormat] = useState<Record<string, LabelFieldStyle>>({});
   const [busy, setBusy] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
   const inFlight = useRef<number | null>(null);
   const session = useRef(0);
 
@@ -58,6 +61,7 @@ export default function CredentialCategoryTemplates({
     // Um POST antigo não pode bloquear a edição de outro evento/categoria.
     inFlight.current = null;
     setBusy(false);
+    setIsEditing(false);
     const found = templates.find((item) => item.categoryId === categoryId);
     setDraft(found ? [...found.fields] : [...DEFAULT]);
     setFormat(found?.styles ? { ...found.styles } : {});
@@ -75,32 +79,58 @@ export default function CredentialCategoryTemplates({
       !field.appliesToCategoryIds?.length || field.appliesToCategoryIds.includes(categoryId))
     .filter((field, index, all) => all.findIndex((candidate) => candidate.code === field.code) === index);
   const available = choices.filter((field) => !draft.includes(field.code));
-  const move = (index: number, step: number) => setDraft((current) => {
+  const move = (index: number, step: number) => {
+    setIsEditing(true);
+    setDraft((current) => {
     const next = [...current];
     const target = index + step;
     if (target < 0 || target >= next.length) return current;
     [next[index], next[target]] = [next[target], next[index]];
     return next;
-  });
+    });
+  };
   const display = (code: string) => choices.find((field) => field.code === code)?.label ?? code;
   // Códigos customizados como "constructor" não devem herdar valores de Object.prototype.
   const ownStyle = (code: string): LabelFieldStyle | undefined =>
     Object.prototype.hasOwnProperty.call(format, code) ? format[code] : undefined;
   const sample = (code: string): string =>
     Object.prototype.hasOwnProperty.call(SAMPLES, code) ? SAMPLES[code] : display(code);
-  const changeStyle = (code: string, patch: Partial<LabelFieldStyle>) => setFormat((current) => ({
-    ...current,
-    [code]: { ...(Object.prototype.hasOwnProperty.call(current, code) ? current[code] : DEFAULT_STYLE), ...patch },
-  }));
-  const preview: CredentialLabelData = {
+  const changeStyle = (code: string, patch: Partial<LabelFieldStyle>) => {
+    setIsEditing(true);
+    setFormat((current) => ({
+      ...current,
+      [code]: { ...(Object.prototype.hasOwnProperty.call(current, code) ? current[code] : DEFAULT_STYLE), ...patch },
+    }));
+  };
+  // A impressão utiliza o modelo persistido da categoria ou, se ausente,
+  // a configuração histórica de etiqueta do evento (CheckInService).
+  // Ao editar, mostramos na MESMA prévia o rascunho, sinalizando que não está em uso.
+  const selectedCategory = categories.find((item) => item.id === categoryId);
+  const savedTemplate = templates.find((item) => item.categoryId === categoryId);
+  const visibleTemplate = isEditing ? { fields: draft, styles: format } : savedTemplate;
+  const legacyValue = (code: string): string =>
+    Object.prototype.hasOwnProperty.call(SAMPLES, code) ? SAMPLES[code] : '';
+  const preview: CredentialLabelData = visibleTemplate ? {
     eventName: 'Exemplo de evento', name: null, company: null, lines: [], category: null,
-    protocol: 'EXEMPLO-0001', qr: draft.includes('qr') ? 'EVQ1.preview' : null, barcode: null,
-    widthMm, heightMm,
-    orderedContent: draft.map((code) => ({
+    protocol: 'EXEMPLO-0001',
+    qr: visibleTemplate.fields.includes('qr') ? 'EVQ1.preview' : null,
+    barcode: null, widthMm, heightMm,
+    orderedContent: visibleTemplate.fields.map((code) => ({
       code, kind: code === 'qr' ? 'qr' as const : 'text' as const,
       value: code === 'qr' ? '' : sample(code),
-      style: ownStyle(code),
+      style: Object.prototype.hasOwnProperty.call(visibleTemplate.styles ?? {}, code)
+        ? visibleTemplate.styles?.[code] : undefined,
     })),
+  } : {
+    eventName: 'Exemplo de evento',
+    name: labelConfig.showName ? legacyValue(labelConfig.nameField) || SAMPLES.preferred_name : null,
+    company: labelConfig.showCompany ? legacyValue(labelConfig.companyField) || null : null,
+    lines: labelConfig.extraFields.map(legacyValue).filter(Boolean),
+    category: labelConfig.showCategory ? selectedCategory?.name ?? 'Categoria' : null,
+    protocol: 'EXEMPLO-0001', codeMode: labelConfig.codeMode,
+    qr: labelConfig.codeMode === 'BARCODE' ? null : 'EVQ1.preview',
+    barcode: labelConfig.codeMode === 'QR' ? null : 'EVB1.preview',
+    widthMm, heightMm,
   };
 
   async function save() {
@@ -166,17 +196,16 @@ export default function CredentialCategoryTemplates({
       ? <p role="status">Crie uma categoria em Inscrições e vendas para configurar sua etiqueta.</p>
       : <>
         <label className={styles.category}>Categoria do evento
-          <select value={categoryId} disabled={busy} onChange={(event) => setCategoryId(event.target.value)}>
+          <select value={categoryId} disabled={busy} onChange={(event) => { setIsEditing(false); setCategoryId(event.target.value); }}>
             {categories.map((category) => <option value={category.id} key={category.id}>{category.name}</option>)}
           </select>
         </label>
         <div className={styles.columns}>
           <div className={styles.editor}>
             <h4>Campos da etiqueta</h4>
-            {!templates.some((item) => item.categoryId === categoryId) && <p role="status">
-              Esta categoria ainda usa a etiqueta histórica configurada em Papel, dimensões e códigos.
-              A prévia abaixo mostra o novo modelo em edição; ele só substituirá o histórico
-              desta categoria depois de salvar. Os outros modelos e o tamanho do papel não serão alterados.
+            {!savedTemplate && <p role="status">
+              Esta categoria utiliza a etiqueta histórica enquanto não existir modelo personalizado salvo.
+              Configure os campos aqui e salve para ativar o modelo da categoria. O tamanho do papel permanece compartilhado.
             </p>}
             <p>Organize de cima para baixo com as setas. Em cada campo, escolha alinhamento, negrito, cor, família e tamanho da fonte. A prévia acompanha as mudanças.</p>
             {draft.length === 0 && <p>Nenhum campo selecionado. Adicione um campo abaixo.</p>}
@@ -190,7 +219,7 @@ export default function CredentialCategoryTemplates({
                     aria-label={`Descer ${display(code)}`} onClick={() => move(index, 1)}>↓</button>
                   <button type="button" disabled={busy || !organizer}
                     aria-label={`Remover ${display(code)}`}
-                    onClick={() => setDraft((current) => current.filter((item) => item !== code))}>Remover</button>
+                    onClick={() => { setIsEditing(true); setDraft((current) => current.filter((item) => item !== code)); }}>Remover</button>
                 </div>
                 <div className={styles.formatBar} role="group" aria-label={`Formatação de ${display(code)}`}>
                   <label>Alinhamento
@@ -235,19 +264,24 @@ export default function CredentialCategoryTemplates({
                 </select>
               </label>
               <button type="button" disabled={busy || !organizer || !selectedField || draft.length >= 12}
-                onClick={() => { setDraft((current) => [...current, selectedField]); setSelectedField(''); }}>Adicionar campo</button>
+                onClick={() => { setIsEditing(true); setDraft((current) => [...current, selectedField]); setSelectedField(''); }}>Adicionar campo</button>
             </div>
             <div className={styles.footer}>
               <button type="button" disabled={busy || !organizer}
-                onClick={() => { setDraft([...DEFAULT]); setFormat({}); }}>Restaurar padrão</button>
+                onClick={() => { setIsEditing(true); setDraft([...DEFAULT]); setFormat({}); }}>Restaurar padrão</button>
               <button type="button" disabled={busy || !organizer} onClick={() => void save()}>
                 {busy ? 'Salvando…' : 'Salvar modelo da categoria'}
               </button>
             </div>
           </div>
           <aside className={styles.preview} aria-label="Prévia do crachá da categoria">
-            <h4>Prévia do modelo em edição · {categories.find((item) => item.id === categoryId)?.name}</h4>
-            <p>Dados fictícios apenas para visualização; dimensão {widthMm / 10} × {heightMm / 10} cm.</p>
+            <h4>Prévia única da impressão · {selectedCategory?.name}</h4>
+            <p role="status">{isEditing
+              ? 'Rascunho não salvo. A impressão continua usando a configuração anterior até você salvar este modelo.'
+              : savedTemplate
+                ? 'Modelo salvo e utilizado na impressão desta categoria.'
+                : 'Etiqueta histórica em uso nesta categoria (sem modelo próprio salvo).'}</p>
+            <p>Dados fictícios para visualização · {widthMm / 10} × {heightMm / 10} cm. A impressão utiliza dados reais da inscrição.</p>
             <CredentialLabel label={preview} preview />
           </aside>
         </div>
