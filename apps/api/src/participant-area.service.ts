@@ -156,6 +156,58 @@ export class ParticipantAreaService {
     return { eventId: session.eventId, organizationId: session.organizationId, reservationId: session.reservationId };
   }
 
+  async eventCommunicationConsent(slugValue: string, authorization?: string) {
+    const session = await this.requireSession(slugValue, authorization);
+    const scope = { id: session.reservationId, eventId: session.eventId, organizationId: session.organizationId };
+    const row = await this.prisma.eventRegistrationReservation.findUnique({
+      where: { id_eventId_organizationId: scope }, select: { registrationData: true },
+    });
+    if (!row) throw new UnauthorizedException('Sessão inválida ou expirada.');
+    const data = row.registrationData;
+    return { eventId: scope.eventId, consented: Boolean(data && typeof data === 'object'
+      && !Array.isArray(data) && data.event_communications_consent === true) };
+  }
+
+  async revokeEventCommunicationConsent(slugValue: string, authorization?: string) {
+    const session = await this.requireSession(slugValue, authorization);
+    const scope = { id: session.reservationId, eventId: session.eventId, organizationId: session.organizationId };
+    return this.prisma.$transaction(async tx => {
+      const active = await tx.participantAccessSession.findFirst({
+        where: { id: session.id, revokedAt: null, expiresAt: { gt: new Date() },
+          reservationId: scope.id, eventId: scope.eventId, organizationId: scope.organizationId },
+        select: { id: true },
+      });
+      if (!active) throw new UnauthorizedException('Sessão inválida ou expirada.');
+      // Serialize with changes to this registration. The outbox is currently
+      // PREPARED only; its eventual sender must recheck live consent before POST.
+      const locked = await tx.$queryRaw<Array<{ id: string }>>`
+        SELECT id FROM "EventRegistrationReservation"
+        WHERE id = ${scope.id} AND "eventId" = ${scope.eventId}
+          AND "organizationId" = ${scope.organizationId} FOR UPDATE`;
+      if (!locked.length) throw new UnauthorizedException('Sessão inválida ou expirada.');
+      const row = await tx.eventRegistrationReservation.findUniqueOrThrow({
+        where: { id_eventId_organizationId: scope }, select: { registrationData: true },
+      });
+      const data = row.registrationData && typeof row.registrationData === 'object'
+        && !Array.isArray(row.registrationData) ? row.registrationData : {};
+      if (data.event_communications_consent !== true) {
+        return { eventId: scope.eventId, consented: false, revoked: false };
+      }
+      await tx.eventRegistrationReservation.update({
+        where: { id_eventId_organizationId: scope },
+        data: { registrationData: { ...data, event_communications_consent: false } as Prisma.InputJsonObject,
+          registrationRevision: { increment: 1 } },
+      });
+      await tx.auditLog.create({ data: {
+        organizationId: scope.organizationId, eventId: scope.eventId,
+        action: 'participant.event_communications_consent_revoked',
+        entityType: 'EventRegistrationReservation', entityId: scope.id,
+        metadata: { consentCode: 'event_communications_consent' },
+      } });
+      return { eventId: scope.eventId, consented: false, revoked: true };
+    });
+  }
+
   async revoke(slugValue: string, authorization?: string) {
     const session = await this.requireSession(slugValue, authorization);
     const now = new Date();
