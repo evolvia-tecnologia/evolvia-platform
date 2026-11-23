@@ -130,3 +130,16 @@ test('bloqueia prévia de texto comprimido a cerca de metade antes da impressão
    'texto reduzido em mais de 35% não deve ser impresso automaticamente');
  assert.ok(nodes(preview).some(node=>node.props?.role==='alert'));
 });
+
+
+test('QR e barras ordenados usam um único layout e bloqueiam ausência do código ou falta de espaço', () => {
+  const both={...base, widthMm:90, heightMm:40, name:null, company:null, category:null, lines:[],
+    barcode:'EVB1.demo', orderedContent:[{code:'preferred_name',kind:'text',value:'Bia'},
+      {code:'qr',kind:'qr',value:''}, {code:'barcode',kind:'barcode',value:''}]};
+  const sheet=nodes(Label({label:both,preview:true})).find(n=>n.type==='section');
+  assert.equal(sheet.props['data-fit-warning'],false);
+  assert.ok(nodes(Label({label:both,preview:true})).some(n=>n.props?.className==='orderedBarcode'));
+  assert.equal(nodes(Label({label:{...both,barcode:null},preview:true})).find(n=>n.type==='section').props['data-fit-warning'],true);
+  assert.equal(nodes(Label({label:{...both,qr:null},preview:true})).find(n=>n.type==='section').props['data-fit-warning'],true);
+  assert.equal(nodes(Label({label:{...both,heightMm:20,widthMm:40},preview:true})).find(n=>n.type==='section').props['data-fit-warning'],true);
+});
