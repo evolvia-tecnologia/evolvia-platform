@@ -156,6 +156,25 @@ export class ParticipantAreaService {
     return { eventId: session.eventId, organizationId: session.organizationId, reservationId: session.reservationId };
   }
 
+  async revoke(slugValue: string, authorization?: string) {
+    const session = await this.requireSession(slugValue, authorization);
+    const now = new Date();
+    await this.prisma.$transaction(async (tx) => {
+      await tx.participantAccessSession.update({ where: { id: session.id }, data: { revokedAt: now } });
+      await tx.auditLog.create({
+        data: {
+          organizationId: session.organizationId,
+          eventId: session.eventId,
+          action: 'participant.session_revoked',
+          entityType: 'ParticipantAccessSession',
+          entityId: session.id,
+          metadata: {} as Prisma.InputJsonObject,
+        },
+      });
+    });
+    return { revoked: true };
+  }
+
   async eventCommunicationConsent(slugValue: string, authorization?: string) {
     const session = await this.requireSession(slugValue, authorization);
     const scope = { id: session.reservationId, eventId: session.eventId, organizationId: session.organizationId };
@@ -206,25 +225,6 @@ export class ParticipantAreaService {
       } });
       return { eventId: scope.eventId, consented: false, revoked: true };
     });
-  }
-
-  async revoke(slugValue: string, authorization?: string) {
-    const session = await this.requireSession(slugValue, authorization);
-    const now = new Date();
-    await this.prisma.$transaction(async (tx) => {
-      await tx.participantAccessSession.update({ where: { id: session.id }, data: { revokedAt: now } });
-      await tx.auditLog.create({
-        data: {
-          organizationId: session.organizationId,
-          eventId: session.eventId,
-          action: 'participant.session_revoked',
-          entityType: 'ParticipantAccessSession',
-          entityId: session.id,
-          metadata: {} as Prisma.InputJsonObject,
-        },
-      });
-    });
-    return { revoked: true };
   }
 
   async getEditableRegistration(slugValue: string, authorization?: string) {
