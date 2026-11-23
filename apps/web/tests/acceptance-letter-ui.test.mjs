@@ -2,11 +2,12 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 
-const [panel, area, letters, policy] = await Promise.all([
+const [panel, area, letters, policy, submissions] = await Promise.all([
   readFile(new URL('../components/scientific-author-panel.tsx', import.meta.url), 'utf8'),
   readFile(new URL('../components/participant-area.tsx', import.meta.url), 'utf8'),
   readFile(new URL('../components/scientific-decision-letters.tsx', import.meta.url), 'utf8'),
   readFile(new URL('../../api/src/acceptance-letter.policy.ts', import.meta.url), 'utf8'),
+  readFile(new URL('../components/scientific-submissions.tsx', import.meta.url), 'utf8'),
 ]);
 
 test('a carta fica na área do autor aceito ou recusado e a EVA não promete e-mail', () => {
@@ -17,6 +18,25 @@ test('a carta fica na área do autor aceito ou recusado e a EVA não promete e-m
   assert.match(panel, /Ver carta de recusa/u);
   assert.match(panel, /PublicRichText/u);
   assert.match(panel, /carta-de-recusa/u);
+  assert.match(panel, /decision-letter\/receipt/u);
+  assert.match(panel, /DOWNLOADED/u);
+  assert.match(panel, /Não enviamos e-mail/u);
+  const open = panel.slice(panel.indexOf('async function openLetter('), panel.indexOf('async function downloadLetter('));
+  assert.ok(open.indexOf("setLetter(null)") < open.indexOf('decision-letter'));
+  assert.ok(open.indexOf("setLetterReceipt('')") < open.indexOf('decision-letter'));
+  // Resposta lenta / troca de sessão: só aplica carta se o contexto ainda for o atual.
+  const openStill = [...open.matchAll(/if \(!stillCurrent\(context\)\) return;/gu)];
+  assert.equal(openStill.length, 2);
+  assert.ok(open.indexOf('if (!stillCurrent(context)) return;') < open.indexOf('setLetter({'));
+  assert.match(open, /payload\.message === 'string' \? payload\.message : 'Não foi possível abrir a carta\.'/u);
+  assert.match(open, /catch \(caught\)[\s\S]*setLetter\(null\)[\s\S]*setLetterReceipt\(''\)/u);
+  const download = panel.slice(panel.indexOf('async function downloadLetter('), panel.indexOf('async function uploadEposter('));
+  assert.match(download, /new Blob\(\[payload\.text\]/u);
+  assert.ok(download.indexOf('if (!stillCurrent(context)) return;') < download.indexOf('link.click()'));
+  assert.ok(download.indexOf("action !== 'DOWNLOADED'") < download.indexOf('link.click()'));
+  // Erro no download: mensagem ao usuário e sem disparar o clique do arquivo.
+  assert.match(download, /catch \(caught\)[\s\S]*setError\([\s\S]*Não foi possível baixar a carta/u);
+  assert.ok(download.indexOf('catch (caught)') > download.indexOf('link.click()'));
   assert.match(area, /Não mostro parecer, nota ou o trabalho de outra pessoa/u);
   assert.match(area, /aceita ou recusa/u);
   assert.match(area, /A EVA não envia e-mail nem parecer/u);
@@ -39,4 +59,9 @@ test('o organizador formata aceite e recusa com as mesmas tags da política', ()
   assert.match(letters, /\{CODIGO\}/u);
   assert.equal(letters.match(/<ScientificEvaHelp/gu)?.length, 1);
   assert.doesNotMatch(letters, /organizationId|parecerista|e-mail do autor/iu);
+  assert.match(submissions, /A entrega acontece na área do autor/u);
+  assert.match(submissions, /Não enviamos e-mail/u);
+  assert.match(submissions, /Vista na área do autor/u);
+  assert.match(submissions, /Baixada na área do autor/u);
+  assert.doesNotMatch(submissions, /mailto:|nodemailer/iu);
 });
