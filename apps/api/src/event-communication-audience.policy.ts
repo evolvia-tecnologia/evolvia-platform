@@ -41,3 +41,10 @@ export function uniqueCommunicationContacts(rows: { registrationData: unknown }[
   }
   return { contacts, missingEmail, duplicates };
 }
+
+// Explicit event-specific opt-in. Missing, false or string values never authorize
+// a bulk campaign (transactional confirmation/author notices use other policies).
+export function hasCommunicationOptIn(registrationData: unknown): boolean {
+  return Boolean(registrationData && typeof registrationData === 'object' && !Array.isArray(registrationData)
+    && (registrationData as Record<string, unknown>).communication_opt_in === true);
+}
