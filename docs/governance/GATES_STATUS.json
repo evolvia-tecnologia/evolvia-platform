@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
   "baseline": "Gates v1 — 93 unidades e pesos preservados; reconciliação do Git em 08/10/2026",
-  "sourceSha": "865bf03f2315642612c1e251559701bca87a993e",
-  "ciRun": null,
+  "sourceSha": "393ab9930d205dcb592cbf283b55c3fd1d2d86e3",
+  "ciRun": "45105953160 (G5.8 I/T; não atesta deploy/aceite global)",
   "deployJob": null,
   "gateStatus": "0/11 encerrados; sem Go de produção",
   "publicAcceptance": {
@@ -642,20 +642,20 @@
         {
           "id": "G5.8",
           "criterion": "Aviso ao autor após submissão/correção",
-          "integrated": false,
-          "ci": false,
+          "integrated": true,
+          "ci": true,
           "deployed": false,
           "accepted": false,
-          "evidence": "A #610 em 6ba3ed58 implementa candidato para avisos ao autor com opt-in. O GitHub mantém a PR aberta.",
-          "next": "Gemini deve revisar o delta atual e comprovar entrega autorizada, isolamento por evento e idempotência.",
-          "implementationState": "Avisos em PR",
-          "ciSourceSha": null
+          "evidence": "PR #610 integrada em develop@71cb31fef5ae32cfe75e35ddee9a31c458ebbb38; claim PostgreSQL concorrente PR #708 integrado por squash em develop@393ab9930d205dcb592cbf283b55c3fd1d2d86e3; CI #45105953160 COMPLETED/SUCCESS (qualidade, PostgreSQL, ARM64), 0 threads. Evidência I/T de código e CI, não de envio externo, deploy ou aceite.",
+          "next": "Validar fluxo autorizado e destinatário/opt-in em homologação com SHA servido; confirmar timeout/crash UNKNOWN e dois workers; D/F permanecem falsos.",
+          "implementationState": "Integrado (I/T; D/F pendentes)",
+          "ciSourceSha": "393ab9930d205dcb592cbf283b55c3fd1d2d86e3"
         }
       ],
-      "points": 21,
+      "points": 23,
       "total": 32,
-      "percent": 65.625,
-      "implementationPercent": 87.5
+      "percent": 71.875,
+      "implementationPercent": 100
     },
     {
       "id": 6,
@@ -1327,8 +1327,8 @@
       "implementationPercent": 100
     }
   ],
-  "globalPercent": 71.73971861471863,
-  "globalImplementationPercent": 95.77922077922076,
+  "globalPercent": 72.30790043290044,
+  "globalImplementationPercent": 96.9155844155844,
   "ciSourceSha": null,
   "sourceTreeSha": "24dacfd558543ad3d6643759c7a9c55c4ef425fa",
   "auditedAtUtc": "2026-11-19T11:12:33.964Z",
@@ -1340,7 +1340,7 @@
     "ciRun": 40272157015,
     "deployJob": 121414197364
   },
-  "integratedCriteria": 88,
+  "integratedCriteria": 89,
   "criteriaCount": 93,
   "methodNote": "Reconciliação de 19/11 validada novamente após a integração #680 em 20/11. G2.10 (#471) e G10.10 (#642) sustentam I/T/D. #680 melhora UX e declara que não conclui G2.11; #694 somente simulação (moneyReturned:false). Não dar novo crédito a G2.11/G2.13/G2.14/G5.8/G6.8 nem a refinamentos de critérios existentes; para G7.4 vale a reconciliação pontual comprovada após #518. Revisão do HEAD develop e evidências não equivale a homologação/Go de produção.\nReconciliação pontual após merge #518: G7.4 recebeu SOMENTE I e T por código integrado + CI PostgreSQL/ARM64. D=0/F=0 porque gate público #108 falhou após publicação e não há jornada autenticada/aceite do autor. Evidências PR #518 e workflows 44958147485 / 45086466534. 0/11 Gates encerrados; sem Go.",
   "lastCrossCheck": {
