@@ -104,7 +104,7 @@ test('QR sem formatação explícita mostra centralizado no editor e preserva al
     read('../components/credential-label.tsx'),
   ]);
   assert.ok(editor.includes("const DEFAULT_QR_STYLE: LabelFieldStyle = { ...DEFAULT_STYLE, align: 'center' };"));
-  assert.ok(editor.includes("code === 'qr' ? DEFAULT_QR_STYLE : DEFAULT_STYLE"));
+  assert.ok(editor.includes("code === 'qr' || code === 'barcode' ? DEFAULT_QR_STYLE : DEFAULT_STYLE"));
   assert.match(editor, /style: Object\.prototype\.hasOwnProperty\.call\(visibleTemplate\.styles \?\? \{\}, code\)/u,
     'a prévia aplicada deve preservar o estilo persistido por categoria');
   assert.ok(label.includes('style={item.style?.align ? { justifySelf:'));
@@ -300,4 +300,21 @@ test('controles de cada campo expõem grupos nomeados e checkbox Negrito context
   assert.match(editor, /className=\{styles\.actions\} role="group" aria-label=\{`Alterar a ordem de \$\{display\(code\)\}`\}/u);
   assert.match(editor, /className=\{styles\.formatBar\} role="group" aria-label=\{`Formatação de \$\{display\(code\)\}`\}/u);
   assert.match(editor, /type="checkbox" aria-label=\{`Negrito de \$\{display\(code\)\}`\}/u);
+});
+
+
+test('campo de código da categoria oferece QR, barras e ambos sem segunda prévia', async () => {
+  const [editor, policy, label] = await Promise.all([
+    read('../components/credential-category-templates.tsx'),
+    read('../../api/src/credential-category-template.policy.ts'),
+    read('../components/credential-label.tsx'),
+  ]);
+  assert.match(editor, /<option value="QR">Somente QR Code<\/option>/u);
+  assert.match(editor, /<option value="BARCODE">Somente código de barras<\/option>/u);
+  assert.match(editor, /<option value="BOTH">Código de barras e QR Code<\/option>/u);
+  assert.match(editor, /visibleTemplate\.fields\.includes\('barcode'\)/u);
+  assert.match(policy, /code === 'barcode'/u);
+  assert.match(label, /item\.kind === 'barcode'/u);
+  assert.match(label, /missingOrderedBarcode/u);
+  assert.equal((editor.match(/<CredentialLabel label=\{preview\} preview/g) ?? []).length, 1);
 });

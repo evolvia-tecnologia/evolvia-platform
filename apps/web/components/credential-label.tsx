@@ -8,7 +8,7 @@ import styles from './credential-label.module.css';
 
 export type CredentialLabelData = {
   eventName: string;
-  orderedContent?: Array<{ code: string; kind: 'text' | 'qr'; value: string; style?: { align: 'left' | 'center' | 'right'; bold: boolean; color: string; fontFamily?: 'sans' | 'serif' | 'mono'; fontSizeMm?: number } }>;
+  orderedContent?: Array<{ code: string; kind: 'text' | 'qr' | 'barcode'; value: string; style?: { align: 'left' | 'center' | 'right'; bold: boolean; color: string; fontFamily?: 'sans' | 'serif' | 'mono'; fontSizeMm?: number } }>;
   name: string | null;
   company: string | null;
   lines: string[];
@@ -36,6 +36,8 @@ export function credentialLabelLayout(label: CredentialLabelData) {
   const emptyOrdered = Boolean(ordered && ordered.length === 0);
   const firstTextIndex = ordered?.findIndex((item) => item.kind === 'text') ?? -1;
   const hasBarcode = Boolean(label.barcode) && !ordered;
+  const hasOrderedBarcode = Boolean(ordered?.some((item) => item.kind === 'barcode')) && Boolean(label.barcode);
+  const missingOrderedBarcode = Boolean(ordered?.some((item) => item.kind === 'barcode')) && !label.barcode;
   const hasOrderedQr = Boolean(ordered?.some((item) => item.kind === 'qr')) && Boolean(label.qr);
   // A categoria pediu QR, mas o servidor não entregou o token: jamais imprimir um crachá sem código.
   const missingOrderedQr = Boolean(ordered?.some((item) => item.kind === 'qr')) && !label.qr;
@@ -53,7 +55,7 @@ export function credentialLabelLayout(label: CredentialLabelData) {
   const approxLines = (value: string, emphasis = false) =>
     Math.max(1, Math.ceil(value.length / Math.max(5, Math.floor(textWidthMm / (emphasis ? 2.2 : 1.35)))));
   const orderedTextOnlyHeight = ordered?.reduce((height, item, index) => {
-    if (item.kind === 'qr') return height;
+    if (item.kind === 'qr' || item.kind === 'barcode') return height;
     const fontMm = item.style?.fontSizeMm ?? (index === firstTextIndex ? 4.2 : 2.4);
     const charsPerLine = Math.max(4, Math.floor(textWidthMm / (fontMm * .55)));
     return height + Math.max(1, Math.ceil(item.value.length / charsPerLine)) * fontMm * 1.15 + .6;
@@ -66,7 +68,8 @@ export function credentialLabelLayout(label: CredentialLabelData) {
   const orderedQrSize = hasOrderedQr
     ? Math.max(0, Math.min(16, label.widthMm * .34, availableHeight))
     : 0;
-  const orderedTextHeight = orderedTextOnlyHeight + orderedQrSize;
+  const orderedMediaHeight = orderedQrSize + (hasOrderedBarcode ? barcodeHeight + 1 : 0);
+  const orderedTextHeight = orderedTextOnlyHeight + orderedMediaHeight;
   const textHeight = ordered
     ? orderedTextHeight
     : 2.64 + (label.name ? approxLines(label.name, true) * 4.5 : 0)
@@ -74,23 +77,23 @@ export function credentialLabelLayout(label: CredentialLabelData) {
       + lines.reduce((height, line) => height + approxLines(line) * 2.7, 0)
       + (label.category ? approxLines(label.category) * 3.5 : 0)
       + (hasBarcode ? 2.42 : 0) + Math.max(0, rows - 1) * .6;
-  const estimatedFitRatio = ordered && hasOrderedQr
+  const estimatedFitRatio = ordered
     ? (orderedTextOnlyHeight > 0
-      ? Math.max(0, availableHeight - orderedQrSize) / orderedTextOnlyHeight
-      : 1)
+      ? Math.max(0, availableHeight - orderedMediaHeight) / orderedTextOnlyHeight
+      : orderedMediaHeight <= availableHeight ? 1 : 0)
     : availableHeight / Math.max(1, textHeight);
   const scale = Math.min(1, Math.max(.24, estimatedFitRatio));
 
   // Conservative minimum for thermal legibility: never auto-print text shrunk to 45%.
   // Physical printer validation may tighten this threshold further.
-  const fitWarning = emptyOrdered || missingOrderedQr || missingLegacyQr || missingLegacyBarcode || estimatedFitRatio < .65 || (hasOrderedQr && orderedQrSize < 12)
+  const fitWarning = emptyOrdered || missingOrderedQr || missingOrderedBarcode || missingLegacyQr || missingLegacyBarcode || estimatedFitRatio < .65 || (hasOrderedQr && orderedQrSize < 12)
     || (!ordered && Boolean(label.qr) && qrSize < 12);
-  return { ordered, emptyOrdered, firstTextIndex, hasBarcode, missingOrderedQr, missingLegacyQr, missingLegacyBarcode, scale, qrSize, orderedQrSize, barcodeHeight, fitWarning };
+  return { ordered, emptyOrdered, firstTextIndex, hasBarcode, missingOrderedQr, missingOrderedBarcode, missingLegacyQr, missingLegacyBarcode, scale, qrSize, orderedQrSize, barcodeHeight, fitWarning };
 }
 
 export default function CredentialLabel({ label, preview = false }: { label: CredentialLabelData; preview?: boolean }) {
   const lines = Array.isArray(label.lines) ? label.lines : [];
-  const { ordered, emptyOrdered, firstTextIndex, hasBarcode, missingOrderedQr, missingLegacyQr, missingLegacyBarcode, scale, qrSize, orderedQrSize, barcodeHeight, fitWarning } = credentialLabelLayout(label);
+  const { ordered, emptyOrdered, firstTextIndex, hasBarcode, missingOrderedQr, missingOrderedBarcode, missingLegacyQr, missingLegacyBarcode, scale, qrSize, orderedQrSize, barcodeHeight, fitWarning } = credentialLabelLayout(label);
   const dimensions = {
     width: `${label.widthMm}mm`, height: `${label.heightMm}mm`,
     '--label-scale': scale,
@@ -111,6 +114,9 @@ export default function CredentialLabel({ label, preview = false }: { label: Cre
       {ordered
         ? ordered.map((item, index) => item.kind === 'qr'
           ? (label.qr ? <div className={styles.orderedQr} key={`${index}-qr`} style={item.style?.align ? { justifySelf: item.style.align === 'center' ? 'center' : item.style.align === 'right' ? 'end' : 'start' } : undefined}><CredentialQr code={label.qr} compact /></div> : null)
+          : item.kind === 'barcode'
+          ? (label.barcode ? <div className={styles.orderedBarcode} key={`${index}-barcode`}
+              style={item.style?.align ? { justifySelf: item.style.align === 'center' ? 'center' : item.style.align === 'right' ? 'end' : 'start' } : undefined}><CredentialBarcode value={label.barcode} /></div> : null)
           : <p key={`${index}-${item.code}`} className={index === firstTextIndex ? styles.orderedFirst : styles.line}
               style={item.style ? { textAlign: item.style.align, fontWeight: item.style.bold ? 700 : 400, color: item.style.color,
                 fontFamily: item.style.fontFamily ? SAFE_FONTS[item.style.fontFamily] : undefined,
@@ -131,6 +137,7 @@ export default function CredentialLabel({ label, preview = false }: { label: Cre
       ? 'A etiqueta está sem campos preenchidos. Adicione um campo ou QR antes de imprimir.'
       : missingOrderedQr
       ? 'O código QR da credencial não está disponível. Não imprima esta etiqueta; tente novamente após atualizar a inscrição.'
+      : missingOrderedBarcode ? 'O código de barras da categoria não está disponível. Não imprima esta etiqueta; tente novamente após atualizar a inscrição.'
       : missingLegacyQr ? 'O código QR exigido na configuração não está disponível. Não imprima esta etiqueta; tente novamente após atualizar a inscrição.'
       : missingLegacyBarcode ? 'O código de barras exigido na configuração não está disponível. Não imprima esta etiqueta; tente novamente após atualizar a inscrição.'
       : 'Atenção: o conteúdo ou o QR pode não caber com legibilidade nesta dimensão. Aumente a etiqueta ou reduza campos e tamanho da fonte.'}</p>}
