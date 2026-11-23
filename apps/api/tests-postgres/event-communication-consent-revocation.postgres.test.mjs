@@ -70,7 +70,8 @@ test('G6.8 PG: participante revoga aceite por sessão, preserva termos e não af
   assert.equal(updated.registrationData.event_communications_consent, false);
   assert.equal(updated.registrationData.terms_acceptance, true);
   assert.equal(updated.registrationData.future_communications_consent, true);
-  assert.equal(updated.registrationRevision, 1);
+  // O registro nasce com revision=1; apenas a primeira revogação a incrementa.
+  assert.equal(updated.registrationRevision, 2);
   assert.equal((await area.eventCommunicationConsent(event.slug, 'Bearer ' + secondToken)).consented, true);
   assert.equal((await prisma.auditLog.count({ where: {
     eventId: event.id, entityId: first.id,
