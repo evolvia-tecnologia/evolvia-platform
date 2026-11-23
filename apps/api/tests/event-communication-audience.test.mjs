@@ -18,9 +18,31 @@ test('normaliza e-mails, agrupa duplicatas e informa contatos inválidos sem exp
   const result=uniqueCommunicationContacts([{registrationData:{email:' ANA@EXAMPLE.TEST ',full_name:'Ana',cpf:'secret'}},{registrationData:{email:'ana@example.test',full_name:'Duplicata'}},{registrationData:{}},{registrationData:{email:'a\n@b.test'}},{registrationData:{email:'a\u0000@b.test'}},{registrationData:{email:'b@example.test',full_name:'<Beto>'}}]);
   assert.equal(result.contacts.length,2);assert.equal(result.duplicates,1);assert.equal(result.missingEmail,3);assert.equal(result.contacts[1].name,'Beto');assert.doesNotMatch(JSON.stringify(result),/cpf|secret|Duplicata/);
 });
-test('PAID exige fato financeiro, data e valor positivo; categorias são OU em conjunto E',async()=>{
-  const h=harness();await h.service.preview('u','evt-a',{payment:'PAID',categoryIds:['cat-a']});
-  const q=h.queries[0];assert.deepEqual(q.where.AND[2],{checkout:{is:{eventId:'evt-a',organizationId:'org-a',status:'PAID',paidAt:{not:null},amountCents:{gt:0}}}});assert.deepEqual(q.where.AND[3],{categoryId:{in:['cat-a']}});
+test('PAID admite checkout individual OU pedido agrupado pago, com preço próprio positivo e escopo em todas as relações', async () => {
+  const h = harness();
+  await h.service.preview('u', 'evt-a', { payment: 'PAID', categoryIds: ['cat-a'] });
+  const paidCheckout = {
+    eventId: 'evt-a', organizationId: 'org-a', status: 'PAID',
+    paidAt: { not: null }, amountCents: { gt: 0 },
+  };
+  assert.deepEqual(h.queries[0].where.AND, [
+    { eventId: 'evt-a', organizationId: 'org-a' },
+    { status: 'CONFIRMED' },
+    {
+      finalPriceCents: { gt: 0 },
+      OR: [
+        { checkout: { is: paidCheckout } },
+        { orderEntry: { is: {
+          eventId: 'evt-a', organizationId: 'org-a', finalPriceCents: { gt: 0 },
+          order: { is: {
+            eventId: 'evt-a', organizationId: 'org-a',
+            checkout: { is: paidCheckout },
+          } },
+        } } },
+      ],
+    },
+    { categoryId: { in: ['cat-a'] } },
+  ], 'G2.10: o pagamento agrupado não pode escapar do filtro, nem misturar eventos e organizações');
 });
 test('valor zero não é marcado como pagamento no checkout',async()=>{
   const h=harness();await h.service.preview('u','evt-a',{payment:'ZERO'});assert.deepEqual(h.queries[0].where.AND[2],{finalPriceCents:0});
@@ -93,4 +115,36 @@ test('OR combina somente categoria e pagamento, dentro do escopo e das inscriç�
   await assert.rejects(h.service.preview('u', 'evt-a', { filterMode: 'OR', categoryIds: ['other'], payment: 'ZERO' }), /não pertence/);
   assert.throws(() => communicationAudienceInput({ filterMode: 'XOR' }));
   assert.throws(() => communicationAudienceInput({ audience: 'ALL_SCIENTIFIC_AUTHORS', filterMode: 'OR' }));
+});
+
+test('OR de categoria/pagamento conserva escopo, não transforma inscrição gratuita do pedido pago em PAID', async () => {
+  const h = harness();
+  await h.service.preview('u', 'evt-a', { payment: 'PAID', categoryIds: ['cat-a'], filterMode: 'OR' });
+  const query = h.queries[0].where;
+  assert.deepEqual(query.AND[0], { eventId: 'evt-a', organizationId: 'org-a' });
+  assert.deepEqual(query.AND[1], { status: 'CONFIRMED' });
+  const combined = query.AND[2].OR;
+  assert.equal(combined.length, 2, 'filtro externo combina pagamento E categoria por OU');
+  assert.deepEqual(combined[0].finalPriceCents, { gt: 0 }, 'item ZERO deve ficar fora de PAID');
+  assert.deepEqual(combined[0].OR[1].orderEntry.is.finalPriceCents, { gt: 0 },
+    'o item do pedido também precisa ter preço positivo');
+  assert.deepEqual(combined[0].OR[1].orderEntry.is.order.is.checkout.is, {
+    eventId: 'evt-a', organizationId: 'org-a', status: 'PAID',
+    paidAt: { not: null }, amountCents: { gt: 0 },
+  });
+  assert.deepEqual(combined[1], { categoryId: { in: ['cat-a'] } });
+  assert.equal(query.OR, undefined, 'nenhum OU pode ser criado fora do escopo e do status');
+  const result = await h.service.preview('u', 'evt-a', { payment: 'PAID' });
+  assert.equal(result.sendingAvailable, false, 'prévia nunca deve enviar comunicação');
+  assert.equal(h.queries[1].where.AND.length, 3);
+});
+
+test('item ZERO no pedido continua no filtro gratuito, sem depender de checkout', async () => {
+  const h = harness();
+  await h.service.preview('u', 'evt-a', { payment: 'ZERO', filterMode: 'OR' });
+  assert.deepEqual(h.queries[0].where.AND, [
+    { eventId: 'evt-a', organizationId: 'org-a' },
+    { status: 'CONFIRMED' }, { finalPriceCents: 0 },
+  ]);
+  assert.equal(h.queries[0].where.OR, undefined);
 });
