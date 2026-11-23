@@ -611,9 +611,25 @@ export class RegistrationRefundService {
       if (!locked.length) throw new NotFoundException('Pedido não encontrado.');
       const current = await tx.registrationRefundRequest.findFirst({ where, select });
       if (!current || JSON.stringify(current) !== JSON.stringify(request)) throw new ConflictException('O pedido mudou.');
+      // A first, definitively rejected HTTP 400/401/403 can be retried ONCE
+      // by an authorized OWNER who explicitly calls the processing endpoint.
+      // Ambiguous transport errors remain PROCESSING: never retry a possible
+      // successful provider POST merely because a later GET sees no refund.
+      // Match the immutable tenant/payment/amount and cap total provider POSTs at 2.
       const inserted = await tx.$executeRaw`
         INSERT INTO "SandboxRefundOperation" ("requestId","organizationId","eventId","paymentId","amountCents","attempts")
-        VALUES (${requestId},${organizationId},${eventId},${op.paymentId},${op.amountCents},${observed.matched ? 0 : 1}) ON CONFLICT ("requestId") DO NOTHING`;
+        VALUES (${requestId},${organizationId},${eventId},${op.paymentId},${op.amountCents},${observed.matched ? 0 : 1})
+        ON CONFLICT ("requestId") DO UPDATE SET
+          status = 'PROCESSING',
+          attempts = "SandboxRefundOperation".attempts + 1,
+          "nextCheckAt" = now()
+        WHERE "SandboxRefundOperation".status = 'FAILED'
+          AND "SandboxRefundOperation".attempts = 1
+          AND "SandboxRefundOperation"."organizationId" = ${organizationId}
+          AND "SandboxRefundOperation"."eventId" = ${eventId}
+          AND "SandboxRefundOperation"."paymentId" = ${op.paymentId}
+          AND "SandboxRefundOperation"."amountCents" = ${op.amountCents}
+          AND ${!observed.matched && observed.eligible}`;
       if (inserted && !observed.matched && !observed.eligible) throw new ConflictException('Cobrança indisponível para nova operação.');
       return inserted === 1 && !observed.matched;
     });
