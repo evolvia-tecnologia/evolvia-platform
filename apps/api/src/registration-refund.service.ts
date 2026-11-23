@@ -643,7 +643,7 @@ export class RegistrationRefundService {
     if (typeof header !== 'string' || !timingSafeEqual(digest(header), digest(secret))) throw new UnauthorizedException();
     const payload = input as { event?: unknown; payment?: { id?: unknown } } | null;
     if (typeof payload?.event !== 'string') throw new BadRequestException('Evento inválido.');
-    if (!['PAYMENT_REFUNDED', 'PAYMENT_PARTIALLY_REFUNDED', 'PAYMENT_REFUND_IN_PROGRESS'].includes(payload.event)) return;
+    if (!['PAYMENT_REFUNDED', 'PAYMENT_PARTIALLY_REFUNDED', 'PAYMENT_REFUND_IN_PROGRESS', 'PAYMENT_REFUND_DENIED'].includes(payload.event)) return;
     const paymentId = payload.payment?.id;
     if (typeof paymentId !== 'string' || !/^pay_[a-zA-Z0-9_-]{1,196}$/.test(paymentId)) {
       throw new BadRequestException('Referência de cobrança inválida.');
