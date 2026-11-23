@@ -13,7 +13,9 @@ export async function verifyConfirmationInbox(prisma: PrismaClient, reservationI
   const url = env.EVOLVIA_TEST_MAIL_JMAP_URL?.trim();
   if (!org?.trim() || !recipient?.trim() || !accountId?.trim() || !mailboxId?.trim() || !url ||
       !env.EVOLVIA_TEST_MAIL_TOKEN?.trim() || !sender || !publicBaseUrl || !reservationId?.trim() || !messageId?.trim()) throw new Error('Configuração de homologação incompleta.');
-  const endpoint = new URL(url);
+  let endpoint: URL;
+  try { endpoint = new URL(url); }
+  catch { throw new Error('Endpoint de caixa inválido.'); }
   if (endpoint.protocol !== 'https:' || endpoint.username || endpoint.password || endpoint.search || endpoint.hash) throw new Error('Endpoint de caixa inválido.');
   const row = await prisma.eventRegistrationReservation.findFirst({ where: { id: reservationId, organizationId: org,
     event: { organizationId: org } }, select: { eventId: true, protocol: true, registrationData: true, event: { select: { slug: true } } } });
@@ -50,8 +52,9 @@ export async function verifyConfirmationInbox(prisma: PrismaClient, reservationI
 export async function runInboxVerification() {
   const prisma = new PrismaClient();
   try { console.log(JSON.stringify(await verifyConfirmationInbox(prisma, process.argv[2], process.argv[3]))); }
+  // Não registrar erros brutos: o transporte pode incluir endpoint, tokens, SQL ou PII.
   catch { console.error('Recebimento na caixa de homologação não comprovado.'); process.exitCode = 1; }
   finally { await prisma.$disconnect(); }
 }
 
-if (require.main === module) void runInboxVerification();
+// A execução CLI fica exclusivamente no script ESM verify-confirmation-inbox.mjs.
