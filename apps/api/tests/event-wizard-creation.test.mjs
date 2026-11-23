@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { EventWizardService } from '../dist/event-wizard.service.js';
 import { getWizardCompletionIssues } from '../dist/wizard-policy.js';
+import { agendaResultante } from '../dist/wizard-save-policy.js';
 
 function serviceWith(transaction) {
   const prisma = { $transaction: transaction };
@@ -204,17 +205,46 @@ test('Autosave mantém rascunho privado; conclusão gera sigla e código públic
     },
   };
 
-  await service.persistEventData(tx, 'evt-1', { name: 'C' });
+  // `persistEventData` passou a receber a agenda já calculada e validada, antes
+  // de `publishSlug`. A fixture monta essa agenda com a MESMA função que o
+  // serviço usa, em vez de descrever a estrutura à mão: fixture que inventa o
+  // contrato passa a verde enquanto o contrato muda embaixo dela.
+  //
+  // Autosave de nome não mexe em data: nenhum dos dois campos entra no update.
+  const agendaSemDatas = agendaResultante({ name: 'C' }, { startDate: null, endDate: null });
+  assert.deepEqual(
+    [agendaSemDatas.gravaStartDate, agendaSemDatas.gravaEndDate],
+    [false, false],
+    'pré-condição: salvar só o nome não escreve data nenhuma',
+  );
+
+  await service.persistEventData(tx, 'evt-1', { name: 'C' }, agendaSemDatas);
   assert.equal(changes[0].slug, undefined);
+  assert.equal('startDate' in changes[0], false, 'autosave de nome não toca no início');
+  assert.equal('endDate' in changes[0], false, 'autosave de nome não toca no término');
   assert.match(currentSlug, /^rascunho-[a-f0-9]{24}$/u);
 
-  await service.persistEventData(tx, 'evt-1', { name: 'Congresso Brasileiro de Inovação' }, true);
+  await service.persistEventData(tx, 'evt-1', { name: 'Congresso Brasileiro de Inovação' }, agendaSemDatas, true);
   assert.match(changes[1].slug, /^cbi-[a-f0-9]{12}$/u);
   const publicSlug = changes[1].slug;
 
-  await service.persistEventData(tx, 'evt-1', { name: 'Congresso de Inovação Atualizado' }, true);
+  await service.persistEventData(tx, 'evt-1', { name: 'Congresso de Inovação Atualizado' }, agendaSemDatas, true);
   assert.equal(changes[2].slug, undefined);
   assert.equal(currentSlug, publicSlug);
+
+  // Os asserts acima NÃO fixam a ordem dos dois últimos argumentos: com
+  // `agenda` e `publishSlug` trocados, `agenda` virava `true`, nenhuma data era
+  // escrita e a sigla saía igual. Uma agenda que GRAVA data é o que distingue a
+  // posição correta — e foi assim que a fixture antiga passou a verde por três
+  // chamadas enquanto o contrato já havia mudado.
+  const agendaComDatas = agendaResultante(
+    { startDate: '2026-12-10T12:00:00.000Z', endDate: '2026-12-12T12:00:00.000Z' },
+    { startDate: null, endDate: null },
+  );
+  await service.persistEventData(tx, 'evt-1', { name: 'Congresso de Inovação Atualizado' }, agendaComDatas);
+  assert.equal(changes[3].startDate?.toISOString(), '2026-12-10T12:00:00.000Z');
+  assert.equal(changes[3].endDate?.toISOString(), '2026-12-12T12:00:00.000Z');
+  assert.equal(changes[3].slug, undefined, 'sem publishSlug, o autosave não publica o código');
 });
 
 test('API deriva perfil e organização do evento, ignorando campos forjados no navegador', () => {

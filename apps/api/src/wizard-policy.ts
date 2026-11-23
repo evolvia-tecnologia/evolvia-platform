@@ -7,6 +7,12 @@ import {
 } from '@prisma/client';
 import { PUBLIC_SUBJECT_AREAS } from './event-publication/public-discovery.policy';
 import { normalizeEventTimeZone } from './time-zone-policy';
+import { getWizardSaveIssues, subjectAreasToPersist } from './wizard-save-policy';
+
+// Reexportadas para que quem já as importava daqui continue funcionando. A
+// definição vive em `wizard-save-policy.ts`, que não tem dependência nenhuma e
+// por isso pode ser exercitado sem build — este arquivo, não.
+export { getWizardSaveIssues, subjectAreasToPersist };
 
 export const PUBLIC_SUBJECT_AREA_IDS = PUBLIC_SUBJECT_AREAS.map((area) => area.id);
 
@@ -135,7 +141,7 @@ function normalizeEstimatedAudience(value: unknown): number | null | undefined {
 }
 
 function profileKey(eventType?: string): string {
-  return (eventType ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  return (eventType ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 }
 
 export const CANONICAL_EVENT_TYPE_PROFILES = [
@@ -320,7 +326,9 @@ export function getWizardCompletionIssues(answers: WizardAnswers): string[] {
   if (!answers.name || answers.name.trim().length < 3) issues.push('Informe um nome com pelo menos 3 caracteres.');
   if (!answers.startDate && !answers.datesPending) issues.push('Informe a data de início ou marque que será definida depois.');
   if (!answers.timeZone) issues.push('Escolha o fuso horário do evento.');
-  if (answers.startDate && answers.endDate && new Date(answers.endDate) < new Date(answers.startDate)) issues.push('A data de término não pode ser anterior à data de início.');
+  // Mesma regra de `save()`, chamada e não repetida: duas cópias da comparação
+  // seriam duas chances de divergirem.
+  issues.push(...getWizardSaveIssues(answers));
   if (!answers.venue && !answers.venuePending) issues.push('Informe o local ou marque que será definido depois.');
   if (!answers.registrationMode) issues.push('Escolha o modelo de inscrição.');
   if (!answers.capabilities?.includes('registration')) issues.push('A capacidade de inscrições é obrigatória.');

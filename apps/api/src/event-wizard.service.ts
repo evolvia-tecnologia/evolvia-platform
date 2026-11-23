@@ -33,6 +33,13 @@ import {
   publicWizardSession,
   type WizardAnswers,
 } from './wizard-policy';
+import {
+  agendaResultante,
+  getAgendaSaveIssues,
+  getWizardSaveIssues,
+  subjectAreasToPersist,
+  type AgendaResultante,
+} from './wizard-save-policy';
 
 @Injectable()
 export class EventWizardService {
@@ -150,9 +157,21 @@ export class EventWizardService {
     const event = await this.requireReadableEvent(userId, eventId);
     this.mutationPolicy.assertFoundationMutable(event.status);
     const answers = this.normalizeAnswersForEvent(event, dto.answers);
+    // Salvar rascunho aceita resposta parcial, mas não aceita resposta
+    // INCOERENTE: gravar término anterior ao início e responder 200 é aceitar
+    // um estado que nenhuma tela consegue mostrar direito depois.
+    //
+    // Validar `answers` não bastava: o corpo é parcial, então "mandei apenas o
+    // término" não tinha o início para comparar e passava — e em seguida a
+    // escrita gravava o término sem tocar no início, persistindo o intervalo
+    // invertido com 200. A regra tem de ler como o evento FICA, e a escrita tem
+    // de usar o MESMO cálculo: é isso que `agendaResultante` centraliza.
+    const agenda = agendaResultante(answers, event);
+    const saveIssues = getAgendaSaveIssues(agenda);
+    if (saveIssues.length > 0) throw new BadRequestException(saveIssues);
 
     await this.prisma.$transaction(async (tx) => {
-      await this.persistEventData(tx, event.id, answers);
+      await this.persistEventData(tx, event.id, answers, agenda);
       await this.auditTimeZoneChange(tx, userId, event, answers);
       await this.syncCapabilities(tx, event.id, answers.capabilities ?? []);
 
@@ -188,11 +207,19 @@ export class EventWizardService {
     const event = await this.requireReadableEvent(userId, eventId);
     const nextStatus = this.mutationPolicy.statusAfterFoundationCompletion(event.status);
     const answers = this.normalizeAnswersForEvent(event, dto.answers);
-    const issues = getWizardCompletionIssues(answers);
+    const agenda = agendaResultante(answers, event);
+    // `getWizardCompletionIssues` compara as datas do CORPO. Concluir é o portão
+    // da publicação, então aqui a comparação do RESULTADO vale sempre, inclusive
+    // com corpo sem data e intervalo já invertido no banco. O Set remove a
+    // duplicata quando as duas apontam o mesmo problema.
+    const issues = [...new Set([
+      ...getWizardCompletionIssues(answers),
+      ...getWizardSaveIssues(agenda),
+    ])];
     if (issues.length > 0) throw new BadRequestException(issues);
 
     await this.prisma.$transaction(async (tx) => {
-      await this.persistEventData(tx, event.id, answers, true);
+      await this.persistEventData(tx, event.id, answers, agenda, true);
       await this.auditTimeZoneChange(tx, userId, event, answers);
       await this.syncCapabilities(tx, event.id, answers.capabilities ?? []);
 
@@ -262,6 +289,10 @@ export class EventWizardService {
       ...requested,
       organizationId: event.organizationId ?? undefined,
       profileCode: canonical?.profileCode ?? event.profileCode ?? undefined,
+      // Corpo sem áreas NÃO pede apagamento. Sem isto, qualquer salvamento
+      // parcial zerava `subjectAreas` do evento, inclusive as definidas pela
+      // rota dedicada `PATCH /events/:eventId/subject-areas`.
+      subjectAreas: subjectAreasToPersist(requested.subjectAreas, event.subjectAreas),
     });
   }
 
@@ -378,6 +409,7 @@ export class EventWizardService {
     tx: Prisma.TransactionClient,
     eventId: string,
     answers: WizardAnswers,
+    agenda: AgendaResultante,
     publishSlug = false,
   ) {
     const data: Prisma.EventUpdateInput = {};
@@ -393,8 +425,11 @@ export class EventWizardService {
         }
       }
     }
-    if (answers.startDate || answers.datesPending) data.startDate = answers.startDate ? new Date(answers.startDate) : null;
-    if (answers.endDate || answers.datesPending) data.endDate = answers.endDate ? new Date(answers.endDate) : null;
+    // As duas guardas que decidiam isto aqui viraram `agenda.grava*`, calculado
+    // uma vez e já validado. A escrita não recalcula: se recalculasse, voltaria
+    // a poder divergir da validação — que foi exatamente o defeito.
+    if (agenda.gravaStartDate) data.startDate = agenda.startDate ? new Date(agenda.startDate) : null;
+    if (agenda.gravaEndDate) data.endDate = agenda.endDate ? new Date(agenda.endDate) : null;
     if (answers.timeZone) data.timeZone = answers.timeZone;
     if (answers.venue !== undefined || answers.venuePending) data.venue = answers.venue ?? null;
     if (answers.estimatedAudience !== undefined || answers.audiencePending) {
