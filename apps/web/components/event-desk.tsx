@@ -70,6 +70,8 @@ type Person = {
 };
 type Badge = CredentialLabelData;
 type DeskMode = 'search' | 'reader' | 'register' | 'settings' | 'labels' | 'report' | 'print' | 'raffle' | 'kiosk' | 'kit' | 'kit-report';
+// Stable fallback prevents reinitializing a category draft on unrelated parent renders.
+const EMPTY_CATEGORY_LABEL_TEMPLATES: CategoryLabelTemplate[] = [];
 
 const hashMode: Record<string, DeskMode> = {
   '#leitor': 'reader',
@@ -894,7 +896,7 @@ function EventDeskSession({ eventId }: { eventId: string }) {
         organizer={organizer}
         categories={context.categories}
         fields={context.labelFields}
-        templates={context.categoryLabelTemplates ?? []}
+        templates={context.categoryLabelTemplates ?? EMPTY_CATEGORY_LABEL_TEMPLATES}
         widthMm={context.label.widthMm}
         heightMm={context.label.heightMm}
         labelConfig={context.label}
