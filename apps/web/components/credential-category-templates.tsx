@@ -39,7 +39,7 @@ export default function CredentialCategoryTemplates({
   templates: CategoryLabelTemplate[];
   widthMm: number;
   heightMm: number;
-  labelConfig: LabelSettings;
+  labelConfig?: LabelSettings | null;
   organizer: boolean;
   onSaved: (template: CategoryLabelTemplate) => void;
   onError: (message: string) => void;
@@ -52,6 +52,7 @@ export default function CredentialCategoryTemplates({
   const [isEditing, setIsEditing] = useState(false);
   const inFlight = useRef<number | null>(null);
   const session = useRef(0);
+  const savedTemplate = templates.find((item) => item.categoryId === categoryId);
 
   useEffect(() => {
     if (!categories.some((category) => category.id === categoryId)) setCategoryId(categories[0]?.id ?? '');
@@ -62,9 +63,8 @@ export default function CredentialCategoryTemplates({
     inFlight.current = null;
     setBusy(false);
     setIsEditing(false);
-    const found = templates.find((item) => item.categoryId === categoryId);
-    setDraft(found ? [...found.fields] : [...DEFAULT]);
-    setFormat(found?.styles ? { ...found.styles } : {});
+    setDraft(savedTemplate ? [...savedTemplate.fields] : [...DEFAULT]);
+    setFormat(savedTemplate?.styles ? { ...savedTemplate.styles } : {});
     setSelectedField('');
     return () => {
       // Ao desmontar (inclusive key={eventId}), invalidar o POST da sessão antiga.
@@ -72,7 +72,7 @@ export default function CredentialCategoryTemplates({
       session.current += 1;
       inFlight.current = null;
     };
-  }, [eventId, categoryId, templates]);
+  }, [eventId, categoryId, savedTemplate]);
 
   const choices = [...fields, ...FALLBACK]
     .filter((field) =>
@@ -106,10 +106,13 @@ export default function CredentialCategoryTemplates({
   // a configuração histórica de etiqueta do evento (CheckInService).
   // Ao editar, mostramos na MESMA prévia o rascunho, sinalizando que não está em uso.
   const selectedCategory = categories.find((item) => item.id === categoryId);
-  const savedTemplate = templates.find((item) => item.categoryId === categoryId);
   const visibleTemplate = isEditing ? { fields: draft, styles: format } : savedTemplate;
   const legacyValue = (code: string): string =>
     Object.prototype.hasOwnProperty.call(SAMPLES, code) ? SAMPLES[code] : '';
+  // Dados legados incompletos usam os mesmos padrões seguros da política de impressão.
+  const legacyCodeMode = labelConfig?.codeMode === 'BARCODE' || labelConfig?.codeMode === 'BOTH'
+    ? labelConfig.codeMode : 'QR';
+  const legacyExtraFields = Array.isArray(labelConfig?.extraFields) ? labelConfig.extraFields : [];
   const preview: CredentialLabelData = visibleTemplate ? {
     eventName: 'Exemplo de evento', name: null, company: null, lines: [], category: null,
     protocol: 'EXEMPLO-0001',
@@ -123,13 +126,13 @@ export default function CredentialCategoryTemplates({
     })),
   } : {
     eventName: 'Exemplo de evento',
-    name: labelConfig.showName ? legacyValue(labelConfig.nameField) || SAMPLES.preferred_name : null,
-    company: labelConfig.showCompany ? legacyValue(labelConfig.companyField) || null : null,
-    lines: labelConfig.extraFields.map(legacyValue).filter(Boolean),
-    category: labelConfig.showCategory ? selectedCategory?.name ?? 'Categoria' : null,
-    protocol: 'EXEMPLO-0001', codeMode: labelConfig.codeMode,
-    qr: labelConfig.codeMode === 'BARCODE' ? null : 'EVQ1.preview',
-    barcode: labelConfig.codeMode === 'QR' ? null : 'EVB1.preview',
+    name: labelConfig?.showName !== false ? legacyValue(labelConfig?.nameField ?? 'preferred_name') || SAMPLES.preferred_name : null,
+    company: labelConfig?.showCompany !== false ? legacyValue(labelConfig?.companyField ?? 'institution') || null : null,
+    lines: legacyExtraFields.map(legacyValue).filter(Boolean),
+    category: labelConfig?.showCategory !== false ? selectedCategory?.name ?? 'Categoria' : null,
+    protocol: 'EXEMPLO-0001', codeMode: legacyCodeMode,
+    qr: legacyCodeMode === 'BARCODE' ? null : 'EVQ1.preview',
+    barcode: legacyCodeMode === 'QR' ? null : 'EVB1.preview',
     widthMm, heightMm,
   };
 
