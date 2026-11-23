@@ -2579,9 +2579,9 @@ model EventCommunicationBatch {
   id                  String   @id @db.Uuid
   organizationId      String
   eventId             String
-  event               Event    @relation(fields: [eventId, organizationId], references: [id, organizationId], onDelete: Restrict, map: "EventCommunicationBatch_event_fkey")
+  event               Event    @relation(fields: [eventId, organizationId], references: [id, organizationId], onDelete: Restrict, onUpdate: NoAction, map: "EventCommunicationBatch_event_fkey")
   draftId             String   @db.Uuid
-  draft               EventCommunicationDraft @relation(fields: [draftId, eventId, organizationId], references: [id, eventId, organizationId], onDelete: Restrict, map: "EventCommunicationBatch_draft_fkey")
+  draft               EventCommunicationDraft @relation(fields: [draftId, eventId, organizationId], references: [id, eventId, organizationId], onDelete: Restrict, onUpdate: NoAction, map: "EventCommunicationBatch_draft_fkey")
   draftRevision       Int
   payloadHash         String   @db.Char(64)
   subject             String   @db.VarChar(180)
@@ -2598,11 +2598,11 @@ model EventCommunicationBatch {
 }
 
 model EventCommunicationRecipient {
-  id                  String   @id @default(uuid()) @db.Uuid
+  id                  String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   batchId             String   @db.Uuid
   organizationId      String
   eventId             String
-  batch               EventCommunicationBatch @relation(fields: [batchId, eventId, organizationId], references: [id, eventId, organizationId], onDelete: Restrict, map: "EventCommunicationRecipient_batch_fkey")
+  batch               EventCommunicationBatch @relation(fields: [batchId, eventId, organizationId], references: [id, eventId, organizationId], onDelete: Restrict, onUpdate: NoAction, map: "EventCommunicationRecipient_batch_fkey")
   emailFingerprint    String   @db.Char(64)
   emailEnvelope       String   @db.Text
   status              String   @default("PENDING") @db.VarChar(24)
