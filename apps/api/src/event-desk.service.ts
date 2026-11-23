@@ -20,7 +20,7 @@ import {
 } from './check-in-record';
 import { eventCalendarDay, PresencePolicyError, presenceDay, presenceReversalReason } from './desk-presence.policy';
 import { printedCredential } from './credential-label';
-import { issueCheckInCode } from './check-in-policy';
+import { issueBarcodeValue, issueCheckInCode } from './check-in-policy';
 import {
   categoryLabelTemplates, normalizeCategoryLabelFields,
   updateCategoryLabelTemplate, categoryBadgeItems, normalizeLabelFieldStyles,
@@ -449,7 +449,9 @@ export class EventDeskService {
       qr: orderedFields.includes('qr')
         ? issueCheckInCode(event.id, reservation.id, process.env.JWT_SECRET ?? '')
         : null,
-      barcode: null,
+      barcode: orderedFields.includes('barcode')
+        ? issueBarcodeValue(event.id, reservation.id, process.env.JWT_SECRET ?? '')
+        : null,
     };
   }
 
