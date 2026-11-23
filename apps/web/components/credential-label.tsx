@@ -115,8 +115,7 @@ export default function CredentialLabel({ label, preview = false }: { label: Cre
         ? ordered.map((item, index) => item.kind === 'qr'
           ? (label.qr ? <div className={styles.orderedQr} key={`${index}-qr`} style={item.style?.align ? { justifySelf: item.style.align === 'center' ? 'center' : item.style.align === 'right' ? 'end' : 'start' } : undefined}><CredentialQr code={label.qr} compact /></div> : null)
           : item.kind === 'barcode'
-          ? (label.barcode ? <div className={styles.orderedBarcode} key={`${index}-barcode`}
-              style={item.style?.align ? { justifySelf: item.style.align === 'center' ? 'center' : item.style.align === 'right' ? 'end' : 'start' } : undefined}><CredentialBarcode value={label.barcode} /></div> : null)
+          ? (label.barcode ? <div className={styles.orderedBarcode} key={`${index}-barcode`}><CredentialBarcode value={label.barcode} /></div> : null)
           : <p key={`${index}-${item.code}`} className={index === firstTextIndex ? styles.orderedFirst : styles.line}
               style={item.style ? { textAlign: item.style.align, fontWeight: item.style.bold ? 700 : 400, color: item.style.color,
                 fontFamily: item.style.fontFamily ? SAFE_FONTS[item.style.fontFamily] : undefined,

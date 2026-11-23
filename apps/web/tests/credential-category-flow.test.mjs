@@ -318,3 +318,16 @@ test('campo de código da categoria oferece QR, barras e ambos sem segunda prév
   assert.match(label, /missingOrderedBarcode/u);
   assert.equal((editor.match(/<CredentialLabel label=\{preview\} preview/g) ?? []).length, 1);
 });
+
+
+test('código de barras ocupa largura útil e não promete alinhamento horizontal inoperante', async () => {
+  const [editor, renderer, css] = await Promise.all([
+    read('../components/credential-category-templates.tsx'),
+    read('../components/credential-label.tsx'),
+    read('../components/credential-label.module.css'),
+  ]);
+  assert.match(editor, /code !== 'barcode' && <label>Alinhamento/u);
+  assert.match(editor, /usa toda a largura disponível/u);
+  assert.doesNotMatch(renderer, /className=\{styles\.orderedBarcode\}[^>]*style=/u);
+  assert.match(css, /\.orderedBarcode \{[^}]*width: 100%/u);
+});

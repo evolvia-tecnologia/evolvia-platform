@@ -257,12 +257,13 @@ export default function CredentialCategoryTemplates({
                     onClick={() => { setIsEditing(true); setDraft((current) => current.filter((item) => item !== code)); }}>Remover</button>
                 </div>
                 <div className={styles.formatBar} role="group" aria-label={`Formatação de ${display(code)}`}>
-                  <label>Alinhamento
+                  {code !== 'barcode' && <label>Alinhamento
                     <select aria-label={`Alinhamento de ${display(code)}`} value={(ownStyle(code) ?? (code === 'qr' || code === 'barcode' ? DEFAULT_QR_STYLE : DEFAULT_STYLE)).align}
                       disabled={busy || !organizer} onChange={(event) => changeStyle(code, { align: event.target.value as LabelFieldStyle['align'] })}>
                       <option value="left">À esquerda</option><option value="center">Centralizado</option><option value="right">À direita</option>
                     </select>
-                  </label>
+                  </label>}
+                  {code === 'barcode' && <p>O código de barras usa toda a largura disponível para favorecer a leitura no scanner.</p>}
                   {code !== 'qr' && code !== 'barcode' && <>
                     <label className={styles.boldOption}><input type="checkbox" aria-label={`Negrito de ${display(code)}`} disabled={busy || !organizer}
                       checked={(ownStyle(code) ?? DEFAULT_STYLE).bold} onChange={(event) => changeStyle(code, { bold: event.target.checked })} /> Negrito</label>
