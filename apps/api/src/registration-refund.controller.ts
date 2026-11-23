@@ -1,12 +1,19 @@
-import { Body, Controller, Get, Headers, Param, Post, Query, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Headers, HttpCode, Param, Post, Query, Req, UseGuards } from '@nestjs/common';
 import { AuthGuard, AuthenticatedRequest } from './auth.guard';
 import { RegistrationRefundService } from './registration-refund.service';
 
-@Controller('public/events/:slug/refund-policy')
+@Controller('public')
 export class RegistrationRefundPublicController {
   constructor(private readonly refunds: RegistrationRefundService) {}
 
-  @Get()
+  @Post('integrations/asaas/sandbox/refunds/webhook')
+  @HttpCode(200)
+  async sandboxWebhook(@Headers('asaas-access-token') token: string | undefined, @Body() body: unknown) {
+    await this.refunds.reconcileSandboxWebhook(token, body);
+    return { received: true };
+  }
+
+  @Get('events/:slug/refund-policy')
   policy(@Param('slug') slug: string) {
     return this.refunds.publicPolicy(slug);
   }
@@ -83,6 +90,11 @@ export class RegistrationRefundOrganizerController {
   @Post('requests/:requestId/sandbox-payment-reference')
   resolveSandboxPayment(@Req() request: AuthenticatedRequest, @Param('eventId') eventId: string, @Param('requestId') requestId: string) {
     return this.refunds.resolveSandboxPayment(request.user!.id, eventId, requestId);
+  }
+
+  @Post('requests/:requestId/sandbox-processing')
+  processSandbox(@Req() request: AuthenticatedRequest, @Param('eventId') eventId: string, @Param('requestId') requestId: string) {
+    return this.refunds.processSandboxRefund(request.user!.id, eventId, requestId);
   }
 
   @Post('requests/:requestId/mock-refund')
