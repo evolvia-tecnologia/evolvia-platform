@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { api } from '../lib/api';
-import CredentialLabel, { CredentialLabelData } from './credential-label';
 import styles from './credential-label-settings.module.css';
 
 type LabelField = { code: string; label: string };
@@ -61,20 +60,6 @@ export default function CredentialLabelSettings({
       code,
       label: code === 'institution' ? 'Empresa / instituição' : code === 'preferred_name' ? 'Como deseja ser chamado' : code === 'job_title' ? 'Cargo / função' : code === 'city_state' ? 'Cidade / UF (combinadas)' : code,
     }], Array.isArray(fields) ? fields : []);
-  const preview: CredentialLabelData = {
-    eventName: 'Evento',
-    name: draft.showName ? 'Nome para crachá' : null,
-    company: draft.showCompany ? 'Empresa / instituição' : null,
-    lines: draft.extraFields.map((code) => choices.find((field) => field.code === code)?.label ?? code),
-    category: draft.showCategory ? 'Categoria' : null,
-    protocol: 'EVO-AB12CD34EF567890',
-    codeMode: draft.codeMode,
-    qr: draft.codeMode === 'BARCODE' ? null : 'EVQ1.preview',
-    barcode: draft.codeMode === 'QR' ? null : 'EVB1.preview',
-    widthMm: draft.widthMm,
-    heightMm: draft.heightMm,
-  };
-
   function setPreset(preset: Preset) {
     const known = PRESETS.find((item) => item[0] === preset);
     setDraft((current) => ({
@@ -126,8 +111,8 @@ export default function CredentialLabelSettings({
   }
 
   return <section className={styles.settings} aria-labelledby="label-settings-title">
-    <header><h3 id="label-settings-title">Etiqueta térmica</h3><p>Escolha o tamanho e os dados que aparecerão na credencial.</p></header>
-    <div className={styles.layout}><div className={styles.form}>
+    <header><h3 id="label-settings-title">Papel e impressão</h3><p>O tamanho do papel vale para todas as categorias. A prévia única acima mostra a etiqueta usada na impressão da categoria selecionada.</p></header>
+    <div className={styles.form}>
     <fieldset className={styles.group}>
     <legend>1. Tamanho da etiqueta</legend>
     <p>Use o mesmo tamanho configurado na impressora térmica.</p>
@@ -146,7 +131,10 @@ export default function CredentialLabelSettings({
       </label>
     </div>}
     </fieldset>
-    <fieldset className={styles.group}><legend>2. Informações da credencial</legend>
+    <details className={styles.legacy}>
+    <summary>Configuração histórica: campos e códigos de categorias sem modelo salvo</summary>
+    <p>Estas opções só são usadas quando a categoria ainda não tem um modelo próprio salvo. Para configurar os campos, a ordem, o QR Code e os estilos das novas etiquetas, utilize o editor por categoria acima. Não existe uma segunda prévia.</p>
+    <fieldset className={styles.group}><legend>Campos da etiqueta histórica</legend>
     <p>Para nome, empresa, cargo e cidade/UF: use o nome preferido e a instituição; nas duas linhas abaixo selecione Cargo / função e Cidade / UF (combinadas). Preencha esses dados na ficha de inscrição.</p>
     <label className={styles.toggle}><input type="checkbox" checked={draft.showName} onChange={(event) => setDraft((current) => ({ ...current, showName: event.target.checked }))} /> Nome para crachá</label>
     <label>Campo do nome
@@ -173,7 +161,7 @@ export default function CredentialLabelSettings({
     </label>)}
     <label className={styles.toggle}><input type="checkbox" checked={draft.showCategory} onChange={(event) => setDraft((current) => ({ ...current, showCategory: event.target.checked }))} /> Categoria na tarja</label>
     </fieldset>
-    <fieldset className={styles.group}><legend>3. Código de identificação</legend>
+    <fieldset className={styles.group}><legend>Códigos da etiqueta histórica</legend>
     <div className={styles.choices}>
       {([['QR', 'Só QR Code'], ['BOTH', 'Código de barras e QR Code'], ['BARCODE', 'Só código de barras']] as const).map(([mode, label]) => <label key={mode}>
         <input type="radio" name="label-code" checked={draft.codeMode === mode} onChange={() => setDraft((current) => ({ ...current, codeMode: mode }))} />
@@ -182,8 +170,9 @@ export default function CredentialLabelSettings({
     </div>
     {draft.widthMm < 70 && draft.codeMode !== 'QR' && <p>Neste tamanho, o QR Code é lido com mais folga do que o código de barras.</p>}
     </fieldset>
+    </details>
     <div className={styles.actions}><button type="button" disabled={busy} onClick={() => void save()}>{busy ? 'Salvando…' : 'Salvar etiqueta'}</button></div>
-    </div><aside className={styles.preview} aria-label="Visualização da credencial"><h4>Prévia da etiqueta</h4><p>{draft.widthMm / 10} × {draft.heightMm / 10} cm · dados de exemplo</p><div className={styles.canvas}><CredentialLabel label={preview} preview /></div><p>Confira os dados e o papel antes de imprimir.</p></aside></div>
+    </div>
   </section>;
 }
 

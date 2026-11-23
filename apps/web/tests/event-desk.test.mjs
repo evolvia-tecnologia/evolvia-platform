@@ -86,7 +86,8 @@ test('a portaria segue recursos ativos e não o perfil do evento', () => {
   assert.match(kiosk, /Este link de autoatendimento não é válido/u);
   assert.doesNotMatch(kiosk, /Imprima sua etiqueta/u);
   assert.match(desk, /CredentialLabelSettings/u);
-  assert.match(labelSettings, /Etiqueta térmica/u);
+  assert.match(labelSettings, /Papel e impressão/u);
+  assert.doesNotMatch(labelSettings, /<CredentialLabel\b/u, 'papel não pode renderizar segunda prévia');
   assert.match(labelSettings, /4×2 cm/u);
   assert.match(labelSettings, /10×5 cm/u);
   assert.match(labelSettings, /Personalizada/u);
