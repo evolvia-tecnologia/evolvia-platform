@@ -43,6 +43,9 @@ test('a leitura da caixa de teste é isolada, verifica a mensagem e persiste uma
     return Response.json({ methodResponses: [['Email/get', { accountId: 'test', list: [mail] }, 'verify']] });
   };
   const verify = (settings = env) => verifyConfirmationInbox(prisma, row.id, 'message', settings, transport);
+  for (const invalid of ['sem-protocolo', 'http://inbox.example.invalid/api', 'https://usuario:senha@inbox.example.invalid/api']) {
+    await assert.rejects(verify({ ...env, EVOLVIA_TEST_MAIL_JMAP_URL: invalid }), /Endpoint de caixa inválido/);
+  }
   await assert.rejects(verify(), /Aceite/);
   await assert.rejects(verify({ ...env, EVOLVIA_TEST_MAIL_ORGANIZATION_ID: 'outra' }), /Inscrição/);
   assert.equal(reads, 0);
