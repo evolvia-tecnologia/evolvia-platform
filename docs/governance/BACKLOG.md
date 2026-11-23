@@ -1,3 +1,10 @@
+
+## Reconciliação G5.8 I/T — 23/11/2026 (PR #708 integrada)
+
+Implementação **96,9%**; conclusão comprovada **72,3%**; **89/93** unidades integradas; **0/11 Gates encerrados**.
+
+Fonte canônica da matriz: `393ab9930d205dcb592cbf283b55c3fd1d2d86e3`. G5.8 I/T comprovados pela #610 e #708, CI #45105953160 COMPLETED/SUCCESS (qualidade, PostgreSQL e ARM64). **D/F continuam falsos**: não há evidência de envio externo autorizado, SHA implantado ou aceite humano. A PR #702 foi fechada sem merge como superada. G2.11, G2.13, G2.14 e G6.8 permanecem pendentes de implementação completa. O gate público Nginx #108 continua externo. Não inferir prontidão de produção. Registros históricos abaixo permanecem como histórico.
+
 ## Reconciliação pós-merge #518 — 22/11/2026 (G7.4 somente I/T)
 
 Implementação **95,8%**; conclusão comprovada **71,7%**; **88/93** unidades integradas; **0/11 Gates encerrados**.
