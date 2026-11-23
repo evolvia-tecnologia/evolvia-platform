@@ -1,5 +1,6 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+import { randomUUID } from 'node:crypto';
 import { AuthorizationService } from './authorization.service';
 import { EVENT_EDITOR_ROLES } from './membership-policy';
 import { PrismaService } from './prisma.service';
@@ -87,7 +88,7 @@ export class EventCommunicationBatchService {
           requestedByUserId: userId,
         }, select: { id: true, draftId: true, draftRevision: true, recipientCount: true, status: true, createdAt: true } });
         await tx.eventCommunicationRecipient.createMany({ data: encrypted.map(recipient => ({
-          ...scope, batchId: input.id, ...recipient,
+          id: randomUUID(), ...scope, batchId: input.id, ...recipient,
         })) });
         await tx.auditLog.create({ data: { ...scope, actorUserId: userId,
           action: 'event.communication_batch_prepared', entityType: 'EventCommunicationBatch', entityId: input.id,

@@ -1,7 +1,7 @@
 import { createCipheriv, createDecipheriv, createHash, createHmac, randomBytes } from 'node:crypto';
 import { communicationAudienceInput } from './event-communication-audience.policy';
 
-const UUID = /^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/u;
+const UUID = /^[a-f0-9]{8}-[a-f0-9]{4}-[47][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/iu;
 
 export function normalizeCommunicationBatch(raw: unknown) {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw new Error('Informe os dados do lote.');
@@ -18,7 +18,7 @@ export function normalizeCommunicationBatch(raw: unknown) {
   if (filters.audience !== 'CONFIRMED_REGISTRATIONS' || filters.page !== 1) {
     throw new Error('Este lote exige inscritos confirmados e uma audiência sem paginação.');
   }
-  return { id: row.id, draftId: row.draftId, draftRevision: row.draftRevision, filters };
+  return { id: row.id.toLowerCase(), draftId: row.draftId.toLowerCase(), draftRevision: row.draftRevision, filters };
 }
 
 export function communicationBatchPayloadHash(organizationId: string, eventId: string,

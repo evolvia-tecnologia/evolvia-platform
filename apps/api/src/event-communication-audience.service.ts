@@ -70,9 +70,21 @@ export class EventCommunicationAudienceService {
     });
     if (rows.length > 5000) throw new ConflictException('Esta prévia suporta até 5000 inscrições. Selecione categorias para reduzir o público. Nenhuma lista parcial foi gerada.');
     const eligible = consentOnly ? rows.filter(row => hasCommunicationOptIn(row.registrationData)) : rows;
-    const { contacts, missingEmail, duplicates } = uniqueCommunicationContacts(eligible);
+    const { contacts: listed, missingEmail, duplicates: initialDuplicates } = uniqueCommunicationContacts(eligible);
+    // The outbox indexes canonical lowercase addresses; deduplicate on that
+    // exact same representation before createMany, including historic mixed-case emails.
+    const seenEmails = new Set<string>();
+    const contacts: typeof listed = [];
+    let foldedDuplicates = 0;
+    for (const contact of listed) {
+      const email = contact.email.trim().toLowerCase();
+      if (seenEmails.has(email)) { foldedDuplicates++; continue; }
+      seenEmails.add(email);
+      contacts.push({ ...contact, email });
+    }
     return { eventId, audience: 'CONFIRMED_REGISTRATIONS', filters: input, contacts,
-      matchedRegistrations: rows.length, missingEmail, duplicates, excludedWithoutConsent: rows.length - eligible.length };
+      matchedRegistrations: rows.length, missingEmail,
+      duplicates: initialDuplicates + foldedDuplicates, excludedWithoutConsent: rows.length - eligible.length };
   }
 
   async preview(userId: string, eventId: string, raw: unknown) {

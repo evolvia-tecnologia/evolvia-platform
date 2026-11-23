@@ -10,7 +10,7 @@ CREATE TABLE "EventCommunicationBatch" (
   "body" VARCHAR(20000) NOT NULL,
   "audienceFilters" JSONB NOT NULL,
   "recipientCount" INTEGER NOT NULL CHECK ("recipientCount" BETWEEN 1 AND 5000),
-  "status" VARCHAR(24) NOT NULL DEFAULT 'PREPARED' CHECK ("status" = 'PREPARED'),
+  "status" VARCHAR(24) NOT NULL DEFAULT 'PREPARED' CHECK ("status" IN ('PREPARED','SENDING','ACCEPTED','RECEIVED','UNKNOWN','FAILED','CANCELLED')),
   "requestedByUserId" TEXT NOT NULL,
   "createdAt" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT "EventCommunicationBatch_event_fkey" FOREIGN KEY ("eventId","organizationId") REFERENCES "Event"("id","organizationId") ON DELETE RESTRICT,
@@ -20,13 +20,13 @@ CREATE TABLE "EventCommunicationBatch" (
 CREATE INDEX "EventCommunicationBatch_scope_created_idx" ON "EventCommunicationBatch" ("organizationId","eventId","createdAt");
 
 CREATE TABLE "EventCommunicationRecipient" (
-  "id" UUID PRIMARY KEY,
+  "id" UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   "batchId" UUID NOT NULL,
   "organizationId" TEXT NOT NULL,
   "eventId" TEXT NOT NULL,
   "emailFingerprint" CHAR(64) NOT NULL,
   "emailEnvelope" TEXT NOT NULL,
-  "status" VARCHAR(24) NOT NULL DEFAULT 'PENDING' CHECK ("status" = 'PENDING'),
+  "status" VARCHAR(24) NOT NULL DEFAULT 'PENDING' CHECK ("status" IN ('PENDING','CLAIMED','ACCEPTED','RECEIVED','UNKNOWN','FAILED','CANCELLED')),
   "createdAt" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT "EventCommunicationRecipient_batch_fkey" FOREIGN KEY ("batchId","eventId","organizationId") REFERENCES "EventCommunicationBatch"("id","eventId","organizationId") ON DELETE RESTRICT,
   CONSTRAINT "EventCommunicationRecipient_batch_email_key" UNIQUE ("batchId","emailFingerprint")
