@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
@@ -64,10 +65,17 @@ test('tag desconhecida e HTML não entram no texto da carta', () => {
 test('a carta só sai do trabalho desta inscrição e a recusa também tem texto', async () => {
   const where = [];
   const configQueries = [];
+  const deliveries = [];
+  const audits = [];
   let config = null;
+  const tx = {
+    scientificDecisionDelivery: { create: async (input) => { deliveries.push(input.data); return { id: 'delivery-1' }; } },
+    auditLog: { create: async (input) => { audits.push(input.data); return {}; } },
+  };
   const prisma = {
     scientificSubmission: { findFirst: async (query) => { where.push(query.where); return null; } },
     scientificSubmissionConfig: { findUnique: async (query) => { configQueries.push(query); return config; } },
+    $transaction: async (run) => run(tx),
   };
   const participants = { requireConfirmedScope: async () => ({ eventId: 'event-1', organizationId: 'org-1', reservationId: 'res-1' }) };
   const service = new ScientificAuthorService(prisma, participants, {});
@@ -87,6 +95,7 @@ test('a carta só sai do trabalho desta inscrição e a recusa também tem texto
     return true;
   });
   assert.equal(configQueries.length, 0);
+  assert.equal(deliveries.length, 0);
 
   prisma.scientificSubmission.findFirst = async () => ({
     title: 'Cuidado seguro', status: 'REJECTED', currentVersion: 1, stationPublicCode: null,
@@ -98,6 +107,16 @@ test('a carta só sai do trabalho desta inscrição e a recusa também tem texto
   assert.match(rejection.text, /Não é certificado/u);
   assert.deepEqual(configQueries[0].where, { eventId_organizationId: { eventId: 'event-1', organizationId: 'org-1' } });
   assert.deepEqual(configQueries[0].select, { acceptanceLetterBody: true, rejectionLetterBody: true });
+  assert.equal(rejection.delivery.channel, 'AUTHOR_AREA');
+  assert.equal(rejection.delivery.action, 'VIEWED');
+  assert.equal(deliveries.length, 1);
+  assert.equal(deliveries[0].action, 'VIEWED');
+  assert.equal(deliveries[0].kind, 'REJECTION');
+  assert.equal(deliveries[0].channel, 'AUTHOR_AREA');
+  assert.equal(deliveries[0].documentHash, createHash('sha256').update(rejection.text).digest('hex'));
+  assert.deepEqual(audits[0].metadata, { action: 'VIEWED', kind: 'REJECTION', channel: 'AUTHOR_AREA' });
+  assert.equal(audits[0].action, 'scientific.decision_letter_delivered');
+  assert.doesNotMatch(JSON.stringify(audits[0]), /Cuidado|@|e-mail/iu);
 
   config = { acceptanceLetterBody: 'Olá **{NOME}** em {EVENTO}. Código {CODIGO}.', rejectionLetterBody: 'recusa {TITULO}' };
   prisma.scientificSubmission.findFirst = async () => ({
@@ -111,6 +130,55 @@ test('a carta só sai do trabalho desta inscrição e a recusa também tem texto
   assert.match(letter.text, /Congresso/u);
   assert.match(letter.text, /Código 42/u);
   assert.doesNotMatch(JSON.stringify(letter), /reviewer|score|email|organizationId|parecer/iu);
+  assert.equal(letter.delivery.action, 'VIEWED');
+  assert.equal(deliveries.at(-1).kind, 'ACCEPTANCE');
+
+  const downloaded = await service.recordDecisionDownload('congresso', 'Bearer token', 'csubmission01');
+  assert.equal(downloaded.delivery.action, 'DOWNLOADED');
+  assert.equal(downloaded.kind, 'acceptance');
+  assert.equal(deliveries.at(-1).action, 'DOWNLOADED');
+  assert.equal(deliveries.at(-1).documentHash, createHash('sha256').update(downloaded.text).digest('hex'));
+  assert.doesNotMatch(JSON.stringify(downloaded), /reviewer|score|email|organizationId|parecer/iu);
+
+  prisma.$transaction = async () => { throw new Error('banco'); };
+  await assert.rejects(() => service.acceptanceLetter('congresso', 'Bearer token', 'csubmission01'), /banco/u);
+});
+
+test('carta exige inscrição dona do trabalho; outra reserva ou org recebe NotFound', async () => {
+  const queries = [];
+  const prisma = {
+    scientificSubmission: {
+      findFirst: async (query) => {
+        queries.push(query.where);
+        return null;
+      },
+    },
+    scientificSubmissionConfig: { findUnique: async () => null },
+    $transaction: async () => { throw new Error('não deve gravar entrega'); },
+  };
+  const participants = {
+    requireConfirmedScope: async () => ({
+      eventId: 'event-1', organizationId: 'org-1', reservationId: 'res-peer',
+    }),
+  };
+  const service = new ScientificAuthorService(prisma, participants, {});
+  await assert.rejects(
+    () => service.acceptanceLetter('congresso', 'Bearer token', 'csubmission01'),
+    NotFoundException,
+  );
+  assert.deepEqual(queries[0], {
+    id: 'csubmission01', eventId: 'event-1', organizationId: 'org-1', ownerReservationId: 'res-peer',
+  });
+
+  participants.requireConfirmedScope = async () => ({
+    eventId: 'event-2', organizationId: 'org-2', reservationId: 'res-1',
+  });
+  await assert.rejects(
+    () => service.recordDecisionDownload('congresso', 'Bearer token', 'csubmission01'),
+    NotFoundException,
+  );
+  assert.equal(queries[1].organizationId, 'org-2');
+  assert.equal(queries[1].eventId, 'event-2');
 });
 
 test('o autor não recebe o modelo e as duas rotas usam o mesmo método', () => {
@@ -121,9 +189,17 @@ test('o autor não recebe o modelo e as duas rotas usam o mesmo método', () => 
   assert.match(letterSource, /acceptanceLetterBody: true, rejectionLetterBody: true/u);
   assert.match(letterSource, /eventId: scope\.eventId, organizationId: scope\.organizationId/u);
   assert.doesNotMatch(letterSource, /submissionKeyHash|email|reviewer|score/u);
+  assert.match(letterSource, /scientificDecisionDelivery\.create/u);
+  assert.match(letterSource, /channel: 'AUTHOR_AREA'/u);
   assert.match(controller, /acceptance-letter/u);
-  assert.match(controller, /decision-letter/u);
+  assert.match(controller, /decision-letter\/receipt/u);
+  assert.match(controller, /recordDecisionDownload/u);
   assert.equal(controller.match(/authors\.acceptanceLetter/gu)?.length, 2);
+  const management = readFileSync(new URL('../src/scientific-submissions.service.ts', import.meta.url), 'utf8');
+  const list = management.slice(management.indexOf('scientificDecisionDelivery.findMany'), management.indexOf('defaultPresentationFormats'));
+  assert.match(list, /take: 20/u);
+  assert.match(list, /title: true/u);
+  assert.doesNotMatch(list, /email|submissionKeyHash/u);
 });
 
 test('o organizador grava só as cartas enviadas e recusa tag ou HTML', async () => {

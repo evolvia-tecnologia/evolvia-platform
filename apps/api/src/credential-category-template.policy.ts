@@ -6,7 +6,7 @@ import { DeskPolicyError, deskDisplayName, labelFieldAllowed } from './event-des
  */
 export type LabelFieldStyle = { align: 'left' | 'center' | 'right'; bold: boolean; color: string; fontFamily?: 'sans' | 'serif' | 'mono'; fontSizeMm?: number };
 export type CategoryLabelTemplate = { categoryId: string; fields: string[]; styles?: Record<string, LabelFieldStyle> };
-export type CategoryBadgeItem = { code: string; kind: 'text' | 'qr'; value: string; style?: LabelFieldStyle };
+export type CategoryBadgeItem = { code: string; kind: 'text' | 'qr' | 'barcode'; value: string; style?: LabelFieldStyle };
 const DEFAULT_FIELDS = ['preferred_name', 'institution', 'city_state', 'qr'] as const;
 const MAX_FIELDS = 12;
 const SAFE_ID = /^[a-zA-Z0-9_-]{8,64}$/u;
@@ -44,7 +44,7 @@ export function normalizeLabelFieldStyles(raw: unknown, fields: ReadonlyArray<st
 
 
 function availableCode(code: string, available: ReadonlyArray<string>): boolean {
-  return code === 'qr' || (labelFieldAllowed(code)
+  return code === 'qr' || code === 'barcode' || (labelFieldAllowed(code)
     && (available.includes(code) || VIRTUAL_FIELDS.has(code)));
 }
 
@@ -72,7 +72,7 @@ export function categoryLabelTemplates(config: unknown): CategoryLabelTemplate[]
       || !Array.isArray(record.fields) || record.fields.length > MAX_FIELDS
       || new Set(record.fields).size !== record.fields.length
       || record.fields.some((field) =>
-        typeof field !== 'string' || field === '__proto__' || (field !== 'qr' && !labelFieldAllowed(field)))) return [];
+        typeof field !== 'string' || field === '__proto__' || (field !== 'qr' && field !== 'barcode' && !labelFieldAllowed(field)))) return [];
     let styles: Record<string, LabelFieldStyle> | undefined;
     if (record.styles && typeof record.styles === 'object' && !Array.isArray(record.styles)) {
       // Leitura tolerante de legado: descartar somente o estilo inválido,
@@ -162,6 +162,7 @@ export function categoryBadgeItems(
     // Nunca herdar propriedades do protótipo como "constructor" de um mapa de estilos vazio.
     const style = Object.prototype.hasOwnProperty.call(styles, code) ? styles[code] : undefined;
     if (code === 'qr') return [{ code, kind: 'qr', value: '', ...(style ? { style } : {}) }];
+    if (code === 'barcode') return [{ code, kind: 'barcode', value: '', ...(style ? { style } : {}) }];
     if (code === '__proto__' || !labelFieldAllowed(code)) return [];
     const result = value(code);
     return result ? [{ code, kind: 'text', value: result, ...(style ? { style } : {}) }] : [];

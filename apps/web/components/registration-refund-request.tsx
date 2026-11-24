@@ -8,6 +8,10 @@ type RequestView = { statusLabel: string; reason: string; decisionNote: string |
 type View = { paid: boolean; current: Eligibility; accepted: (Eligibility & { acceptedAt: string; version: number }) | null; request: RequestView | null };
 
 export default function RegistrationRefundRequest({ slug, token }: { slug: string; token: string }) {
+  return <ParticipantRefund key={JSON.stringify([slug, token])} slug={slug} token={token} />;
+}
+
+function ParticipantRefund({ slug, token }: { slug: string; token: string }) {
   const [view, setView] = useState<View | null>(null);
   const [reason, setReason] = useState('');
   const [loading, setLoading] = useState(true);
@@ -34,17 +38,23 @@ export default function RegistrationRefundRequest({ slug, token }: { slug: strin
 
   async function submit(event: FormEvent) {
     event.preventDefault();
+    if (sending) return;
+    const cleanReason = reason.trim().replace(/\s+/gu, ' ');
+    if (cleanReason.length < 10 || cleanReason.length > 500) {
+      setError('O motivo precisa ter entre 10 e 500 caracteres.');
+      return;
+    }
     setSending(true);
     setError('');
     try {
       const response = await fetch(`/api/public/events/${encodeURIComponent(slug)}/participant/refund/requests`, {
         method: 'POST',
         headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
-        body: JSON.stringify({ reason }),
+        body: JSON.stringify({ reason: cleanReason }),
       });
       const payload = await response.json().catch(() => ({})) as { error?: { message?: string }; statusLabel?: string; reason?: string; decisionNote?: string | null };
       if (!response.ok) throw new Error(payload.error?.message || 'Não foi possível registrar o pedido.');
-      setView((current) => current ? { ...current, request: { statusLabel: payload.statusLabel ?? 'Em análise', reason: payload.reason ?? reason, decisionNote: payload.decisionNote ?? null, moneyReturned: false } } : current);
+      setView((current) => current ? { ...current, request: { statusLabel: payload.statusLabel ?? 'Em análise', reason: payload.reason ?? cleanReason, decisionNote: payload.decisionNote ?? null, moneyReturned: false } } : current);
     } catch (reasonError) {
       setError(reasonError instanceof Error ? reasonError.message : 'Não foi possível registrar o pedido.');
     } finally {

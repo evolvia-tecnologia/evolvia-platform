@@ -332,3 +332,18 @@ test('leitura de estilos legados descarta apenas o campo inválido sem perder os
   assert.deepEqual(safe.styles.preferred_name, valid);
   assert.equal(Object.prototype.polluted, undefined);
 });
+
+
+test('modelo por categoria aceita QR, barras ou ambos com ordem persistente e escopo próprio', () => {
+  for (const codes of [['qr'], ['barcode'], ['qr', 'barcode'], ['barcode', 'qr']]) {
+    const fields = ['preferred_name', 'institution', 'city_state', ...codes];
+    assert.deepEqual(normalizeCategoryLabelFields(fields, available), fields);
+    const config = updateCategoryLabelTemplate({}, categoryA, fields);
+    assert.deepEqual(labelTemplateForCategory(config, categoryA), fields);
+    assert.deepEqual(categoryBadgeItems({ preferred_name: 'Teste' }, fields).map(x => x.kind).slice(-codes.length),
+      codes.map(code => code === 'qr' ? 'qr' : 'barcode'));
+    assert.deepEqual(labelTemplateForCategory(config, categoryB), defaultCategoryLabelFields());
+  }
+  assert.throws(() => normalizeCategoryLabelFields(['barcode', 'barcode'], available), DeskPolicyError);
+  assert.throws(() => normalizeCategoryLabelFields(['qr', 'qr', 'barcode'], available), DeskPolicyError);
+});

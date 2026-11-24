@@ -20,7 +20,7 @@ const FAILED = 'registration.confirmation_email_failed';
 type Poster = (url: string, body: string, headers: Record<string, string>) => Promise<number>;
 
 async function postDelivery(url: string, body: string, headers: Record<string, string>): Promise<number> {
-  const response = await fetch(url, { method: 'POST', headers, body, signal: AbortSignal.timeout(10_000) });
+  const response = await fetch(url, { method: 'POST', redirect: 'error', headers, body, signal: AbortSignal.timeout(10_000) });
   try {
     return response.status;
   } finally {
