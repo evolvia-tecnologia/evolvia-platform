@@ -252,6 +252,47 @@ test('mudar a agenda NÃO toca lote nem inscrição', LIMITE, async () => {
   assert.equal(depois.row.status, 'PUBLISHED', 'o estado do evento não muda por alteração de agenda');
 });
 
+test('limpar término/local sincroniza a sessão do Wizard (não ressuscita no GET)', LIMITE, async () => {
+  // ONLINE permite venue null; presencial publicado recusa limpar o local.
+  const c = await cenario('wizard-sync', { format: 'ONLINE' });
+  await db.eventWizardSession.create({
+    data: {
+      eventId: c.eventId,
+      flowVersion: 'v2',
+      currentStep: 'review',
+      revision: 3,
+      status: 'COMPLETED',
+      answers: {
+        startDate: dia(10),
+        endDate: dia(12),
+        timeZone: 'America/Sao_Paulo',
+        venue: 'Centro de Convenções',
+      },
+    },
+  });
+
+  const r = await c.patch({
+    expectedUpdatedAt: c.esperado,
+    motivo: MOTIVO,
+    endDate: null,
+    venue: null,
+  });
+  assert.equal(r.status, 200, r.texto);
+  assert.deepEqual(r.json.alterados, ['endDate', 'venue']);
+  assert.equal(r.json.endDate, null);
+  assert.equal(r.json.venue, null);
+  assert.equal(r.json.wizardRevision, 4);
+
+  const sessao = await db.eventWizardSession.findUniqueOrThrow({
+    where: { eventId_flowVersion: { eventId: c.eventId, flowVersion: 'v2' } },
+  });
+  assert.equal(sessao.revision, 4);
+  assert.equal(sessao.answers.endDate, null, 'null gravado evita ?? ressuscitar o término antigo');
+  assert.equal(sessao.answers.venue, null, 'null gravado evita ?? ressuscitar o local antigo');
+  assert.equal(sessao.answers.startDate, dia(10));
+  assert.equal(sessao.answers.timeZone, 'America/Sao_Paulo');
+});
+
 test('duas abas: o segundo PATCH com o updatedAt velho recebe 409 e não grava', LIMITE, async () => {
   const c = await cenario('duasabas');
   const velho = c.esperado;

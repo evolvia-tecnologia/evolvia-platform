@@ -271,6 +271,46 @@ export class EventsService {
         select: { startDate: true, endDate: true, timeZone: true, venue: true, updatedAt: true },
       });
 
+      // Mesma sincronização de `updateSubjectAreas`: o GET do Wizard usa `??`
+      // sobre a sessão; limpar término/local no Event sem gravar null na sessão
+      // ressuscita o valor antigo ao reabrir a configuração.
+      const session = await tx.eventWizardSession.findUnique({
+        where: { eventId_flowVersion: { eventId: event.id, flowVersion: WIZARD_FLOW_VERSION } },
+        select: { id: true, answers: true, revision: true, status: true },
+      });
+      let wizardRevision: number | null = null;
+      if (session) {
+        const stored =
+          session.answers && typeof session.answers === 'object' && !Array.isArray(session.answers)
+            ? (session.answers as Prisma.JsonObject)
+            : {};
+        const answers: Prisma.JsonObject = {
+          ...stored,
+          startDate: atualizado.startDate?.toISOString() ?? null,
+          endDate: atualizado.endDate?.toISOString() ?? null,
+          timeZone: atualizado.timeZone,
+          venue: atualizado.venue,
+        };
+        const synced = await tx.eventWizardSession.updateMany({
+          where: { id: session.id, revision: session.revision },
+          data: {
+            answers,
+            revision: { increment: 1 },
+            ...(session.status === WizardSessionStatus.ACTIVE
+              ? { completionPercent: getWizardCompletion(normalizeWizardAnswers(answers)) }
+              : {}),
+          },
+        });
+        if (synced.count !== 1) {
+          throw new ConflictException({
+            code: 'VERSION_CONFLICT',
+            message:
+              'Este evento foi atualizado em outra sessão. Recarregue para ver os valores atuais antes de salvar.',
+          });
+        }
+        wizardRevision = session.revision + 1;
+      }
+
       await tx.auditLog.create({
         data: {
           organizationId,
@@ -284,6 +324,7 @@ export class EventsService {
             alterados: plano.alterados,
             antes: plano.antes,
             depois: plano.depois,
+            wizardRevision,
           } as Prisma.InputJsonObject,
         },
       });
@@ -297,6 +338,7 @@ export class EventsService {
         venue: atualizado.venue,
         updatedAt: atualizado.updatedAt.toISOString(),
         alterados: plano.alterados,
+        wizardRevision,
       };
     });
   }
