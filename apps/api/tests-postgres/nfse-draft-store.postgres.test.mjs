@@ -143,3 +143,24 @@ test('revogação confirmada depois da leitura impede gravar rascunho e auditori
   assert.equal(await db.fiscalReceiptDraft.count({ where: { receiptId: receipt.id } }), 0);
   assert.equal(await db.auditLog.count({ where: { entityId: receipt.id, action: 'nfse.draft_prepared' } }), 0);
 });
+
+test('cancelamento do checkout após a leitura impede persistir prévia e auditoria', async t => {
+  const { db, owner, checkout, receipt, setup } = await fiscalFixture(t);
+  const { readOrPrepareFiscalDraft } = await import('../dist/nfse-draft-store.js');
+  let cancelled = false;
+  const instrumented = db.$extends({ query: { eventRegistrationPaymentReceipt: {
+    async findFirst({ args, query }) {
+      const result = await query(args);
+      if (result && !cancelled) {
+        await db.eventRegistrationCheckout.update({ where: { id: checkout.id }, data: { status: 'CANCELED' } });
+        cancelled = true;
+      }
+      return result;
+    },
+  } } });
+  await assert.rejects(readOrPrepareFiscalDraft(instrumented, owner.id, receipt.eventId, receipt.id, { setup }),
+    error => error.getStatus?.() === 404);
+  assert.equal(cancelled, true);
+  assert.equal(await db.fiscalReceiptDraft.count({ where: { receiptId: receipt.id } }), 0);
+  assert.equal(await db.auditLog.count({ where: { entityId: receipt.id, action: 'nfse.draft_prepared' } }), 0);
+});

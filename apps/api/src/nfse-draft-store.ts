@@ -36,12 +36,17 @@ export async function readOrPrepareFiscalDraft(
           throw new ConflictException('Os dados fiscais divergem da prévia registrada.');
         }
         if (!stored) {
-          // Lock the authorization row through commit. A revocation that won the
-          // race invalidates this serializable snapshot and forces a fresh check.
+          // Hold the eligibility rows through commit. Concurrent changes invalidate
+          // this serializable snapshot and must pass the checks on a fresh read.
           const authorized = await tx.$queryRaw<Array<{ id: string }>>`
-            SELECT "id" FROM "OrganizationMembership"
-            WHERE "organizationId" = ${organizationId} AND "userId" = ${userId}
-              AND "status" = 'ACTIVE' AND "role" = 'OWNER' FOR SHARE
+            SELECT m.id FROM "EventRegistrationPaymentReceipt" r
+            JOIN "OrganizationMembership" m ON m."organizationId" = r."organizationId"
+            JOIN "EventRegistrationCheckout" c ON c.id = r."checkoutId"
+            JOIN "EventRegistrationReservation" s ON s.id = r."reservationId"
+            WHERE r.id = ${receiptId} AND r."eventId" = ${eventId} AND r."organizationId" = ${organizationId}
+              AND m."userId" = ${userId} AND m.status = 'ACTIVE' AND m.role = 'OWNER'
+              AND c.status = 'PAID' AND c."paidAt" IS NOT NULL AND s.status = 'CONFIRMED'
+            FOR SHARE OF r, m, c, s
           `;
           if (!authorized.length) throw new NotFoundException('Recibo indisponível.');
           await tx.fiscalReceiptDraft.create({ data: {
