@@ -1,3 +1,5 @@
+import { ExternalProviderJsonError, readExternalProviderJson } from './external-provider-json.ts';
+
 /** Read-only adapter. The caller supplies a checkout loaded from the authorized
  * tenant/event and a reader bound to that tenant's Asaas account. */
 type Checkout = Readonly<{
@@ -63,8 +65,9 @@ export function lookupSandboxRefundPayment(
         throw new Error();
       }
       failure = 'INVALID_JSON';
-      return await response.json();
-    } catch {
+      return await readExternalProviderJson(response);
+    } catch (error) {
+      if (error instanceof ExternalProviderJsonError && error.code === 'provider_response_too_large') failure = 'RESPONSE_TOO_LARGE';
       throw new Error('Não foi possível consultar a cobrança na homologação.', { cause: failure });
     }
   });

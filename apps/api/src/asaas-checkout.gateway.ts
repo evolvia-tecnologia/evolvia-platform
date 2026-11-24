@@ -1,3 +1,4 @@
+import { readExternalProviderJson, ExternalProviderJsonError } from './external-provider-json';
 import { Injectable } from '@nestjs/common';
 import { createHash } from 'node:crypto';
 import {
@@ -40,8 +41,6 @@ export class AsaasGatewayError extends Error {
   }
 }
 
-const MAX_RESPONSE_BYTES = 64 * 1024;
-
 function publicBaseUrl(): URL | null {
   try {
     const url = new URL(process.env.EVOLVIA_PUBLIC_BASE_URL ?? '');
@@ -50,34 +49,6 @@ function publicBaseUrl(): URL | null {
     return url;
   } catch {
     return null;
-  }
-}
-
-async function boundedJson(response: Response): Promise<Record<string, unknown>> {
-  const declared = Number(response.headers.get('content-length') ?? 0);
-  if (declared > MAX_RESPONSE_BYTES) throw new AsaasGatewayError('provider_response_too_large', 'UNKNOWN');
-  if (!response.body) return {};
-  const reader = response.body.getReader();
-  const chunks: Uint8Array[] = [];
-  let size = 0;
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    size += value.byteLength;
-    if (size > MAX_RESPONSE_BYTES) {
-      await reader.cancel();
-      throw new AsaasGatewayError('provider_response_too_large', 'UNKNOWN');
-    }
-    chunks.push(value);
-  }
-  const bytes = new Uint8Array(size);
-  let offset = 0;
-  for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.byteLength; }
-  try {
-    const parsed = JSON.parse(new TextDecoder().decode(bytes));
-    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed as Record<string, unknown> : {};
-  } catch {
-    throw new AsaasGatewayError('provider_invalid_response', 'UNKNOWN');
   }
 }
 
@@ -190,7 +161,14 @@ export class AsaasCheckoutGateway {
     } catch {
       throw new AsaasGatewayError('provider_network_ambiguous', 'UNKNOWN');
     }
-    const body = await boundedJson(response);
+    let result: unknown;
+    try {
+      result = await readExternalProviderJson(response);
+    } catch (error) {
+      const code = error instanceof ExternalProviderJsonError ? error.code : 'provider_network_ambiguous';
+      throw new AsaasGatewayError(code, 'UNKNOWN');
+    }
+    const body = result && typeof result === 'object' && !Array.isArray(result) ? result as Record<string, unknown> : {};
     if (!response.ok) {
       const safe = response.status >= 400 && response.status < 500 ? 'SAFE' : 'UNKNOWN';
       throw new AsaasGatewayError(`provider_http_${response.status}`, safe);
