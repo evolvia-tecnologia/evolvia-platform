@@ -62,10 +62,14 @@ test('a leitura da caixa de teste é isolada, verifica a mensagem e persiste uma
   mail.bodyValues['1'].isEncodingProblem = false;
   const action = 'registration.confirmation_test_inbox_received';
   assert.equal(await prisma.auditLog.count({ where: { ...entity, action } }), 0);
-  await Promise.all([verify(), verify()]);
+  const checks = await Promise.all([verify(), verify()]);
   const evidence = await prisma.auditLog.findMany({ where: { ...entity, action } });
   assert.equal(evidence.length, 1);
   const { evidenceHash, ...metadata } = evidence[0].metadata;
   assert.match(evidenceHash, /^[a-f0-9]{64}$/);
+  for (const check of checks) assert.deepEqual(check, { environment: 'TEST', received: true, evidenceHash });
+  mail.id = 'other-message';
+  await assert.rejects(verifyConfirmationInbox(prisma, row.id, mail.id, env, transport), /outra mensagem/);
+  assert.equal(await prisma.auditLog.count({ where: { ...entity, action } }), 1);
   assert.deepEqual(metadata, { environment: 'TEST', received: true, evidence: 'authenticated_mailbox_read' });
 });

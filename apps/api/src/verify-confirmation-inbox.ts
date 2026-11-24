@@ -44,9 +44,17 @@ export async function verifyConfirmationInbox(prisma: PrismaClient, reservationI
       })) throw new Error('A mensagem não comprova esta confirmação na caixa autorizada.');
   const id = createHash('sha256').update(JSON.stringify(['sandbox-confirmation-received-v1',org,row.eventId,reservationId])).digest('hex');
   const evidenceHash = createHash('sha256').update(JSON.stringify([endpoint.origin, accountId, mailboxId, messageId])).digest('hex');
-  await prisma.auditLog.createMany({ data: [{ id, ...scope, action: 'registration.confirmation_test_inbox_received',
+  const inserted = await prisma.auditLog.createMany({ data: [{ id, ...scope, action: 'registration.confirmation_test_inbox_received',
     metadata: { environment: 'TEST', received: true, evidence: 'authenticated_mailbox_read', evidenceHash } }], skipDuplicates: true });
-  return { environment: 'TEST', received: true };
+  if (inserted.count === 0) {
+    const sameMessage = await prisma.auditLog.findFirst({
+      where: { id, ...scope, action: 'registration.confirmation_test_inbox_received',
+        metadata: { path: ['evidenceHash'], equals: evidenceHash } },
+      select: { id: true },
+    });
+    if (!sameMessage) throw new Error('A evidência registrada corresponde a outra mensagem.');
+  }
+  return { environment: 'TEST', received: true, evidenceHash };
 }
 
 export async function runInboxVerification() {
