@@ -33,6 +33,13 @@ import {
   publicWizardSession,
   type WizardAnswers,
 } from './wizard-policy';
+import {
+  agendaResultante,
+  getAgendaSaveIssues,
+  getWizardSaveIssues,
+  subjectAreasToPersist,
+  type AgendaResultante,
+} from './wizard-save-policy';
 
 @Injectable()
 export class EventWizardService {
@@ -112,8 +119,16 @@ export class EventWizardService {
     const stored = session.answers && typeof session.answers === 'object' && !Array.isArray(session.answers)
       ? session.answers as Record<string, unknown>
       : {};
+    // Datas/local/fuso e áreas vêm do Event quando gravados: o rascunho parcial
+    // na sessão não pode apagar o que o organizador já confirmou no banco.
     const answers = normalizeWizardAnswers({
       ...stored,
+      startDate: event.startDate?.toISOString() ?? stored.startDate ?? null,
+      endDate: event.endDate?.toISOString() ?? stored.endDate ?? null,
+      timeZone: event.timeZone ?? stored.timeZone,
+      datesPending: event.startDate ? false : stored.datesPending,
+      venue: event.venue ?? stored.venue ?? null,
+      venuePending: event.venue ? false : stored.venuePending,
       subjectAreas: event.subjectAreas.length > 0 ? event.subjectAreas : stored.subjectAreas,
     });
     const selected = new Set(answers.capabilities ?? []);
@@ -150,9 +165,13 @@ export class EventWizardService {
     const event = await this.requireReadableEvent(userId, eventId);
     this.mutationPolicy.assertFoundationMutable(event.status);
     const answers = this.normalizeAnswersForEvent(event, dto.answers);
+    // Corpo parcial: validar e gravar o intervalo RESULTANTE, não só o pedido.
+    const agenda = agendaResultante(answers, event);
+    const saveIssues = getAgendaSaveIssues(agenda);
+    if (saveIssues.length > 0) throw new BadRequestException(saveIssues);
 
     await this.prisma.$transaction(async (tx) => {
-      const sessionAnswers = await this.persistEventData(tx, event.id, answers);
+      const sessionAnswers = await this.persistEventData(tx, event.id, answers, agenda);
       await this.auditTimeZoneChange(tx, userId, event, answers);
       await this.syncCapabilities(tx, event.id, answers.capabilities ?? []);
 
@@ -188,11 +207,15 @@ export class EventWizardService {
     const event = await this.requireReadableEvent(userId, eventId);
     const nextStatus = this.mutationPolicy.statusAfterFoundationCompletion(event.status);
     const answers = this.normalizeAnswersForEvent(event, dto.answers);
-    const issues = getWizardCompletionIssues(answers);
+    const agenda = agendaResultante(answers, event);
+    const issues = [...new Set([
+      ...getWizardCompletionIssues(answers),
+      ...getWizardSaveIssues(agenda),
+    ])];
     if (issues.length > 0) throw new BadRequestException(issues);
 
     await this.prisma.$transaction(async (tx) => {
-      const sessionAnswers = await this.persistEventData(tx, event.id, answers, true);
+      const sessionAnswers = await this.persistEventData(tx, event.id, answers, agenda, true);
       await this.auditTimeZoneChange(tx, userId, event, answers);
       await this.syncCapabilities(tx, event.id, answers.capabilities ?? []);
 
@@ -262,6 +285,8 @@ export class EventWizardService {
       ...requested,
       organizationId: event.organizationId ?? undefined,
       profileCode: canonical?.profileCode ?? event.profileCode ?? undefined,
+      // Corpo sem áreas NÃO pede apagamento (rota dedicada /subject-areas).
+      subjectAreas: subjectAreasToPersist(requested.subjectAreas, event.subjectAreas),
     });
   }
 
@@ -378,6 +403,7 @@ export class EventWizardService {
     tx: Prisma.TransactionClient,
     eventId: string,
     answers: WizardAnswers,
+    agenda: AgendaResultante,
     publishSlug = false,
   ): Promise<WizardAnswers> {
     const data: Prisma.EventUpdateInput = {};
@@ -393,18 +419,9 @@ export class EventWizardService {
         }
       }
     }
-    // Datas: null explícito remove o valor no Event. undefined (omissão/inválido) não altera o histórico.
-    if (answers.datesPending === true) {
-      data.startDate = null;
-      data.endDate = null;
-    } else {
-      if (answers.startDate !== undefined) {
-        data.startDate = answers.startDate ? new Date(answers.startDate) : null;
-      }
-      if (answers.endDate !== undefined) {
-        data.endDate = answers.endDate ? new Date(answers.endDate) : null;
-      }
-    }
+    // #662/#716: gravar pelo intervalo RESULTANTE (agenda), não pelo pedido parcial.
+    if (agenda.gravaStartDate) data.startDate = agenda.startDate ? new Date(agenda.startDate) : null;
+    if (agenda.gravaEndDate) data.endDate = agenda.endDate ? new Date(agenda.endDate) : null;
     if (answers.timeZone) data.timeZone = answers.timeZone;
     if (answers.venue !== undefined || answers.venuePending) data.venue = answers.venue ?? null;
     if (answers.estimatedAudience !== undefined || answers.audiencePending) {

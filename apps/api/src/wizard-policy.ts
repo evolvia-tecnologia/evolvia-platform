@@ -7,6 +7,9 @@ import {
 } from '@prisma/client';
 import { PUBLIC_SUBJECT_AREAS } from './event-publication/public-discovery.policy';
 import { normalizeEventTimeZone } from './time-zone-policy';
+import { getWizardSaveIssues, subjectAreasToPersist } from './wizard-save-policy';
+
+export { getWizardSaveIssues, subjectAreasToPersist };
 
 export const PUBLIC_SUBJECT_AREA_IDS = PUBLIC_SUBJECT_AREAS.map((area) => area.id);
 
@@ -322,7 +325,7 @@ export function getWizardCompletionIssues(answers: WizardAnswers): string[] {
   if (!answers.name || answers.name.trim().length < 3) issues.push('Informe um nome com pelo menos 3 caracteres.');
   if (!answers.startDate && !answers.datesPending) issues.push('Informe a data de início ou marque que será definida depois.');
   if (!answers.timeZone) issues.push('Escolha o fuso horário do evento.');
-  if (answers.startDate && answers.endDate && new Date(answers.endDate) < new Date(answers.startDate)) issues.push('A data de término não pode ser anterior à data de início.');
+  issues.push(...getWizardSaveIssues(answers));
   if (!answers.venue && !answers.venuePending) issues.push('Informe o local ou marque que será definido depois.');
   if (!answers.registrationMode) issues.push('Escolha o modelo de inscrição.');
   if (!answers.capabilities?.includes('registration')) issues.push('A capacidade de inscrições é obrigatória.');
