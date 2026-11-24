@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { api, getToken } from '../lib/api';
+import { publicPortraitUrl } from '../lib/public-event-program';
 import ScientificEvaHelp from './scientific-eva-help';
 import styles from './scientific-guests.module.css';
 
@@ -27,6 +28,7 @@ type Guest = {
   displayName?: string | null;
   professionalTitle?: string | null;
   miniBio?: string | null;
+  portraitUrl?: string | null;
   internalNotes?: string | null;
   accessibilityNotes?: string | null;
   technicalSupportNotes?: string | null;
@@ -100,9 +102,11 @@ export default function ScientificGuests({ eventId }: { eventId: string }) {
     customRoleLabel: '',
     professionalTitle: '',
     miniBio: '',
+    portraitUrl: '',
     accessibilityNotes: '',
     technicalSupportNotes: '',
   });
+  const [portraitDrafts, setPortraitDrafts] = useState<Record<string, string>>({});
   const [template, setTemplate] = useState({ subject: '', body: '', expiresInDays: 14 });
 
   useEffect(() => {
@@ -216,6 +220,7 @@ export default function ScientificGuests({ eventId }: { eventId: string }) {
           customRoleLabel: guest.customRoleLabel || undefined,
           professionalTitle: guest.professionalTitle || undefined,
           miniBio: guest.miniBio || undefined,
+          portraitUrl: guest.portraitUrl || undefined,
           accessibilityNotes: guest.accessibilityNotes || undefined,
           technicalSupportNotes: guest.technicalSupportNotes || undefined,
         }
@@ -227,12 +232,16 @@ export default function ScientificGuests({ eventId }: { eventId: string }) {
           customRoleLabel: guest.customRoleLabel || undefined,
           professionalTitle: guest.professionalTitle || undefined,
           miniBio: guest.miniBio || undefined,
+          portraitUrl: guest.portraitUrl || undefined,
           accessibilityNotes: guest.accessibilityNotes || undefined,
           technicalSupportNotes: guest.technicalSupportNotes || undefined,
         };
 
     if (mode === 'existing' && !guest.personId) return setError('Escolha um membro da Grade científica.');
     if (mode === 'new' && !guest.name.trim()) return setError('Informe o Nome do Membro da Programação Científica.');
+    if (guest.portraitUrl.trim() && !publicPortraitUrl(guest.portraitUrl)) {
+      return setError('A foto pública precisa ser um endereço https de até 300 caracteres, sem usuário ou senha na URL.');
+    }
 
     const result = await mutate<Payload>(`/scientific-events/${eventId}/guests`, {
       method: 'POST', body: JSON.stringify(body),
@@ -242,9 +251,29 @@ export default function ScientificGuests({ eventId }: { eventId: string }) {
     setNotice('Membro adicionado à programação científica.');
     setGuest({
       personId: '', name: '', email: '', institution: '', participationType: 'SPEAKER', customRoleLabel: '',
-      professionalTitle: '', miniBio: '', accessibilityNotes: '', technicalSupportNotes: '',
+      professionalTitle: '', miniBio: '', portraitUrl: '', accessibilityNotes: '', technicalSupportNotes: '',
     });
     setMode(result.people.some((item) => !item.hasGuestProfile) ? 'existing' : 'new');
+  }
+
+  async function savePortrait(event: FormEvent, guestId: string, current: string) {
+    event.preventDefault();
+    const portraitUrl = (portraitDrafts[guestId] ?? current).trim();
+    if (portraitUrl && !publicPortraitUrl(portraitUrl)) {
+      setError('A foto pública precisa ser um endereço https de até 300 caracteres, sem usuário ou senha na URL.');
+      return;
+    }
+    const result = await mutate<Payload>(`/scientific-events/${eventId}/guests/${guestId}`, {
+      method: 'PATCH', body: JSON.stringify({ portraitUrl }),
+    }, `portrait-${guestId}`);
+    if (!result) return;
+    setPayload(result);
+    setPortraitDrafts((drafts) => {
+      const next = { ...drafts };
+      delete next[guestId];
+      return next;
+    });
+    setNotice(portraitUrl ? 'Foto pública salva. Ela aparece na programação quando o convite estiver confirmado.' : 'Foto pública removida da programação.');
   }
 
   async function saveTemplate(event: FormEvent) {
@@ -381,6 +410,10 @@ export default function ScientificGuests({ eventId }: { eventId: string }) {
                   <span className={styles.fieldHelp}>Use para apresentar o membro ao público. Prefira 2 a 4 frases objetivas. Ex.: Cardiologista, pesquisadora em insuficiência cardíaca e professora da UFMG.</span>
                   <textarea placeholder="Ex.: Cardiologista, pesquisadora em insuficiência cardíaca e professora da UFMG." value={guest.miniBio} onChange={(e) => setGuest({ ...guest, miniBio: e.target.value })} />
                 </label>
+                <label>Foto pública <small>opcional</small>
+                  <span className={styles.fieldHelp}>Informe um endereço https da foto. Ela aparece na programação quando o convite estiver confirmado. Link de rede social não entra aqui.</span>
+                  <input type="url" inputMode="url" autoComplete="off" maxLength={300} placeholder="https://exemplo.org/foto.jpg" value={guest.portraitUrl} onChange={(e) => setGuest({ ...guest, portraitUrl: e.target.value })} />
+                </label>
                 <div className={styles.row}>
                   <label>Acessibilidade <small>opcional</small>
                     <span className={styles.fieldHelp}>Preencha somente quando houver uma necessidade operacional. Ex.: acesso sem escadas, intérprete de Libras ou assento adaptado.</span>
@@ -439,17 +472,28 @@ export default function ScientificGuests({ eventId }: { eventId: string }) {
           </label>
         </div>}
 
-        {payload.guests.length === 0 ? <div className={styles.empty}>Nenhum palestrante ou convidado cadastrado ainda. Comece pelo bloco “Adicionar membro da programação científica”.</div> : filteredGuests.length === 0 ? <div className={styles.empty}>Nenhum membro corresponde aos filtros atuais. Limpe a busca ou escolha “Todos”.</div> : <div className={styles.guestGrid}>{filteredGuests.map((item) => <article className={styles.guestCard} key={item.id}>
+        {payload.guests.length === 0 ? <div className={styles.empty}>Nenhum palestrante ou convidado cadastrado ainda. Comece pelo bloco “Adicionar membro da programação científica”.</div> : filteredGuests.length === 0 ? <div className={styles.empty}>Nenhum membro corresponde aos filtros atuais. Limpe a busca ou escolha “Todos”.</div> : <div className={styles.guestGrid}>{filteredGuests.map((item) => {
+          const portraitPreview = publicPortraitUrl(portraitDrafts[item.id] ?? item.portraitUrl ?? '');
+          return <article className={styles.guestCard} key={item.id}>
           <div className={styles.guestHead}><div><strong>{item.displayName || item.person.name}</strong><span>{item.roleLabel}{item.person.institution ? ` · ${item.person.institution}` : ''}</span></div><span className={`${styles.status} ${styles[`status${item.invitationStatus}`]}`}>{invitationLabels[item.invitationStatus]}</span></div>
           {item.professionalTitle && <p className={styles.title}>{item.professionalTitle}</p>}
           {item.miniBio && <p className={styles.bio}>{item.miniBio}</p>}
+          <form className={styles.portraitForm} onSubmit={(event) => savePortrait(event, item.id, item.portraitUrl || '')}>
+            <label>Foto pública <small>https, opcional</small>
+              <span className={styles.fieldHelp}>Aparece na programação do evento quando o convite estiver confirmado. Link de rede social não entra aqui.</span>
+              <input type="url" inputMode="url" autoComplete="off" maxLength={300} placeholder="https://exemplo.org/foto.jpg" value={portraitDrafts[item.id] ?? item.portraitUrl ?? ''} onChange={(event) => setPortraitDrafts((current) => ({ ...current, [item.id]: event.target.value }))} />
+            </label>
+            {portraitPreview && <img className={styles.portraitPreview} src={portraitPreview} alt={`Foto de ${item.displayName || item.person.name}`} width={72} height={72} decoding="async" referrerPolicy="no-referrer" />}
+            <button className={styles.portraitSave} type="submit" disabled={Boolean(busy)}>{busy === `portrait-${item.id}` ? 'Salvando…' : 'Salvar foto'}</button>
+          </form>
           <div className={styles.meta}><span>{item.person.email || 'Sem e-mail cadastrado'}</span>{item.invitationExpiresAt && <span>Link válido até {new Date(item.invitationExpiresAt).toLocaleDateString('pt-BR')}</span>}</div>
           <div className={styles.guestActions}>
-            {!['CONFIRMED', 'CANCELLED'].includes(item.invitationStatus) && <button onClick={() => prepareInvitation(item.id)} disabled={Boolean(busy)}>{busy === `prepare-${item.id}` ? 'Preparando…' : item.invitationStatus === 'DECLINED' ? 'Preparar novo convite' : 'Preparar convite'}</button>}
-            {item.invitationStatus === 'PREPARED' && <button onClick={() => setInvitationStatus(item.id, 'SENT')} disabled={Boolean(busy)}>Registrar envio</button>}
-            {!['CANCELLED', 'CONFIRMED', 'DECLINED'].includes(item.invitationStatus) && <button className={styles.danger} onClick={() => setInvitationStatus(item.id, 'CANCELLED')} disabled={Boolean(busy)}>Cancelar</button>}
+            {!['CONFIRMED', 'CANCELLED'].includes(item.invitationStatus) && <button type="button" onClick={() => prepareInvitation(item.id)} disabled={Boolean(busy)}>{busy === `prepare-${item.id}` ? 'Preparando…' : item.invitationStatus === 'DECLINED' ? 'Preparar novo convite' : 'Preparar convite'}</button>}
+            {item.invitationStatus === 'PREPARED' && <button type="button" onClick={() => setInvitationStatus(item.id, 'SENT')} disabled={Boolean(busy)}>Registrar envio</button>}
+            {!['CANCELLED', 'CONFIRMED', 'DECLINED'].includes(item.invitationStatus) && <button type="button" className={styles.danger} onClick={() => setInvitationStatus(item.id, 'CANCELLED')} disabled={Boolean(busy)}>Cancelar</button>}
           </div>
-        </article>)}</div>}
+        </article>;
+        })}</div>}
       </section>
 
       <div className={styles.footerNote}><strong>A4 preparado para A5 e certificados</strong><p>Identidade, tipo de participação, convite e confirmação ficam auditáveis. O A5 vinculará esses membros às atividades e horários; presença e carga horária serão evidências separadas.</p></div>

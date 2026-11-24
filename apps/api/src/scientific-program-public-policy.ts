@@ -40,6 +40,7 @@ export type PublicProgramActivityRow = {
         displayName: string | null;
         professionalTitle: string | null;
         invitationStatus: ScientificInvitationStatus;
+        portraitUrl?: string | null;
       } | null;
     };
   }>;
@@ -50,7 +51,27 @@ export type PublicProgramParticipant = {
   professionalTitle: string | null;
   participationType: ScientificParticipationType;
   customRoleLabel: string | null;
+  portraitUrl: string | null;
 };
+
+const PORTRAIT_URL_MAX = 300;
+
+/** https only, no credentials. Empty or unsafe values stay off the public page. */
+export function publishedPortraitUrl(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  if (!trimmed || trimmed.length > PORTRAIT_URL_MAX) return null;
+  let parsed: URL;
+  try {
+    parsed = new URL(trimmed);
+  } catch {
+    return null;
+  }
+  if (parsed.protocol !== 'https:') return null;
+  if (parsed.username || parsed.password) return null;
+  if (!parsed.hostname) return null;
+  return parsed.href;
+}
 
 export type PublicProgramActivity = {
   id: string;
@@ -89,6 +110,7 @@ export function publicProgramParticipants(rows: PublicProgramActivityRow['partic
       customRoleLabel: row.participationType === ScientificParticipationType.OTHER
         ? row.customRoleLabel?.trim() || null
         : null,
+      portraitUrl: publishedPortraitUrl(profile.portraitUrl),
     }];
   });
 }

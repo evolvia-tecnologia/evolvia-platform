@@ -5,6 +5,7 @@ export type PublicProgramParticipant = {
   professionalTitle: string | null;
   participationType: string;
   customRoleLabel: string | null;
+  portraitUrl: string | null;
 };
 
 export type PublicProgramWork = {
@@ -39,12 +40,25 @@ export type PublicProgramDay = {
     startLabel: string;
     endLabel: string;
     endsOnAnotherDay: string | null;
-    people: Array<{ name: string; detail: string }>;
+    people: Array<{ name: string; detail: string; portraitUrl: string | null }>;
   }>;
 };
 
 const text = (value: unknown, max: number): string | null =>
   typeof value === 'string' && value.trim() ? value.trim().slice(0, max) : null;
+
+export function publicPortraitUrl(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  if (!trimmed || trimmed.length > 300) return null;
+  try {
+    const parsed = new URL(trimmed);
+    if (parsed.protocol !== 'https:' || parsed.username || parsed.password || !parsed.hostname) return null;
+    return parsed.href;
+  } catch {
+    return null;
+  }
+}
 
 const instant = (value: unknown): string | null =>
   typeof value === 'string' && Number.isFinite(Date.parse(value)) ? value : null;
@@ -86,6 +100,7 @@ function parseActivity(value: unknown): PublicProgramActivity | null {
       professionalTitle: text(person.professionalTitle, 160),
       participationType: text(person.participationType, 40) ?? 'OTHER',
       customRoleLabel: text(person.customRoleLabel, 100),
+      portraitUrl: publicPortraitUrl(person.portraitUrl),
     }];
   }) : [];
   return {
@@ -146,6 +161,7 @@ export function publicProgramDays(program: PublicProgram): PublicProgramDay[] {
       people: activity.participants.map((person) => ({
         name: person.name,
         detail: [agendaRole(person.participationType, person.customRoleLabel), person.professionalTitle].filter(Boolean).join(' · '),
+        portraitUrl: person.portraitUrl,
       })),
     });
   }

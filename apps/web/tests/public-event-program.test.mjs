@@ -9,7 +9,7 @@ const compile = (path) => ts.transpileModule(readFileSync(new URL(path, import.m
 }).outputText;
 const agenda = url(compile('../lib/scientific-program-agenda.ts'));
 const model = url(compile('../lib/public-event-program.ts').replace(/['"]\.\/scientific-program-agenda['"]/, JSON.stringify(agenda)));
-const { parsePublicProgram, publicProgramDays, publicProgramTimeZone, publicProgramWideLayout } = await import(model);
+const { parsePublicProgram, publicPortraitUrl, publicProgramDays, publicProgramTimeZone, publicProgramWideLayout } = await import(model);
 
 const modules = {
   'react/jsx-runtime': url('export const Fragment="fragment"; export const jsx=(type,props)=>({type,props}); export const jsxs=jsx;'),
@@ -45,7 +45,7 @@ const payload = {
         authors: ['Dra. Ana Souza', { name: 'Segredo', email: 'autor@privado.example' }],
         email: 'trabalho@privado.example', fileKey: 's3://segredo',
       },
-      participants: [{ name: 'Dra. Ana Souza', professionalTitle: 'Cardiologista', participationType: 'SPEAKER', customRoleLabel: null, email: 'ana@privado.example' }] },
+      participants: [{ name: 'Dra. Ana Souza', professionalTitle: 'Cardiologista', participationType: 'SPEAKER', customRoleLabel: null, email: 'ana@privado.example', portraitUrl: 'https://cdn.example/ana.jpg', websiteUrl: 'https://social.example/ana', linkedinUrl: 'https://usuario:senha@linkedin.example/in/ana' }] },
     { id: '', title: 'Sem identificador', startAt: '2026-10-16T12:00:00Z', endAt: '2026-10-16T13:00:00Z' },
     { id: 'x', title: 'Data inválida', startAt: 'amanhã', endAt: '2026-10-16T13:00:00Z' },
   ],
@@ -68,7 +68,8 @@ test('agrupa por dia no fuso do evento, inclusive perto da meia-noite', () => {
 test('parser descarta campos privados que não fazem parte do contrato público', () => {
   const program = parsePublicProgram(payload);
   const serialized = JSON.stringify(program);
-  for (const secret of ['privado.example', 'microfone', 'streamUrl', 'email', 's3://', 'Segredo']) assert.doesNotMatch(serialized, new RegExp(secret, 'u'));
+  for (const secret of ['privado.example', 'microfone', 'streamUrl', 'email', 's3://', 'Segredo', 'social.example', 'linkedin.example', 'usuario:senha']) assert.doesNotMatch(serialized, new RegExp(secret, 'u'));
+  assert.equal(program.activities.find((item) => item.id === 'a1').participants[0].portraitUrl, 'https://cdn.example/ana.jpg');
   assert.equal(program.activities.find((item) => item.id === 'a1').work.code, 12);
   assert.deepEqual(program.activities.find((item) => item.id === 'a1').work.authors, ['Dra. Ana Souza']);
   assert.equal(parsePublicProgram(null), null);
@@ -102,6 +103,11 @@ test('seção pública mostra dias, horários, salas e pessoas sem links de tran
   assert.match(content, /Auditório Principal · Térreo/u);
   assert.match(content, /Online/u);
   assert.match(content, /Dra\. Ana Souza/u);
+  const photos = findAll(tree, (node) => node.type === 'img');
+  assert.equal(photos.length, 1);
+  assert.equal(photos[0].props.src, 'https://cdn.example/ana.jpg');
+  assert.equal(photos[0].props.alt, 'Foto de Dra. Ana Souza');
+  assert.equal(photos[0].props.referrerPolicy, 'no-referrer');
   assert.match(content, /Trabalho confirmado: Diretrizes de insuficiência cardíaca · código 12 · Dra\. Ana Souza/u);
   assert.match(content, /Moderação/u);
   const links = findAll(tree, (node) => node.type === 'a');
@@ -120,6 +126,23 @@ test('um único dia dispensa a navegação por dias e sem online não promete ac
   const tree = PublicEventProgram({ program });
   assert.equal(findAll(tree, (node) => node.type === 'nav').length, 0);
   assert.doesNotMatch(text(tree), /área do participante/u);
+});
+
+test('foto insegura não vira imagem e a pessoa sem foto continua só com nome e função', () => {
+  for (const unsafe of ['http://cdn.example/ana.jpg', 'javascript:alert(1)', 'data:image/png;base64,aaaa', 'https://user:senha@cdn.example/ana.jpg', `https://cdn.example/${'a'.repeat(300)}`]) {
+    assert.equal(publicPortraitUrl(unsafe), null);
+  }
+  const program = parsePublicProgram({
+    ...payload,
+    activities: [{
+      ...payload.activities[0],
+      participants: [{ name: 'Dr. Paulo Reis', professionalTitle: null, participationType: 'MODERATOR', customRoleLabel: null, portraitUrl: 'http://cdn.example/paulo.jpg' }],
+    }],
+  });
+  assert.equal(program.activities[0].participants[0].portraitUrl, null);
+  const tree = PublicEventProgram({ program });
+  assert.equal(findAll(tree, (node) => node.type === 'img').length, 0);
+  assert.match(text(tree), /Dr\. Paulo Reis/u);
 });
 
 test('código público acima de um milhão continua visível no trabalho da programação', () => {

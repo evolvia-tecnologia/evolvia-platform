@@ -40,7 +40,10 @@ export default function PublicEventProgram({ program, wide = false }: { program:
               {activity.work.authors.length > 0 && <> · {activity.work.authors.join(', ')}</>}
             </p>}
             {activity.people.length > 0 && <ul className={styles.people} aria-label="Participantes confirmados">
-              {activity.people.map((person, index) => <li key={`${person.name}-${index}`}><strong>{person.name}</strong><span>{person.detail}</span></li>)}
+              {activity.people.map((person, index) => <li key={`${person.name}-${index}`}>
+                {person.portraitUrl && <img className={styles.portrait} src={person.portraitUrl} alt={`Foto de ${person.name}`} width={72} height={72} decoding="async" loading="lazy" referrerPolicy="no-referrer" />}
+                <div className={styles.personCopy}><strong>{person.name}</strong>{person.detail ? <span>{person.detail}</span> : null}</div>
+              </li>)}
             </ul>}
           </div>
         </li>)}

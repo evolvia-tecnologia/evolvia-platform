@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { ScientificProgramService } from '../dist/scientific-program.service.js';
 import { ScientificProgramPublicService } from '../dist/scientific-program-public.service.js';
-import { presentPublicProgramActivity } from '../dist/scientific-program-public-policy.js';
+import { presentPublicProgramActivity, publishedPortraitUrl } from '../dist/scientific-program-public-policy.js';
 
 function organizerFixture({ status = 'READY_FOR_REVIEW', eventStatus = 'PUBLISHED', denied = false, raced = false, overlap = false } = {}) {
   const event = { id: 'event-1', organizationId: 'org-1', profileCode: 'SCIENTIFIC_EVENT', status: eventStatus,
@@ -127,8 +127,8 @@ test('apresentação pública mostra só pessoas confirmadas e nenhum dado inter
     startAt: '2026-10-15T12:00:00.000Z', endAt: '2026-10-15T13:00:00.000Z',
     space: { name: 'Sala virtual', location: null }, online: true, area: 'Cardiologia',
     participants: [
-      { name: 'Dra. Ana Souza', professionalTitle: 'Cardiologista', participationType: 'SPEAKER', customRoleLabel: null },
-      { name: 'Davi Rocha', professionalTitle: null, participationType: 'OTHER', customRoleLabel: 'Facilitação' },
+      { name: 'Dra. Ana Souza', professionalTitle: 'Cardiologista', participationType: 'SPEAKER', customRoleLabel: null, portraitUrl: null },
+      { name: 'Davi Rocha', professionalTitle: null, participationType: 'OTHER', customRoleLabel: 'Facilitação', portraitUrl: null },
     ],
     work: null,
   });
@@ -169,6 +169,9 @@ test('programação pública lê apenas atividades publicadas do próprio evento
   assert.deepEqual(queries[0].where, { eventId: 'event-1', organizationId: 'org-1', status: 'PUBLISHED' });
   assert.equal(queries[0].select.operationalNotes, undefined);
   assert.equal(queries[0].select.participants.select.person.select.email, undefined);
+  assert.equal(queries[0].select.participants.select.person.select.guestProfile.select.portraitUrl, true);
+  assert.equal(queries[0].select.participants.select.person.select.guestProfile.select.websiteUrl, undefined);
+  assert.equal(queries[0].select.participants.select.person.select.guestProfile.select.linkedinUrl, undefined);
 });
 
 test('evento não publicado, sem organização ou não científico não expõe programação', async () => {
@@ -185,4 +188,44 @@ test('evento não publicado, sem organização ou não científico não expõe p
   const { service } = publicFixture(publishedEvent);
   assert.equal(await service.findBySlug('   '), null);
   assert.equal(await service.findBySlug('outro-evento'), null);
+});
+
+test('foto pública aceita só https sem credencial e descarta rede social', () => {
+  assert.equal(publishedPortraitUrl(' https://cdn.example/ana.jpg '), 'https://cdn.example/ana.jpg');
+  for (const unsafe of [
+    '',
+    '   ',
+    'http://cdn.example/ana.jpg',
+    'javascript:alert(1)',
+    'data:image/png;base64,aaaa',
+    'https://user:senha@cdn.example/ana.jpg',
+    'https://usuario@cdn.example/ana.jpg',
+    'ftp://cdn.example/ana.jpg',
+    `https://cdn.example/${'a'.repeat(300)}`,
+    null,
+    12,
+  ]) assert.equal(publishedPortraitUrl(unsafe), null);
+
+  const presented = presentPublicProgramActivity({
+    ...row,
+    participants: [
+      confirmed('Ana Souza', {
+        displayName: 'Dra. Ana Souza',
+        portraitUrl: 'https://cdn.example/ana.jpg',
+        websiteUrl: 'https://social.example/ana',
+        linkedinUrl: 'https://linkedin.example/in/ana',
+      }),
+      confirmed('Olga Ruiz', { portraitUrl: 'http://cdn.example/olga.jpg' }),
+    ],
+  });
+  assert.deepEqual(presented.participants.map((person) => ({ name: person.name, portraitUrl: person.portraitUrl })), [
+    { name: 'Dra. Ana Souza', portraitUrl: 'https://cdn.example/ana.jpg' },
+    { name: 'Olga Ruiz', portraitUrl: null },
+  ]);
+  const serialized = JSON.stringify(presented);
+  assert.equal(serialized.includes('social.example'), false);
+  assert.equal(serialized.includes('linkedin.example'), false);
+  assert.equal(serialized.includes('websiteUrl'), false);
+  assert.equal(serialized.includes('linkedinUrl'), false);
+  assert.equal(serialized.includes('http://cdn.example'), false);
 });

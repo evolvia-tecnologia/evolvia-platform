@@ -34,6 +34,7 @@ import {
   participationTypeLabels,
   renderScientificInvitationTemplate,
 } from './scientific-guests-policy';
+import { publishedPortraitUrl } from './scientific-program-public-policy';
 import { normalizeScientificText } from './scientific-structure-policy';
 
 const DEFAULT_INVITATION_TEMPLATE = {
@@ -141,6 +142,7 @@ export class ScientificGuestsService {
             miniBio: this.optional(dto.miniBio, 1200),
             websiteUrl: this.optional(dto.websiteUrl, 300),
             linkedinUrl: this.optional(dto.linkedinUrl, 300),
+            portraitUrl: this.portrait(dto.portraitUrl),
             internalNotes: this.optional(dto.internalNotes, 1200),
             accessibilityNotes: this.optional(dto.accessibilityNotes, 600),
             technicalSupportNotes: this.optional(dto.technicalSupportNotes, 600),
@@ -174,6 +176,7 @@ export class ScientificGuestsService {
     if (dto.miniBio !== undefined) data.miniBio = this.optional(dto.miniBio, 1200);
     if (dto.websiteUrl !== undefined) data.websiteUrl = this.optional(dto.websiteUrl, 300);
     if (dto.linkedinUrl !== undefined) data.linkedinUrl = this.optional(dto.linkedinUrl, 300);
+    if (dto.portraitUrl !== undefined) data.portraitUrl = this.portrait(dto.portraitUrl);
     if (dto.internalNotes !== undefined) data.internalNotes = this.optional(dto.internalNotes, 1200);
     if (dto.accessibilityNotes !== undefined) data.accessibilityNotes = this.optional(dto.accessibilityNotes, 600);
     if (dto.technicalSupportNotes !== undefined) data.technicalSupportNotes = this.optional(dto.technicalSupportNotes, 600);
@@ -181,7 +184,8 @@ export class ScientificGuestsService {
     await this.prisma.$transaction(async (tx) => {
       await tx.scientificGuestProfile.update({ where: { id: guest.id }, data });
       await this.audit(tx, event, userId, 'scientific.guest_updated', 'ScientificGuestProfile', guest.id, {
-        changedFields: Object.keys(dto),
+        changedFields: Object.keys(dto).filter((field) => field !== 'portraitUrl'),
+        portraitUpdated: dto.portraitUrl !== undefined,
       });
     });
 
@@ -491,6 +495,15 @@ export class ScientificGuestsService {
     return value && typeof value === 'object' && !Array.isArray(value)
       ? { ...(value as Record<string, unknown>) }
       : {};
+  }
+
+  private portrait(value: string | null | undefined): string | null {
+    if (!value || !value.trim()) return null;
+    const portrait = publishedPortraitUrl(value);
+    if (!portrait) {
+      throw new BadRequestException('A foto pública precisa ser um endereço https de até 300 caracteres, sem usuário ou senha na URL.');
+    }
+    return portrait;
   }
 
   private optional(value: string | undefined, maxLength: number): string | null {

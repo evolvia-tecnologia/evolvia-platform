@@ -162,9 +162,24 @@
 }
 
 .people li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-12);
+  font-size: var(--font-size-sm);
+}
+
+.portrait {
+  width: 72px;
+  height: 72px;
+  flex: 0 0 72px;
+  border-radius: var(--radius-pill);
+  object-fit: cover;
+  background: var(--color-surface-subtle);
+}
+
+.personCopy {
   display: grid;
   gap: var(--space-4);
-  font-size: var(--font-size-sm);
 }
 
 .people span {
