@@ -116,7 +116,10 @@ test('visão geral carregada oferece edição de informações sem gravar dados 
       assert.equal(link.props.href, foundationHref);
       assert.equal(text(link), 'Editar informações do evento');
       assert.match(text(card), /nome, as datas, o local e o formato/);
-      assert.deepEqual(calls, [{ path: '/event-wizard/evento-qa', method: undefined }]);
+      assert.deepEqual(calls, [
+        { path: '/event-wizard/evento-qa', method: undefined },
+        { path: '/events/evento-qa/operators/me/capabilities', method: undefined },
+      ]);
     });
 });
 

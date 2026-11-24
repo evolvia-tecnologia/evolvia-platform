@@ -125,21 +125,6 @@ function ClosedPanel({ message }: { message: string }) {
   </main>;
 }
 
-function OperationalEventFrame({ section, children }: { section: EventFlowSection; children: ReactNode }) {
-  return <div className={styles.page} data-shell="operation">
-    <a className={styles.skipLink} href="#event-admin-content">Pular para o conteúdo</a>
-    <header className={styles.operationBar}>
-      <Link className={styles.brand} href="/painel">EVOLVIA</Link>
-      <strong>{sectionLabels[section]}</strong>
-      <Link className={styles.secondaryButton} href="/painel">Voltar ao painel</Link>
-    </header>
-    <p className={styles.operationNote}>A configuração do evento não faz parte deste acesso. A operação continua disponível.</p>
-    <div id="event-admin-content" className={styles.operationContent} tabIndex={-1}>
-      {children}
-    </div>
-  </div>;
-}
-
 /** CL02 — shell do OPERATOR: só atalhos que o servidor já listou + minhas permissões. */
 function RestrictedOperatorFrame({
   eventId,
@@ -175,7 +160,7 @@ function RestrictedOperatorFrame({
       <Link className={styles.secondaryButton} href="/painel">Voltar ao painel</Link>
     </header>
     <p className={styles.operationNote}>
-      Acesso de operador: só as ações concedidas neste evento. Configuração, financeiro e expositor ficam com o organizador.
+      Acesso de operador: só as ações concedidas neste evento. Configuração, cobrança e área de expositor ficam com o organizador.
     </p>
     <nav className={styles.navigation} aria-label="Operação restrita do evento">
       {links.map((link) => {
@@ -198,6 +183,21 @@ function RestrictedOperatorFrame({
         {children}
       </div>
     )}
+  </div>;
+}
+
+function OperationalEventFrame({ section, children }: { section: EventFlowSection; children: ReactNode }) {
+  return <div className={styles.page} data-shell="operation">
+    <a className={styles.skipLink} href="#event-admin-content">Pular para o conteúdo</a>
+    <header className={styles.operationBar}>
+      <Link className={styles.brand} href="/painel">EVOLVIA</Link>
+      <strong>{sectionLabels[section]}</strong>
+      <Link className={styles.secondaryButton} href="/painel">Voltar ao painel</Link>
+    </header>
+    <p className={styles.operationNote}>A configuração do evento não faz parte deste acesso. A operação continua disponível.</p>
+    <div id="event-admin-content" className={styles.operationContent} tabIndex={-1}>
+      {children}
+    </div>
   </div>;
 }
 
