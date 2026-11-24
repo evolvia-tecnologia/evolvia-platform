@@ -35,3 +35,31 @@ test('consulta Pix cancela resposta fragmentada excessiva mesmo com tamanho decl
   assert.equal(calls, 1);
   assert.equal(cancelled, true);
 });
+
+
+test('consulta Pix distingue falha durante leitura de JSON inválido', async () => {
+  const scope = { organizationId: 'org-A', eventId: 'event-A', providerCheckoutId: 'checkout-A' };
+  const account = { organizationId: 'org-A', token: 'fixture' };
+  let reads = 0;
+  const body = new ReadableStream({
+    pull(controller) {
+      if (++reads === 1) controller.enqueue(new TextEncoder().encode('{"data":'));
+      else controller.error(new Error('fixture transport failure'));
+    },
+  });
+  await assert.rejects(lookupSandboxRefundPayment(scope, account, async () => new Response(body)),
+    { message: 'Não foi possível consultar a cobrança na homologação.', cause: 'TRANSPORT' });
+  assert.equal(body.locked, false);
+  await assert.rejects(lookupSandboxRefundPayment(scope, account, async () => new Response('{invalid')),
+    { message: 'Não foi possível consultar a cobrança na homologação.', cause: 'INVALID_JSON' });
+});
+
+test('leitor distingue JSON válido de corpo vazio ou malformado sem vazar conteúdo', async () => {
+  assert.equal(await readExternalProviderJson(new Response(null)), null);
+  for (const payload of ['', '{invalid']) {
+    const response = new Response(payload);
+    await assert.rejects(readExternalProviderJson(response), { code: 'provider_invalid_response' });
+    assert.equal(response.body.locked, false);
+  }
+  assert.deepEqual(await readExternalProviderJson(new Response('[]')), []);
+});
