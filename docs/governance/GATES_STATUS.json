@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
   "baseline": "Gates v1 — 93 unidades e pesos preservados; reconciliação do Git em 08/10/2026",
-  "sourceSha": "d0493a743690fad325c4c64646dd12a7ad345ae7",
-  "ciRun": 40475151905,
-  "deployJob": 122112460724,
+  "sourceSha": "393ab9930d205dcb592cbf283b55c3fd1d2d86e3",
+  "ciRun": 45105953160,
+  "deployJob": null,
   "gateStatus": "0/11 encerrados; sem Go de produção",
   "publicAcceptance": {
     "passed": 1,
@@ -87,8 +87,8 @@
           "ci": true,
           "deployed": true,
           "accepted": false,
-          "evidence": "#388/#402; PR #405 comentário 04/10 18:31 UTC; ensaio público da feira; #584 alinha CTA/ingresso: ENTERTAINMENT ou (OTHER/null + Festival/Show); NON_TICKET_PROFILES nunca ingresso.",
-          "next": "Ensaio público das ações por perfil no SHA implantado; F pendente",
+          "evidence": "#388/#402; PR #405 comentário 04/10 18:31 UTC; ensaio público da feira; #584 alinha CTA/ingresso: ENTERTAINMENT ou (OTHER/null + Festival/Show); NON_TICKET_PROFILES nunca ingresso. Em 21/11 o catálogo filtrado levou a páginas HTTPS 200 de corporativo, feira e científico, com local e links de participação. As consultas de entretenimento, social e outro perfil não forneceram amostra de evento para o mesmo ensaio.",
+          "next": "Work deve completar as ações por perfil e o aceite funcional em homologação.",
           "deployedSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2",
           "implementationState": "Integrado",
           "ciSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2"
@@ -251,14 +251,15 @@
         {
           "id": "G2.10",
           "criterion": "Compra com várias entradas e ficha por comprador",
-          "integrated": false,
-          "ci": false,
-          "deployed": false,
+          "integrated": true,
+          "ci": true,
+          "deployed": true,
           "accepted": false,
-          "evidence": "operacao-do-evento.md, fatia 10",
-          "next": "Implementar sem duplicar identidade",
-          "implementationState": "Pendente",
-          "ciSourceSha": null
+          "evidence": "PR #471. CI pós-merge aprovou qualidade, migration/integração e ARM64. O job registrou o SHA implantado e a prontidão de API e PostgreSQL antes da falha no cabeçalho Server. https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/42683330025/job/129390430705",
+          "next": "Validar a compra múltipla na jornada autenticada em homologação.",
+          "implementationState": "Integrado",
+          "ciSourceSha": "838d2ad839acb10a92e41f1e15d5e3f4e2f87016",
+          "deployedSourceSha": "838d2ad839acb10a92e41f1e15d5e3f4e2f87016"
         },
         {
           "id": "G2.11",
@@ -267,9 +268,9 @@
           "ci": false,
           "deployed": false,
           "accepted": false,
-          "evidence": "operacao-do-evento.md, fatia 14",
-          "next": "Implementar política e compensação explícita",
-          "implementationState": "Pendente",
+          "evidence": "Reembolso individual e de compra múltipla preparado na #693. A #694 persiste a cobrança sandbox e a #680 integra a interface e valida a justificativa. Publicação 8f6409b0 no job 136701219650. A simulação registra moneyReturned=false.",
+          "next": "Codex deve comprovar restituição integral e parcial no provedor sandbox, conciliação e replay idempotente.",
+          "implementationState": "Entrega parcial publicada",
           "ciSourceSha": null
         },
         {
@@ -292,9 +293,9 @@
           "ci": false,
           "deployed": false,
           "accepted": false,
-          "evidence": "#376; envio real ainda sem evidência conclusiva",
-          "next": "Provar entrega, repetição/falha e privacidade",
-          "implementationState": "Pendente",
+          "evidence": "A #579 integrou a retomada da confirmação após a configuração do canal (0213c9e3). A regressão com transporte simulado está registrada na #571, comentário 7056044955.",
+          "next": "Codex deve comprovar o recebimento da confirmação e da credencial por destinatário de teste autorizado.",
+          "implementationState": "Entrega parcial integrada",
           "ciSourceSha": null
         },
         {
@@ -304,16 +305,16 @@
           "ci": false,
           "deployed": false,
           "accepted": false,
-          "evidence": "BACKLOG.md; responsável/comprovante não emite nota",
-          "next": "Adaptador e homologação fiscal próprios",
-          "implementationState": "Pendente",
+          "evidence": "A #613 em e4deefb6 protege a escrita do rascunho e registra auditoria. O candidato inclui teste PostgreSQL. Onze discussões aguardavam decisão independente na consulta.",
+          "next": "Codex e revisor fiscal devem fechar a revisão da prévia. A emissão exige município e conta sandbox autorizada.",
+          "implementationState": "Prévia fiscal em revisão",
           "ciSourceSha": null
         }
       ],
-      "points": 30,
+      "points": 33,
       "total": 56,
-      "percent": 53.57142857142857,
-      "implementationPercent": 71.42857142857143
+      "percent": 58.92857142857143,
+      "implementationPercent": 78.57142857142857
     },
     {
       "id": 3,
@@ -641,20 +642,20 @@
         {
           "id": "G5.8",
           "criterion": "Aviso ao autor após submissão/correção",
-          "integrated": false,
-          "ci": false,
+          "integrated": true,
+          "ci": true,
           "deployed": false,
           "accepted": false,
-          "evidence": "#406 explicitamente exclui envio de e-mail",
-          "next": "Provar entrega e idempotência",
-          "implementationState": "Pendente",
-          "ciSourceSha": null
+          "evidence": "PR #610 integrada em develop@71cb31fef5ae32cfe75e35ddee9a31c458ebbb38; claim PostgreSQL concorrente PR #708 integrado por squash em develop@393ab9930d205dcb592cbf283b55c3fd1d2d86e3; CI #45105953160 COMPLETED/SUCCESS (qualidade, PostgreSQL, ARM64), 0 threads. Evidência I/T de código e CI, não de envio externo, deploy ou aceite.",
+          "next": "Validar fluxo autorizado e destinatário/opt-in em homologação com SHA servido; confirmar timeout/crash UNKNOWN e dois workers; D/F permanecem falsos.",
+          "implementationState": "Integrado (I/T; D/F pendentes)",
+          "ciSourceSha": "393ab9930d205dcb592cbf283b55c3fd1d2d86e3"
         }
       ],
-      "points": 21,
+      "points": 23,
       "total": 32,
-      "percent": 65.625,
-      "implementationPercent": 87.5
+      "percent": 71.875,
+      "implementationPercent": 100
     },
     {
       "id": 6,
@@ -759,8 +760,8 @@
           "deployed": false,
           "accepted": false,
           "evidence": "operação fatia 11/benchmark; #551/8bea955c integrado/publicado: distribuição assistida com cargas persistidas e locks, CI40466676636/89PG. Refinamento parcial não conclui o critério.",
-          "next": "Comunicação real com canal/destinatário autorizado e aceite da operação completa; sem crédito adicional pela distribuição isolada.",
-          "implementationState": "Pendente",
+          "next": "Gemini deve provar comunicação em lote com filtro, destinatário autorizado e prevenção de duplicatas. A distribuição assistida da #551 já está contabilizada como entrega parcial.",
+          "implementationState": "Entrega parcial publicada",
           "ciSourceSha": null
         }
       ],
@@ -815,14 +816,14 @@
         {
           "id": "G7.4",
           "criterion": "Carta de aceite e comunicação ao autor",
-          "integrated": false,
-          "ci": false,
+          "integrated": true,
+          "ci": true,
           "deployed": false,
           "accepted": false,
-          "evidence": "Cartas configuráveis de aceite/recusa com editor, tags e consulta pelo próprio autor; envio e entrega de comunicação não comprovados.",
-          "next": "Documento e entrega real",
-          "implementationState": "Parcial",
-          "ciSourceSha": null
+          "evidence": "#518 merged por squash na develop e46268121378b77343231366922fd6a6b723830d; CI PR 44958147485 success; PG 137012174728 passou 255/255, inclusive testes 220 (aceite/recusa VIEWED e isolamento) e 221 (download DOWNLOADED + sessão); CI pós-merge 45086466534: qualidade, ARM64, migração/integração success. Publicação executada, mas prova pública reprovou por Server: nginx/1.24.0 (Ubuntu); sem aceite humano nem SHA servido correlacionado.",
+          "next": "Operador autorizado corrigir Nginx ativo #108 (server_tokens) e repetir prova pública do SHA; Work validar no navegador homologado autor correto/terceiro/outra organização, aceite/recusa e VIEWED/DOWNLOADED + trilha; obter aceite humano F. Nenhum e-mail real foi enviado.",
+          "implementationState": "Integrado e testado; homologação/aceite pendentes",
+          "ciSourceSha": "e46268121378b77343231366922fd6a6b723830d"
         },
         {
           "id": "G7.5",
@@ -851,10 +852,10 @@
           "ciSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2"
         }
       ],
-      "points": 15,
+      "points": 17,
       "total": 24,
-      "percent": 62.5,
-      "implementationPercent": 83.33333333333333
+      "percent": 70.83333333333334,
+      "implementationPercent": 100
     },
     {
       "id": 8,
@@ -1182,14 +1183,15 @@
         {
           "id": "G10.10",
           "criterion": "Atribuição granular do operador por evento/função",
-          "integrated": false,
-          "ci": false,
-          "deployed": false,
+          "integrated": true,
+          "ci": true,
+          "deployed": true,
           "accepted": false,
-          "evidence": "Posto básico integrado; ACL granular do operador ainda no #368, com conflitos.",
-          "next": "Reconciliar com posto integrado; não recriar",
-          "implementationState": "Bloqueado",
-          "ciSourceSha": null
+          "evidence": "PR #642. CI pós-merge aprovou qualidade, migration/integração e ARM64. O job registrou o SHA implantado e a prontidão de API e PostgreSQL antes da falha no cabeçalho Server. https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/42715129263/job/129500945850",
+          "next": "Validar em homologação operador com acesso concedido e acesso revogado por evento.",
+          "implementationState": "Integrado",
+          "ciSourceSha": "707781c635106d3f974bb5e678a8c3e913357372",
+          "deployedSourceSha": "707781c635106d3f974bb5e678a8c3e913357372"
         },
         {
           "id": "G10.11",
@@ -1231,10 +1233,10 @@
           "deployedSourceSha": "badd9ff097c7b3856a2f4141d39a5fccc19065d5"
         }
       ],
-      "points": 36,
+      "points": 39,
       "total": 52,
-      "percent": 69.23076923076923,
-      "implementationPercent": 92.3076923076923
+      "percent": 75,
+      "implementationPercent": 100
     },
     {
       "id": 11,
@@ -1325,23 +1327,44 @@
       "implementationPercent": 100
     }
   ],
-  "globalPercent": 69.97065434565435,
-  "globalImplementationPercent": 92.91541791541792,
-  "ciSourceSha": "877ee94e4236580f99376f9399c1513b70b3c2af",
-  "sourceTreeSha": "55b5bcbb3e1758c835fa027e972f0428b322d5bd",
-  "auditedAtUtc": "2026-10-27T13:11:00Z",
-  "deploymentOfCurrentSourceConfirmed": true,
-  "deployRun": 40479956349,
+  "globalPercent": 72.30790043290044,
+  "globalImplementationPercent": 96.9155844155844,
+  "ciSourceSha": null,
+  "sourceTreeSha": "24dacfd558543ad3d6643759c7a9c55c4ef425fa",
+  "auditedAtUtc": "2026-11-19T11:12:33.964Z",
+  "deploymentOfCurrentSourceConfirmed": false,
+  "deployRun": null,
   "previousSnapshot": {
     "sourceSha": "4337c99cd83cec1939b3744910032165c370cd85",
     "auditedAtUtc": "2026-10-26T05:33:26Z",
     "ciRun": 40272157015,
     "deployJob": 121414197364
   },
-  "integratedCriteria": 85,
+  "integratedCriteria": 89,
   "criteriaCount": 93,
-  "methodNote": "Reconciliação27/10: critérios/marcos I/T/D/F, denominadores93/11 e pesos preservados. Refinamentos605/551/606 não concluem novos critérios. G6.8 ainda requer avisos/operação completos; conexão/refresh PowerBI e aceite humano não comprovados.",
-  "integrationCiRun": 40475151905,
+  "methodNote": "Reconciliação de 19/11 validada novamente após a integração #680 em 20/11. G2.10 (#471) e G10.10 (#642) sustentam I/T/D. #680 melhora UX e declara que não conclui G2.11; #694 somente simulação (moneyReturned:false). Não dar novo crédito a G2.11/G2.13/G2.14/G5.8/G6.8 nem a refinamentos de critérios existentes; para G7.4 vale a reconciliação pontual comprovada após #518. Revisão do HEAD develop e evidências não equivale a homologação/Go de produção.\nReconciliação pontual após merge #518: G7.4 recebeu SOMENTE I e T por código integrado + CI PostgreSQL/ARM64. D=0/F=0 porque gate público #108 falhou após publicação e não há jornada autenticada/aceite do autor. Evidências PR #518 e workflows 44958147485 / 45086466534. 0/11 Gates encerrados; sem Go.\nReconciliação de 23/11 após merge da #708: a restrição histórica de NÃO creditar G5.8 foi superada exclusivamente para I/T. O serviço de avisos científicos e claim durável PostgreSQL de #610/#708 passaram no CI 45105953160; D/F continuam sem evidência de entrega real ou aceite. Permanecem sem crédito adicional G2.11, G2.13, G2.14, G6.8. Histórico acima mantido.",
+  "lastCrossCheck": {
+    "localDate": "2026-11-23",
+    "developSha": "393ab9930d205dcb592cbf283b55c3fd1d2d86e3",
+    "latestMergeNumber": 708,
+    "integratedCriteria": 89,
+    "criteriaCount": 93,
+    "implementationPercent": 96.9155844155844,
+    "verifiedPercent": 72.30790043290044,
+    "gateClosure": "0/11",
+    "noAdditionalCredit": [
+      680,
+      694,
+      693,
+      675,
+      678,
+      696,
+      689,
+      706
+    ],
+    "limitation": "G5.8: I/T comprovados com #610 e #708, CI 45105953160; D/F não comprovados. Deploy develop 45107963987 reprovou gate Nginx #108 (Server expõe versão). Sem envio real, inbox, SHA público correlacionado ou aceite do autor. G2.11/G2.13/G2.14/G6.8 continuam abertos."
+  },
+  "integrationCiRun": null,
   "technicalValidation": {
     "sourceSha": "877ee94e4236580f99376f9399c1513b70b3c2af",
     "ciRun": 40475151905,
@@ -1408,7 +1431,10 @@
     604,
     605,
     551,
-    606
+    606,
+    471,
+    642,
+    688
   ],
   "openPullRequests": [
     {
@@ -2001,13 +2027,13 @@
     }
   ],
   "lastConfirmedDeployment": {
-    "sourceSha": "d0493a743690fad325c4c64646dd12a7ad345ae7",
-    "run": 40479956349,
-    "job": 122112460724,
-    "commitAtUtc": "2026-10-27T09:34:54Z",
-    "readinessAtUtc": "2026-10-27T09:34:56Z",
+    "sourceSha": "8f6409b02178b795359ba96ad1e46f03514e3550",
+    "run": 44855700901,
+    "job": 136701219650,
+    "commitAtUtc": "2026-11-21T02:40:19Z",
+    "readinessAtUtc": "2026-11-21T02:40:21Z",
     "httpsStatus": 200,
     "publicGatePassed": false,
-    "note": "Implantação/prontidão comprovadas antes da falha Nginx/alias TLS. Sem Go de produção."
+    "note": "API e PostgreSQL prontos. A verificação pública reprovou porque o cabeçalho Server expôs a versão do Nginx (#108). Aceite autenticado por perfil pendente."
   }
 }

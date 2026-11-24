@@ -9,7 +9,8 @@ import styles from './event-communication.module.css';
 
 type Summary = { id: string; subject: string; revision: number; updatedAt: string };
 type Draft = Summary & { body: string };
-type Listing = { eventId: string; drafts: Summary[]; sendingAvailable: false };
+type Listing = { eventId: string; drafts: Summary[]; sendingAvailable: boolean };
+type Tab = 'write' | 'drafts' | 'preview' | 'history';
 const newDraft = (): Draft => ({ id: communicationDraftId(), subject: '', body: '', revision: 0, updatedAt: '' });
 
 export default function EventCommunication({ eventId }: { eventId: string }) {
@@ -23,7 +24,8 @@ function ScopedCommunication({ eventId }: { eventId: string }) {
   const [busy, setBusy] = useState(false);
   const [dirty, setDirty] = useState(false);
   const [message, setMessage] = useState('');
-  const [tab, setTab] = useState<'write' | 'drafts'>('write');
+  const [sendingAvailable, setSendingAvailable] = useState(false);
+  const [tab, setTab] = useState<Tab>('write');
   const current = useRef(false);
   const operation = useRef(false);
   const endpoint = `/events/${eventId}/communication/drafts`;
@@ -34,7 +36,9 @@ function ScopedCommunication({ eventId }: { eventId: string }) {
     if (!getToken()) { setMessage('Entre na sua conta para acessar os rascunhos.'); return () => { current.current = false; }; }
     api<Listing>(endpoint).then((result) => {
       if (!active) return;
-      setDrafts(result.drafts); setReady(true);
+      setDrafts(result.drafts);
+      setSendingAvailable(result.sendingAvailable === true);
+      setReady(true);
       try { setDraft(newDraft()); }
       catch (error) { setMessage(error instanceof Error ? error.message : 'Não foi possível criar um rascunho seguro. Abra um existente.'); }
     }).catch(() => { if (active) setMessage('Não foi possível carregar os rascunhos. Recarregue esta página para tentar novamente.'); });
@@ -94,17 +98,21 @@ function ScopedCommunication({ eventId }: { eventId: string }) {
   }
 
   const disabled = busy || !ready || !draft;
+  const showAudience = tab === 'write' || tab === 'preview';
   return <main className={styles.page}>
-    <header><p className={styles.eyebrow}>COMUNICAÇÃO</p><h1>Mensagens do evento</h1><p>Escreva e guarde seus rascunhos com o editor do Evolvia.</p></header>
-    <p className={styles.notice}>Envio ainda indisponível. SMTP, destinatários e disparo em lote estão em preparação. Salvar um rascunho não envia e-mail.</p>
+    <header><p className={styles.eyebrow}>COMUNICAÇÃO</p><h1>Mensagens do evento</h1><p>Escreva e confira destinatários. Salvar rascunho não envia e-mail; aceite do servidor não é entrega na caixa.</p></header>
+    <p className={styles.notice}>{sendingAvailable
+      ? 'O transporte de envio está sinalizado para este evento. Mesmo assim, aceite do gateway não significa e-mail recebido.'
+      : 'Envio em lote ainda indisponível na API. Você pode escrever, salvar rascunhos e conferir destinatários. Salvar ou conferir não envia e-mail.'}</p>
     <nav className={styles.actions} aria-label="Seções de comunicação">
       <button type="button" aria-pressed={tab === 'write'} onClick={() => setTab('write')}>Escrever</button>
       <button type="button" aria-pressed={tab === 'drafts'} onClick={() => setTab('drafts')}>Rascunhos ({drafts.length})</button>
+      <button type="button" aria-pressed={tab === 'preview'} onClick={() => setTab('preview')}>Prévia do público</button>
+      <button type="button" aria-pressed={tab === 'history'} onClick={() => setTab('history')}>Histórico</button>
     </nav>
-    <EventCommunicationAudience eventId={eventId} />
     {message && <p role="status">{message}</p>}
     {dirty && <p role="status">Você tem alterações não salvas. Salve ou use “Novo rascunho” para descartá-las antes de abrir outra mensagem.</p>}
-    {tab === 'write' ? <section className={styles.card} aria-label="Editor da mensagem">
+    {tab === 'write' && <section className={styles.card} aria-label="Editor da mensagem">
       <label htmlFor="communication-subject">Assunto</label>
       <input id="communication-subject" maxLength={180} disabled={disabled} value={draft?.subject ?? ''} onChange={(event) => { setDraft((value) => value && { ...value, subject: event.target.value }); setDirty(true); }} />
       <PublicationRichTextField id="communication-body" label="Mensagem" help="Use a formatação do editor. Não cole HTML nem dados sensíveis desnecessários." value={draft?.body ?? ''} onChange={(body) => { setDraft((value) => value && { ...value, body }); setDirty(true); }} maxLength={20000} disabled={disabled} />
@@ -113,10 +121,20 @@ function ScopedCommunication({ eventId }: { eventId: string }) {
         <button type="button" disabled={!ready || busy} onClick={reset}>Novo rascunho</button>
       </div>
       {draft && draft.revision > 0 && <p>Versão salva: {draft.revision}. Atualizada em {new Date(draft.updatedAt).toLocaleString('pt-BR')}.</p>}
-    </section> : <section className={styles.card} aria-label="Rascunhos salvos">
+    </section>}
+    {tab === 'drafts' && <section className={styles.card} aria-label="Rascunhos salvos">
       <h2>Rascunhos salvos</h2>
       {!drafts.length && <p>Nenhum rascunho salvo neste evento.</p>}
       <ul className={styles.list}>{drafts.map((row) => <li key={row.id}><strong>{row.subject}</strong><span>Versão {row.revision} · {new Date(row.updatedAt).toLocaleString('pt-BR')}</span><button type="button" disabled={busy || dirty} onClick={() => void open(row.id)}>Abrir <span className={styles.srOnly}>{row.subject}</span></button></li>)}</ul>
+    </section>}
+    {/* Mantém a prévia montada ao trocar de aba para não perder filtros/seleção. */}
+    <div hidden={!showAudience}>
+      <EventCommunicationAudience eventId={eventId} />
+    </div>
+    {tab === 'history' && <section className={styles.card} aria-label="Histórico de envios">
+      <h2>Histórico de envios</h2>
+      <p>A API ainda não publica histórico de disparos. Esta tela não consulta envios e não afirma “enviado” ou “entregue”.</p>
+      <p>Prévia de destinatários e rascunho salvo não contam como mensagem enviada. Quando o transporte e o histórico existirem, falhas, retentativas e resultados reais aparecerão aqui.</p>
     </section>}
   </main>;
 }
