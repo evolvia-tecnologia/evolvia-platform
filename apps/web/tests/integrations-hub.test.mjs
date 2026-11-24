@@ -39,6 +39,10 @@ test('busca por objetivo e detalhes locais reduzem texto sem prometer conexão',
   assert.match(hub, /item\.recipes\?\.flatMap/u);
   assert.match(hub, /integrations-category/u);
   assert.match(hub, /integrations-objective/u);
+  assert.match(hub, /integrations-availability/u);
+  assert.match(hub, /Disponíveis agora/u);
+  assert.match(hub, /disponível\(is\) neste evento/u);
+  assert.match(hub, /AVAILABILITY_RANK/u);
   assert.match(hub, /aria-expanded=\{expanded\}/u);
   assert.match(hub, /integration-detail-\$\{item\.code\}/u);
   assert.match(hub, /\{expanded && <div/u);

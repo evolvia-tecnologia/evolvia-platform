@@ -279,6 +279,8 @@ function joinPt(parts: string[]): string {
   return `${parts.slice(0, -1).join(', ')} e ${parts[parts.length - 1]}`;
 }
 
+const AVAILABILITY_RANK = { READY: 0, PREPARING: 1, PLANNED: 2 } as const;
+
 export default function IntegrationsHub({ eventId }: { eventId: string }) {
   const [payload, setPayload] = useState<IntegrationsPayload | null>(null);
   const [error, setError] = useState('');
@@ -286,6 +288,7 @@ export default function IntegrationsHub({ eventId }: { eventId: string }) {
   const [query, setQuery] = useState('');
   const [category, setCategory] = useState<IntegrationCategoryCode | 'ALL'>('ALL');
   const [objective, setObjective] = useState<string>('ALL');
+  const [availability, setAvailability] = useState<'ALL' | 'READY' | 'PREPARING' | 'PLANNED'>('ALL');
   const [selectedCode, setSelectedCode] = useState<string | null>(null);
   const [diagnosticBusy, setDiagnosticBusy] = useState(false);
   const [diagnosticError, setDiagnosticError] = useState('');
@@ -346,6 +349,7 @@ export default function IntegrationsHub({ eventId }: { eventId: string }) {
     return payload.items.filter((item) => {
       if (category !== 'ALL' && item.category !== category) return false;
       if (objective !== 'ALL' && !item.objectives?.some((entry) => entry.code === objective)) return false;
+      if (availability !== 'ALL' && item.availability !== availability) return false;
       if (!needle) return true;
       const haystack = normalize([
         item.name,
@@ -358,8 +362,12 @@ export default function IntegrationsHub({ eventId }: { eventId: string }) {
         ...(item.recipes?.flatMap((entry) => [entry.trigger, entry.action]) ?? []),
       ].join(' '));
       return haystack.includes(needle);
+    }).sort((left, right) => {
+      const byAvailability = AVAILABILITY_RANK[left.availability] - AVAILABILITY_RANK[right.availability];
+      if (byAvailability !== 0) return byAvailability;
+      return left.name.localeCompare(right.name, 'pt-BR');
     });
-  }, [payload, query, category, objective]);
+  }, [payload, query, category, objective, availability]);
 
   const selected = filtered.find((item) => item.code === selectedCode) ?? null;
 
@@ -373,6 +381,7 @@ export default function IntegrationsHub({ eventId }: { eventId: string }) {
     setQuery('');
     setCategory('ALL');
     setObjective('ALL');
+    setAvailability('ALL');
   }
 
   if (loading || (payload && payload.event.id !== eventId)) {
@@ -394,6 +403,15 @@ export default function IntegrationsHub({ eventId }: { eventId: string }) {
     const label = payload.objectives?.find((entry) => entry.code === objective)?.label ?? objective;
     activeFilterParts.push(`o objetivo ${label}`);
   }
+  if (availability !== 'ALL') {
+    activeFilterParts.push(`a disponibilidade ${
+      availability === 'READY' ? 'Disponível' : availability === 'PREPARING' ? 'Em preparação' : 'Planejada'
+    }`);
+  }
+
+  const readyCount = payload.items.filter((item) => item.availability === 'READY').length;
+  const preparingCount = payload.items.filter((item) => item.availability === 'PREPARING').length;
+  const plannedCount = payload.items.filter((item) => item.availability === 'PLANNED').length;
 
   return <div className={styles.hub}>
     <section className={styles.hero} aria-labelledby="integrations-title">
@@ -401,6 +419,9 @@ export default function IntegrationsHub({ eventId }: { eventId: string }) {
         <p className={styles.eyebrow}>CATÁLOGO DO EVENTO</p>
         <h1 id="integrations-title">Integrações</h1>
         <p>Encontre a ferramenta pelo que deseja fazer. Consulte abaixo a configuração do Asaas. API, webhooks e presença em sites deste evento já podem ser configurados.</p>
+        <p role="status" className={styles.resultMeta}>
+          {readyCount} disponível(is) neste evento · {preparingCount} em preparação · {plannedCount} planejada(s). Itens planejados não disparam conexão externa.
+        </p>
       </div>
     </section>
 
@@ -450,6 +471,19 @@ export default function IntegrationsHub({ eventId }: { eventId: string }) {
           <select id="integrations-objective" value={objective} onChange={(event) => setObjective(event.target.value)}>
             <option value="ALL">Todos os objetivos</option>
             {payload.objectives?.map((item) => <option key={item.code} value={item.code}>{item.label}</option>)}
+          </select>
+        </label>
+        <label htmlFor="integrations-availability">
+          Disponibilidade
+          <select
+            id="integrations-availability"
+            value={availability}
+            onChange={(event) => setAvailability(event.target.value as 'ALL' | 'READY' | 'PREPARING' | 'PLANNED')}
+          >
+            <option value="ALL">Todas</option>
+            <option value="READY">Disponíveis agora</option>
+            <option value="PREPARING">Em preparação</option>
+            <option value="PLANNED">Planejadas</option>
           </select>
         </label>
       </div>
