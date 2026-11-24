@@ -64,10 +64,11 @@ export function lookupSandboxRefundPayment(
         await response.body?.cancel?.();
         throw new Error();
       }
-      failure = 'INVALID_JSON';
       return await readExternalProviderJson(response);
     } catch (error) {
-      if (error instanceof ExternalProviderJsonError && error.code === 'provider_response_too_large') failure = 'RESPONSE_TOO_LARGE';
+      if (error instanceof ExternalProviderJsonError) {
+        failure = error.code === 'provider_response_too_large' ? 'RESPONSE_TOO_LARGE' : 'INVALID_JSON';
+      }
       throw new Error('Não foi possível consultar a cobrança na homologação.', { cause: failure });
     }
   });
