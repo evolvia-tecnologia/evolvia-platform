@@ -2,12 +2,12 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 import { queueWizardSave } from '../lib/event-wizard-save.ts';
-import ts from 'typescript';
+import { stripTypeScriptTypes } from 'node:module';
 
 const apiSource = await readFile(new URL('../lib/api.ts', import.meta.url), 'utf8');
-const apiModule = ts.transpileModule(apiSource, {
-  compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext },
-}).outputText;
+const helperSource = await readFile(new URL('../lib/api-failure-message.ts', import.meta.url), 'utf8');
+const helperUrl = 'data:text/javascript;base64,' + Buffer.from(stripTypeScriptTypes(helperSource)).toString('base64');
+const apiModule = stripTypeScriptTypes(apiSource.replace("'./api-failure-message'", JSON.stringify(helperUrl)), { mode: 'transform' });
 const { ApiError } = await import('data:text/javascript;base64,' + Buffer.from(apiModule).toString('base64'));
 
 function harness(draft, response) {
@@ -139,3 +139,4 @@ test('duas operações pendentes na mesma etapa consultam dirty após confirmaç
   assert.equal(state.dirty, false);
   assert.equal(state.draftRef.current.name, 'Congresso Berg ');
 });
+
