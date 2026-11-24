@@ -132,10 +132,16 @@ test('evento sem datas gravadas e corpo sem datas não inventa valor', () => {
  * um resultado que não é o que se grava — que é o defeito C-04 de novo.
  */
 test('a correção não muda o que se grava, em toda a matriz de entradas', () => {
+  // Espelho de agendaResultante+#651: null explícito limpa; undefined omite;
+  // datesPending força gravação (valor do corpo ou null).
   const escritaLegada = (pedido, atual) => {
     const data = {};
-    if (pedido.startDate || pedido.datesPending) data.startDate = pedido.startDate ? new Date(pedido.startDate) : null;
-    if (pedido.endDate || pedido.datesPending) data.endDate = pedido.endDate ? new Date(pedido.endDate) : null;
+    if (pedido.startDate !== undefined || pedido.datesPending === true) {
+      data.startDate = pedido.startDate ? new Date(pedido.startDate) : null;
+    }
+    if (pedido.endDate !== undefined || pedido.datesPending === true) {
+      data.endDate = pedido.endDate ? new Date(pedido.endDate) : null;
+    }
     return {
       gravaStartDate: 'startDate' in data,
       gravaEndDate: 'endDate' in data,

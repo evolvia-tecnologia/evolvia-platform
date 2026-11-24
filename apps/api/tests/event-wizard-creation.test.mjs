@@ -209,24 +209,42 @@ test('limpar só o término grava endDate null no Event sem apagar o início', a
     },
   };
 
-  const cleared = await service.persistEventData(tx, 'evt-1', {
+  const answersClear = {
     startDate: '2026-10-16T12:00:00.000Z',
     endDate: null,
     datesPending: false,
     timeZone: 'America/Sao_Paulo',
-  });
+  };
+  const cleared = await service.persistEventData(
+    tx,
+    'evt-1',
+    answersClear,
+    agendaResultante(answersClear, stored),
+  );
   assert.equal(changes[0].startDate.toISOString(), '2026-10-16T12:00:00.000Z');
   assert.equal(changes[0].endDate, null);
   assert.equal(cleared.endDate, null);
   assert.equal(cleared.startDate, '2026-10-16T12:00:00.000Z');
 
-  const omitted = await service.persistEventData(tx, 'evt-1', { name: 'Só o nome' });
+  const answersOmit = { name: 'Só o nome' };
+  const omitted = await service.persistEventData(
+    tx,
+    'evt-1',
+    answersOmit,
+    agendaResultante(answersOmit, stored),
+  );
   assert.equal(changes[1].startDate, undefined);
   assert.equal(changes[1].endDate, undefined);
   assert.equal(omitted.startDate, '2026-10-16T12:00:00.000Z');
   assert.equal(omitted.endDate, null);
 
-  const pending = await service.persistEventData(tx, 'evt-1', { datesPending: true });
+  const answersPending = { datesPending: true };
+  const pending = await service.persistEventData(
+    tx,
+    'evt-1',
+    answersPending,
+    agendaResultante(answersPending, stored),
+  );
   assert.equal(changes[2].startDate, null);
   assert.equal(changes[2].endDate, null);
   assert.equal(pending.startDate, null);
