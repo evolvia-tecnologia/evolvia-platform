@@ -68,8 +68,10 @@ export function agendaResultante(
   gravado: AgendaGravada | null | undefined,
 ): AgendaResultante {
   const datasPendentes = pedido.datesPending === true;
-  const gravaStartDate = Boolean(pedido.startDate) || datasPendentes;
-  const gravaEndDate = Boolean(pedido.endDate) || datasPendentes;
+  // null explícito limpa a data; undefined significa que o PATCH omitiu o campo.
+  // Boolean() confundia esses dois pedidos e mantinha a data antiga.
+  const gravaStartDate = pedido.startDate !== undefined || datasPendentes;
+  const gravaEndDate = pedido.endDate !== undefined || datasPendentes;
 
   return {
     startDate: gravaStartDate ? (pedido.startDate ?? null) : (gravado?.startDate ?? null),
