@@ -288,6 +288,9 @@ test('pedido repetido ou concorrente permanece único e a aprovação não devol
       expiresAt: new Date(Date.now() + 3_600_000),
     },
   });
+  await prisma.event.update({ where: { id: event.id }, data: { status: 'SUSPENDED' } });
+  await rejects(refunds.publicPolicy(event.slug), 404);
+  assert.equal((await refunds.accountView(people.buyer.id, event.slug)).protocol, row.protocol);
   const seen = await refunds.participantView(event.slug, `Bearer ${token}`);
   assert.equal(seen.protocol, row.protocol);
   assert.equal(seen.paid, true);
@@ -474,4 +477,189 @@ test('pedidos simultâneos de uma compra múltipla compartilham o saldo do check
   await refunds.prepare(people.owner.id,event.id,requests[index].id,{amountCents:500});
   const allocated = await prisma.registrationRefundRequest.aggregate({ where:{ ...scope, preparedOrderCheckoutId:group.id },_sum:{preparedAmountCents:true} });
   assert.equal(allocated._sum.preparedAmountCents,1500);
+});
+
+test('a referência de sandbox fica no pedido preparado uma vez, com autorização e auditoria', async t => {
+  const event = await insertEvent(organizationId);
+  const { lot, category } = await catalog(event);
+  const row = await reservation(event, lot, category, { status: 'CONFIRMED', priceCents: 1200, identityHash: digest(), emailHash: digest() });
+  const paid = await checkout(row, 'PAID');
+  const providerCheckoutId = 'checkout_' + digest();
+  await prisma.eventRegistrationCheckout.update({ where: { id: paid.id }, data: { providerCheckoutId } });
+  const request = await prisma.registrationRefundRequest.create({ data: {
+    organizationId, eventId: event.id, reservationId: row.id, reason, status: 'APPROVED',
+  } });
+  const resolve = (actor = people.owner.id) => refunds.resolveSandboxPayment(actor, event.id, request.id);
+  const orgKey = 'ASAAS_REFUND_SANDBOX_ORGANIZATION_ID';
+  const tokenKey = 'ASAAS_REFUND_SANDBOX_TOKEN';
+  const prior = [process.env[orgKey], process.env[tokenKey]];
+  t.after(() => [orgKey, tokenKey].forEach((key, i) => {
+    if (prior[i] === undefined) delete process.env[key]; else process.env[key] = prior[i];
+  }));
+  process.env[orgKey] = 'outra-organizacao';
+  process.env[tokenKey] = 'fixture';
+  const paymentId = 'pay_' + digest();
+  const transport = t.mock.method(globalThis, 'fetch', async url => {
+    assert.equal(url.origin, 'https://api-sandbox.asaas.com');
+    assert.equal(url.searchParams.get('checkoutSession'), providerCheckoutId);
+    return Response.json({ totalCount: 1, hasMore: false, data: [{ id: paymentId, checkoutSession: providerCheckoutId }] });
+  });
+  await rejects(resolve(), 409);
+  await refunds.prepare(people.owner.id, event.id, request.id, { amountCents: 900 });
+  await rejects(resolve(people.operator.id), 404);
+  await rejects(resolve(), 503);
+  assert.equal(transport.mock.callCount(), 0);
+  process.env[orgKey] = organizationId;
+  process.env[tokenKey] = '   ';
+  await rejects(resolve(), 503);
+  assert.equal(transport.mock.callCount(), 0);
+  process.env[tokenKey] = 'fixture';
+  transport.mock.mockImplementationOnce(async () => new Response('detalhe reservado', { status: 503 }));
+  await assert.rejects(resolve(), error => {
+    assert.equal(error.getStatus(), 503);
+    assert.equal(error.cause, 'HTTP_503');
+    assert.doesNotMatch(JSON.stringify(error.getResponse()), /HTTP_503|detalhe reservado/u);
+    return true;
+  });
+  const member = await prisma.organizationMembership.findFirstOrThrow({where:{organizationId,userId:people.owner.id}});
+  transport.mock.mockImplementationOnce(async url => {
+    await prisma.organizationMembership.update({where:{id:member.id},data:{role:'VIEWER'}});
+    return Response.json({totalCount:1, hasMore:false, data:[{id:paymentId,checkoutSession:providerCheckoutId}]});
+  });
+  try {
+    await rejects(resolve(),409);
+    assert.equal((await prisma.registrationRefundRequest.findUniqueOrThrow({where:{id:request.id}})).sandboxPaymentId,null);
+  } finally {
+    await prisma.organizationMembership.update({where:{id:member.id},data:{role:'OWNER'}});
+  }
+  const results = await Promise.all([resolve(), resolve()]);
+  assert.deepEqual(results[0], { id: request.id, processingStatus: 'SANDBOX_PAYMENT_IDENTIFIED', moneyReturned: false });
+  assert.deepEqual(results[0], results[1]);
+  const count = transport.mock.callCount();
+  assert.deepEqual(await resolve(), results[0]);
+  assert.equal(transport.mock.callCount(), count);
+  assert.equal((await prisma.registrationRefundRequest.findUniqueOrThrow({where:{id:request.id}})).sandboxPaymentId, paymentId);
+  assert.equal(await prisma.auditLog.count({where:{entityId:request.id,action:'refund.sandbox_payment_identified'}}),1);
+  assert.equal((await refunds.prepare(people.owner.id,event.id,request.id,{amountCents:900})).processingStatus,'SANDBOX_PAYMENT_IDENTIFIED');
+});
+
+test('estorno simulado integral e parcial concilia uma vez por pedido em evento suspenso', async t => {
+  const event = await insertEvent(organizationId);
+  const { lot, category } = await catalog(event);
+  const key = 'EVOLVIA_REFUND_SIMULATION_ORGANIZATION_ID';
+  const sandbox = 'ASAAS_REFUND_SANDBOX_ORGANIZATION_ID';
+  const token = 'ASAAS_REFUND_SANDBOX_TOKEN';
+  const previous = [key, sandbox, token].map(name => [name, process.env[name]]);
+  t.after(() => {
+    for (const [name, value] of previous) {
+      if (value === undefined) delete process.env[name]; else process.env[name] = value;
+    }
+  });
+  process.env[sandbox] = organizationId;
+  process.env[token] = 'simulado';
+  for (const amountCents of [1200, 750]) {
+    const row = await reservation(event, lot, category, { status: 'CONFIRMED', priceCents: 1200, identityHash: digest(), emailHash: digest() });
+    const paid = await checkout(row, 'PAID');
+    const request = await prisma.registrationRefundRequest.create({ data: {
+      organizationId, eventId: event.id, reservationId: row.id, status: 'APPROVED', reason,
+    } });
+    const reconciledAt = new Date('2026-11-19T19:15:00Z');
+    const command = (action, actor = people.owner.id, now = reconciledAt) => refunds.mockRefund(actor,event.id,request.id,action,now);
+    delete process.env[key];
+    await rejects(command('ISSUE'),404);
+    process.env[key] = organizationId;
+    await rejects(command('ISSUE'),409);
+    await refunds.prepare(people.owner.id,event.id,request.id,{amountCents});
+    await rejects(command('ISSUE'),409);
+    const paymentId = 'pay_' + digest();
+    await prisma.registrationRefundRequest.update({where:{id:request.id},data:{sandboxPaymentId:paymentId}});
+    await prisma.event.update({where:{id:event.id},data:{status:'SUSPENDED'}});
+    await rejects(command('ISSUE',people.operator.id),404);
+    await rejects(command('ISSUE',people.outsider.id),404);
+    await rejects(command('RECONCILE'),409);
+    process.env[sandbox] = otherOrganizationId;
+    await rejects(command('ISSUE'),404);
+    process.env[sandbox] = organizationId;
+    assert.equal(await prisma.mockRefundReceipt.count({where:{requestId:request.id}}),0);
+    const sends = await Promise.all(Array.from({length:8},()=>command('ISSUE')));
+    assert.deepEqual(sends[0],{id:request.id, amountCents, simulated:true, moneyReturned:false, mockRefundStatus:'ISSUED'});
+    assert.ok(sends.every(x=>x.mockRefundStatus==='ISSUED'));
+    await prisma.mockRefundReceipt.update({where:{requestId:request.id},data:{amountCents:1}});
+    await rejects(command('RECONCILE'),409);
+    assert.equal((await prisma.mockRefundReceipt.findUniqueOrThrow({where:{requestId:request.id}})).reconciledAt,null);
+    await prisma.mockRefundReceipt.update({where:{requestId:request.id},data:{amountCents}});
+    process.env[token] = ' ';
+    await rejects(command('RECONCILE'),404);
+    assert.equal((await prisma.mockRefundReceipt.findUniqueOrThrow({where:{requestId:request.id}})).reconciledAt,null);
+    process.env[token] = 'simulado';
+    const confirmations = await Promise.all(Array.from({length:8},()=>command('RECONCILE')));
+    assert.ok(confirmations.every(x=>x.moneyReturned===false && x.mockRefundStatus==='RECONCILED'));
+    assert.deepEqual(await command('ISSUE'),confirmations[0]);
+    await command('RECONCILE', people.owner.id, new Date('2026-11-20T19:15:00Z'));
+    const stored = await prisma.mockRefundReceipt.findUniqueOrThrow({where:{requestId:request.id}});
+    assert.equal(stored.reconciledAt.toISOString(), reconciledAt.toISOString());
+    for(const action of ['refund.mock_issued','refund.mock_reconciled']) {
+      assert.equal(await prisma.auditLog.count({where:{entityId:request.id,action}}),1);
+    }
+    assert.equal((await refunds.listRequests(people.owner.id,event.id)).items.find(x=>x.id===request.id).mockRefundStatus,'RECONCILED');
+    assert.equal((await prisma.eventRegistrationCheckout.findUniqueOrThrow({where:{id:paid.id}})).status,'PAID');
+  }
+});
+
+test('capacidade de simulação da página exige OWNER ativo e ambas as configurações da organização', async t => {
+  const event = await insertEvent(organizationId);
+  const other = await insertEvent(otherOrganizationId);
+  const simulation = 'EVOLVIA_REFUND_SIMULATION_ORGANIZATION_ID';
+  const sandbox = 'ASAAS_REFUND_SANDBOX_ORGANIZATION_ID';
+  const token = 'ASAAS_REFUND_SANDBOX_TOKEN';
+  const saved = [simulation, sandbox, token].map(key => [key, process.env[key]]);
+  t.after(() => {
+    for (const [key, value] of saved) {
+      if (value === undefined) delete process.env[key]; else process.env[key] = value;
+    }
+  });
+  process.env[simulation] = organizationId;
+  process.env[sandbox] = organizationId;
+  process.env[token] = 'token-sintetico';
+  const list = () => refunds.listRequests(people.owner.id, event.id, { status: 'APPROVED' });
+  assert.deepEqual(await list(), { items: [], nextCursor: null, canSimulateRefund: true });
+  assert.equal((await refunds.listRequests(people.outsider.id, other.id)).canSimulateRefund, false);
+  await rejects(refunds.listRequests(people.outsider.id, event.id), 404);
+  for (const role of ['ADMIN','MANAGER','OWNER']) {
+    const member = await user('cap-' + role);
+    await prisma.organizationMembership.create({data:{organizationId,userId:member.id,role,status:role==='OWNER'?'SUSPENDED':'ACTIVE'}});
+    if (role === 'OWNER') await rejects(refunds.listRequests(member.id, event.id),404);
+    else assert.equal((await refunds.listRequests(member.id,event.id)).canSimulateRefund,false);
+  }
+  for (const key of [simulation,sandbox,token]) {
+    const original=process.env[key];
+    process.env[key]=key===token?'   ':otherOrganizationId;
+    assert.equal((await list()).canSimulateRefund,false);
+    delete process.env[key];
+    assert.equal((await list()).canSimulateRefund,false);
+    process.env[key]=original;
+  }
+});
+
+test('cancelar uma inscrição paga preserva a preparação do reembolso aprovado', async () => {
+  const event = await insertEvent(organizationId);
+  const { lot, category } = await catalog(event);
+  const row = await reservation(event, lot, category, {
+    status: 'CONFIRMED', priceCents: 1200, identityHash: digest(), emailHash: digest(),
+  });
+  const paid = await checkout(row, 'PAID');
+  const request = await prisma.registrationRefundRequest.create({ data: {
+    organizationId, eventId: event.id, reservationId: row.id, reason, status: 'APPROVED',
+  } });
+  await prisma.eventRegistrationReservation.update({ where: { id: row.id }, data: { status: 'CANCELLED' } });
+  const prepare = () => refunds.prepare(people.owner.id, event.id, request.id, { amountCents: 1200 });
+  await prisma.eventRegistrationCheckout.update({ where: { id: paid.id }, data: { paidAt: null } });
+  await rejects(prepare(), 409);
+  await prisma.eventRegistrationCheckout.update({ where: { id: paid.id }, data: { paidAt: paid.paidAt } });
+  const first = await prepare();
+  assert.equal(first.moneyReturned, false);
+  assert.deepEqual(await prepare(), first);
+  assert.equal(await prisma.auditLog.count({ where: { entityId: request.id, action: 'refund.prepared' } }), 1);
+  const saved = await prisma.eventRegistrationReservation.findUniqueOrThrow({ where: { id: row.id } });
+  assert.equal(saved.status, 'CANCELLED');
 });

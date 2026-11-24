@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { stripTypeScriptTypes } from 'node:module';
 
-const sources = new Set(['publication-text-style', 'public-rich-text', 'publication-rich-text-format']);
+const sources = new Set(['publication-text-style', 'public-rich-text', 'publication-rich-text-format', 'organizer-event-card']);
 const urls = new Map();
 
 async function sourceUrl(name) {

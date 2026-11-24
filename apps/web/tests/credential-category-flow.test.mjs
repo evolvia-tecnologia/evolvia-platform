@@ -104,8 +104,9 @@ test('QR sem formatação explícita mostra centralizado no editor e preserva al
     read('../components/credential-label.tsx'),
   ]);
   assert.ok(editor.includes("const DEFAULT_QR_STYLE: LabelFieldStyle = { ...DEFAULT_STYLE, align: 'center' };"));
-  assert.ok(editor.includes("code === 'qr' ? DEFAULT_QR_STYLE : DEFAULT_STYLE"));
-  assert.ok(editor.includes('style: ownStyle(code)'));
+  assert.ok(editor.includes("code === 'qr' || code === 'barcode' ? DEFAULT_QR_STYLE : DEFAULT_STYLE"));
+  assert.match(editor, /style: Object\.prototype\.hasOwnProperty\.call\(visibleTemplate\.styles \?\? \{\}, code\)/u,
+    'a prévia aplicada deve preservar o estilo persistido por categoria');
   assert.ok(label.includes('style={item.style?.align ? { justifySelf:'));
   assert.ok(label.includes(': undefined}><CredentialQr'));
 });
@@ -148,7 +149,8 @@ test('campos customizados com nome constructor não herdam amostras ou estilos d
   assert.match(editor, /Object\.prototype\.hasOwnProperty\.call\(current, code\) \? current\[code\] : DEFAULT_STYLE/u);
   assert.match(editor, /chosen\.flatMap\(\(code\): \[string, LabelFieldStyle\]\[\] =>/u);
   assert.match(editor, /return style \? \[\[code, style\]\] : \[\]/u);
-  assert.match(editor, /style: ownStyle\(code\)/u);
+  assert.match(editor, /style: Object\.prototype\.hasOwnProperty\.call\(visibleTemplate\.styles \?\? \{\}, code\)/u,
+    'a única prévia deve usar somente estilos próprios do modelo efetivo');
   assert.doesNotMatch(editor, /SAMPLES\[code\] \?\? display\(code\)/u);
 
   const samples = { preferred_name: 'Ana Pesquisadora' };
@@ -193,7 +195,9 @@ test('troca de evento/categoria durante POST não bloqueia nova sessão nem libe
   assert.ok(editor.includes('session.current += 1;'));
   assert.ok(editor.includes('inFlight.current = null;'));
   assert.ok(editor.includes('setBusy(false);'));
-  assert.ok(editor.includes('if (inFlight.current === currentSession || !organizer || !categoryId) return;'));
+  assert.ok(editor.includes('if (inFlight.current === currentSession || !organizer || !categoryId || !isEditing) return;'));
+  assert.match(editor, /disabled=\{busy \|\| !organizer \|\| !isEditing\} onClick=\{\(\) => void save\(\)\}/u,
+    'evitar ativar uma etiqueta que o organizador não pré-visualizou');
   assert.ok(editor.includes('if (inFlight.current === currentSession) {'));
   assert.ok(!editor.includes('inFlight.current = false;'));
   // Simulação determinística: A pendente, B iniciada, A conclui depois.
@@ -221,8 +225,8 @@ test('troca de evento/categoria durante POST não bloqueia nova sessão nem libe
 
 test('desmontar editor de etiquetas invalida POST antigo antes de onSaved de outro evento', async () => {
   const editor = await read('../components/credential-category-templates.tsx');
-  const effect = editor.match(/useEffect\(\(\) => \{[\s\S]*?\}, \[eventId, categoryId, templates\]\);/u)?.[0];
-  assert.ok(effect, 'efeito deve acompanhar evento, categoria e templates');
+  const effect = editor.match(/useEffect\(\(\) => \{[\s\S]*?\}, \[eventId, categoryId, savedTemplate\]\);/u)?.[0];
+  assert.ok(effect, 'efeito deve acompanhar evento, categoria e modelo efetivamente salvo');
   assert.match(effect, /return \(\) => \{\s*[\s\S]*?session\.current \+= 1;\s*inFlight\.current = null;\s*\};/u,
     'cleanup do unmount precisa invalidar sessão e lock de POST');
   assert.match(editor, /if \(currentSession !== session\.current \|\| targetId !== categoryId\) return;/u);
@@ -263,8 +267,9 @@ test('salvamento rejeita resposta vazia sem atualizar a prévia e categoria ause
   const editor = await read('../components/credential-category-templates.tsx');
   assert.match(editor, /if \(!result \|\| result\.categoryId !== targetId \|\| !Array\.isArray\(result\.fields\)/u,
     'API com resposta null/undefined deve ser rejeitada antes de acessar categoryId');
-  assert.match(editor, /categories\.find\(\(item\) => item\.id === categoryId\)\?\.name/u,
-    'troca assíncrona de categorias não pode quebrar a prévia');
+  assert.match(editor, /const selectedCategory = categories\.find\(\(item\) => item\.id === categoryId\)/u,
+    'troca assíncrona de categorias deve resolver o objeto selecionado de forma segura');
+  assert.match(editor, /selectedCategory\?\.name/u, 'prévia não deve quebrar com categoria ausente');
   assert.match(editor, /throw new Error\('O servidor não confirmou o modelo da categoria selecionada\.'\)/u);
   assert.match(editor, /onSaved\(\{ categoryId: targetId, fields: \[\.\.\.result\.fields\]/u);
 });
@@ -295,4 +300,34 @@ test('controles de cada campo expõem grupos nomeados e checkbox Negrito context
   assert.match(editor, /className=\{styles\.actions\} role="group" aria-label=\{`Alterar a ordem de \$\{display\(code\)\}`\}/u);
   assert.match(editor, /className=\{styles\.formatBar\} role="group" aria-label=\{`Formatação de \$\{display\(code\)\}`\}/u);
   assert.match(editor, /type="checkbox" aria-label=\{`Negrito de \$\{display\(code\)\}`\}/u);
+});
+
+
+test('campo de código da categoria oferece QR, barras e ambos sem segunda prévia', async () => {
+  const [editor, policy, label] = await Promise.all([
+    read('../components/credential-category-templates.tsx'),
+    read('../../api/src/credential-category-template.policy.ts'),
+    read('../components/credential-label.tsx'),
+  ]);
+  assert.match(editor, /<option value="QR">Somente QR Code<\/option>/u);
+  assert.match(editor, /<option value="BARCODE">Somente código de barras<\/option>/u);
+  assert.match(editor, /<option value="BOTH">Código de barras e QR Code<\/option>/u);
+  assert.match(editor, /visibleTemplate\.fields\.includes\('barcode'\)/u);
+  assert.match(policy, /code === 'barcode'/u);
+  assert.match(label, /item\.kind === 'barcode'/u);
+  assert.match(label, /missingOrderedBarcode/u);
+  assert.equal((editor.match(/<CredentialLabel label=\{preview\} preview/g) ?? []).length, 1);
+});
+
+
+test('código de barras ocupa largura útil e não promete alinhamento horizontal inoperante', async () => {
+  const [editor, renderer, css] = await Promise.all([
+    read('../components/credential-category-templates.tsx'),
+    read('../components/credential-label.tsx'),
+    read('../components/credential-label.module.css'),
+  ]);
+  assert.match(editor, /code !== 'barcode' && <label>Alinhamento/u);
+  assert.match(editor, /usa toda a largura disponível/u);
+  assert.doesNotMatch(renderer, /className=\{styles\.orderedBarcode\}[^>]*style=/u);
+  assert.match(css, /\.orderedBarcode \{[^}]*width: 100%/u);
 });
