@@ -10,6 +10,11 @@ import { EventMutationPolicy } from './event-mutation-policy.service';
 import { EVENT_EDITOR_ROLES } from './membership-policy';
 import { PrismaService } from './prisma.service';
 import {
+  lotesImpedidos,
+  lotesRemovidos,
+  mensagemDeLotesImpedidos,
+} from './registration-catalog-removal';
+import {
   RegistrationCategoryInput,
   RegistrationCommercialPolicyError,
   normalizeRegistrationCatalog,
@@ -92,136 +97,195 @@ export class RegistrationCommercialService {
 
     const organizationId = event.organizationId!;
     const scope = { eventId, organizationId };
-    await this.prisma.$transaction(async (tx) => {
-      const existing = await tx.eventRegistrationCatalog.findUnique({
-        where: { eventId_organizationId: scope },
-        include: { categories: { include: { lots: true } } },
-      });
-      if ((existing?.revision ?? 0) !== input.expectedRevision) {
-        throw new ConflictException(
-          'As categorias e lotes foram alterados em outra sessão. Recarregue antes de salvar novamente.',
-        );
-      }
-
-      let catalog;
-      if (existing) {
-        const advanced = await tx.eventRegistrationCatalog.updateMany({
-          where: { id: existing.id, ...scope, revision: input.expectedRevision },
-          data: { revision: { increment: 1 } },
+    try {
+      await this.prisma.$transaction(async (tx) => {
+        const existing = await tx.eventRegistrationCatalog.findUnique({
+          where: { eventId_organizationId: scope },
+          include: { categories: { include: { lots: true } } },
         });
-        if (advanced.count !== 1) {
+        if ((existing?.revision ?? 0) !== input.expectedRevision) {
           throw new ConflictException(
             'As categorias e lotes foram alterados em outra sessão. Recarregue antes de salvar novamente.',
           );
         }
-        catalog = await tx.eventRegistrationCatalog.findUniqueOrThrow({
-          where: { id: existing.id },
-        });
-      } else {
-        try {
-          catalog = await tx.eventRegistrationCatalog.create({
-            data: { ...scope, revision: 1 },
+
+        // Antes de qualquer escrita: o que este salvamento REMOVERIA, e se o
+        // lote já está em uso.
+        //
+        // TRÊS modelos referenciam o lote com `onDelete: Restrict` — inscrição,
+        // pedido e fila de espera. O banco recusa nos três, mas recusa com
+        // violação de chave estrangeira, que sem tratamento chega como 500, no
+        // meio de um salvamento que podia ter outras alterações legítimas, e
+        // sem dizer qual lote travou nem por quê.
+        //
+        // A primeira versão desta conferência olhava só inscrições. Lote preso
+        // apenas por pedido ou apenas por fila passava e caía no 500 assim
+        // mesmo — o defeito que a revisão do Work apontou.
+        //
+        // Conferir ANTES de avançar a revisão também evita queimar um número
+        // de revisão num salvamento que não vai acontecer.
+        const removidos = lotesRemovidos(existing?.categories ?? [], categories);
+        if (removidos.length > 0) {
+          const onde = { ...scope, lotId: { in: removidos.map((lote) => lote.id) } };
+          const [inscricoes, pedidos, fila] = await Promise.all([
+            tx.eventRegistrationReservation.findMany({
+              where: onde,
+              select: { lotId: true },
+              distinct: ['lotId'],
+            }),
+            tx.eventRegistrationOrderEntry.findMany({
+              where: onde,
+              select: { lotId: true },
+              distinct: ['lotId'],
+            }),
+            tx.eventRegistrationWaitlistEntry.findMany({
+              where: onde,
+              select: { lotId: true },
+              distinct: ['lotId'],
+            }),
+          ]);
+          const impedidos = lotesImpedidos(removidos, {
+            inscricoes: inscricoes.map((linha) => linha.lotId),
+            pedidos: pedidos.map((linha) => linha.lotId),
+            fila: fila.map((linha) => linha.lotId),
           });
-        } catch (error) {
-          if (
-            error instanceof Prisma.PrismaClientKnownRequestError &&
-            error.code === 'P2002'
-          ) {
+          if (impedidos.length > 0) {
+            throw new ConflictException(mensagemDeLotesImpedidos(impedidos));
+          }
+        }
+
+        let catalog;
+        if (existing) {
+          const advanced = await tx.eventRegistrationCatalog.updateMany({
+            where: { id: existing.id, ...scope, revision: input.expectedRevision },
+            data: { revision: { increment: 1 } },
+          });
+          if (advanced.count !== 1) {
             throw new ConflictException(
               'As categorias e lotes foram alterados em outra sessão. Recarregue antes de salvar novamente.',
             );
           }
-          throw error;
-        }
-      }
-
-      for (const categoryInput of categories) {
-        const previousCategory = existing?.categories.find(
-          (category) => category.code === categoryInput.code,
-        );
-        const categoryData = {
-          name: categoryInput.name,
-          description: categoryInput.description,
-          capacity: categoryInput.capacity,
-          proofRequirement: categoryInput.proofRequirement,
-          active: categoryInput.active,
-          sortOrder: categoryInput.sortOrder,
-        };
-        const category = previousCategory
-          ? await tx.eventRegistrationCategory.update({
-              where: { id: previousCategory.id },
-              data: categoryData,
-            })
-          : await tx.eventRegistrationCategory.create({
-              data: {
-                ...scope,
-                catalogId: catalog.id,
-                code: categoryInput.code,
-                ...categoryData,
-              },
+          catalog = await tx.eventRegistrationCatalog.findUniqueOrThrow({
+            where: { id: existing.id },
+          });
+        } else {
+          try {
+            catalog = await tx.eventRegistrationCatalog.create({
+              data: { ...scope, revision: 1 },
             });
-
-        for (const lotInput of categoryInput.lots) {
-          const previousLot = previousCategory?.lots.find((lot) => lot.code === lotInput.code);
-          const lotData = {
-            name: lotInput.name,
-            startsAt: new Date(lotInput.startsAt),
-            endsAt: new Date(lotInput.endsAt),
-            quantity: lotInput.quantity,
-            priceCents: lotInput.priceCents,
-            active: lotInput.active,
-            sortOrder: lotInput.sortOrder,
-          };
-          if (previousLot) {
-            await tx.eventRegistrationLot.update({
-              where: { id: previousLot.id },
-              data: lotData,
-            });
-          } else {
-            await tx.eventRegistrationLot.create({
-              data: {
-                ...scope,
-                categoryId: category.id,
-                code: lotInput.code,
-                ...lotData,
-              },
-            });
+          } catch (error) {
+            if (
+              error instanceof Prisma.PrismaClientKnownRequestError &&
+              error.code === 'P2002'
+            ) {
+              throw new ConflictException(
+                'As categorias e lotes foram alterados em outra sessão. Recarregue antes de salvar novamente.',
+              );
+            }
+            throw error;
           }
         }
 
-        await tx.eventRegistrationLot.deleteMany({
+        for (const categoryInput of categories) {
+          const previousCategory = existing?.categories.find(
+            (category) => category.code === categoryInput.code,
+          );
+          const categoryData = {
+            name: categoryInput.name,
+            description: categoryInput.description,
+            capacity: categoryInput.capacity,
+            proofRequirement: categoryInput.proofRequirement,
+            active: categoryInput.active,
+            sortOrder: categoryInput.sortOrder,
+          };
+          const category = previousCategory
+            ? await tx.eventRegistrationCategory.update({
+                where: { id: previousCategory.id },
+                data: categoryData,
+              })
+            : await tx.eventRegistrationCategory.create({
+                data: {
+                  ...scope,
+                  catalogId: catalog.id,
+                  code: categoryInput.code,
+                  ...categoryData,
+                },
+              });
+
+          for (const lotInput of categoryInput.lots) {
+            const previousLot = previousCategory?.lots.find((lot) => lot.code === lotInput.code);
+            const lotData = {
+              name: lotInput.name,
+              startsAt: new Date(lotInput.startsAt),
+              endsAt: new Date(lotInput.endsAt),
+              quantity: lotInput.quantity,
+              priceCents: lotInput.priceCents,
+              active: lotInput.active,
+              sortOrder: lotInput.sortOrder,
+            };
+            if (previousLot) {
+              await tx.eventRegistrationLot.update({
+                where: { id: previousLot.id },
+                data: lotData,
+              });
+            } else {
+              await tx.eventRegistrationLot.create({
+                data: {
+                  ...scope,
+                  categoryId: category.id,
+                  code: lotInput.code,
+                  ...lotData,
+                },
+              });
+            }
+          }
+
+          await tx.eventRegistrationLot.deleteMany({
+            where: {
+              ...scope,
+              categoryId: category.id,
+              code: { notIn: categoryInput.lots.map((lot) => lot.code) },
+            },
+          });
+        }
+
+        await tx.eventRegistrationCategory.deleteMany({
           where: {
             ...scope,
-            categoryId: category.id,
-            code: { notIn: categoryInput.lots.map((lot) => lot.code) },
+            catalogId: catalog.id,
+            code: { notIn: categories.map((category) => category.code) },
           },
         });
+
+        await tx.auditLog.create({
+          data: {
+            organizationId,
+            eventId,
+            actorUserId: userId,
+            action: 'registration.commercial_catalog_saved',
+            entityType: 'EventRegistrationCatalog',
+            entityId: catalog.id,
+            metadata: {
+              revision: catalog.revision,
+              categoryCount: categories.length,
+              lotCount: categories.reduce((total, category) => total + category.lots.length, 0),
+            } as Prisma.InputJsonObject,
+          },
+        });
+      });
+    } catch (error) {
+      // Rede de segurança para a corrida entre a conferência acima e o
+      // `deleteMany`: se uma inscrição, pedido ou entrada de fila nascer nesse
+      // intervalo, o `Restrict` do banco recusa com P2003. Sem isto, essa
+      // corrida voltaria a aparecer como 500 — rara, mas exatamente no momento
+      // de maior movimento.
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2003') {
+        throw new ConflictException(
+          'Uma inscrição, pedido ou entrada na fila foi criada durante o salvamento e impede remover categoria ou lote. Recarregue e tente novamente.',
+        );
       }
-
-      await tx.eventRegistrationCategory.deleteMany({
-        where: {
-          ...scope,
-          catalogId: catalog.id,
-          code: { notIn: categories.map((category) => category.code) },
-        },
-      });
-
-      await tx.auditLog.create({
-        data: {
-          organizationId,
-          eventId,
-          actorUserId: userId,
-          action: 'registration.commercial_catalog_saved',
-          entityType: 'EventRegistrationCatalog',
-          entityId: catalog.id,
-          metadata: {
-            revision: catalog.revision,
-            categoryCount: categories.length,
-            lotCount: categories.reduce((total, category) => total + category.lots.length, 0),
-          } as Prisma.InputJsonObject,
-        },
-      });
-    });
+      throw error;
+    }
 
     return this.get(userId, eventId);
   }
