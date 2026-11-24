@@ -228,7 +228,7 @@ export default function EventWorkspace({
   const [menuOpen, setMenuOpen] = useState(false);
   const [mobileNavigation, setMobileNavigation] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [operatorCapabilities, setOperatorCapabilities] = useState<RespostaDeCapacidades | null>(null);
+  const [operatorCapabilities, setOperatorCapabilities] = useState<RespostaDeCapacidades | null | undefined>(undefined);
 
   if (view.eventId !== eventId) {
     const next = providedPayload?.event.id === eventId && eventId
@@ -236,7 +236,7 @@ export default function EventWorkspace({
       : replaceWorkspaceEvent<WorkspacePayload>(eventId);
     setView(next);
     setMenuOpen(false);
-    setOperatorCapabilities(null);
+    setOperatorCapabilities(undefined);
   }
 
   useEffect(() => {
@@ -335,7 +335,7 @@ export default function EventWorkspace({
     const observer = new ResizeObserver(syncHeight);
     observer.observe(header);
     return () => observer.disconnect();
-  }, [shell]);
+  }, [shell, operatorCapabilities]);
 
   if (shell === 'loading') return <LoadingPanel />;
   if (shell === 'operation') {
@@ -345,7 +345,11 @@ export default function EventWorkspace({
     return <ClosedPanel message={view.eventId === eventId ? view.error : ''} />;
   }
 
-  if (operatorCapabilities && isPapelOperadorRestrito(operatorCapabilities.papel)) {
+  if (operatorCapabilities === undefined) return <LoadingPanel />;
+  if (!operatorCapabilities?.papel) {
+    return <ClosedPanel message="Não foi possível verificar suas permissões neste evento." />;
+  }
+  if (isPapelOperadorRestrito(operatorCapabilities.papel)) {
     return <RestrictedOperatorFrame
       eventId={eventId}
       section={section}
