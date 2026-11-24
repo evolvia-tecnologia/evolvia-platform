@@ -63,7 +63,14 @@ function normalize(value: string): string {
 
 type FoundationKind = 'api' | 'webhook' | 'presence';
 type WebhookRow = { id: string; url: string; enabled: boolean };
-type KeyRow = { id: string; label: string; prefix: string; expiresAt: string; revokedAt: string | null };
+type KeyRow = {
+  id: string;
+  label: string;
+  prefix: string;
+  expiresAt: string;
+  revokedAt: string | null;
+  lastUsedAt?: string | null;
+};
 type PresenceView = { publicUrl: string | null; snippet: string | null; note: string };
 
 function FoundationDesk({ eventId, kind }: { eventId: string; kind: FoundationKind }) {
@@ -125,6 +132,7 @@ function FoundationDesk({ eventId, kind }: { eventId: string; kind: FoundationKi
     {error && <p className={styles.error} role="alert">{error}</p>}
     {notice && <p role="status">{notice}</p>}
     {kind === 'webhook' && <>
+      <p role="note">Endpoint ativo não comprova entrega validada no destino. Confirme o recebimento na sua infraestrutura antes de operar em produção.</p>
       <form onSubmit={(event) => {
         event.preventDefault();
         void run(async () => {
@@ -182,6 +190,9 @@ function FoundationDesk({ eventId, kind }: { eventId: string; kind: FoundationKi
           <span>{item.label}</span>
           <span>{item.prefix}</span>
           <span>{item.revokedAt ? 'Revogada' : `Válida até ${new Date(item.expiresAt).toLocaleDateString('pt-BR')}`}</span>
+          <span>{item.lastUsedAt
+            ? `Último uso em ${new Date(item.lastUsedAt).toLocaleString('pt-BR')}`
+            : 'Ainda sem uso registrado'}</span>
           {!item.revokedAt && <button type="button" disabled={busy} onClick={() => void run(async () => {
             await api(`/events/${eventId}/integrations/api-keys/${item.id}/revoke`, { method: 'POST', body: '{}' });
             setKeys((current) => (current ?? []).map((row) => row.id === item.id ? { ...row, revokedAt: new Date().toISOString() } : row));
@@ -257,7 +268,7 @@ function EventConnections({ eventId, items, onOpen }: {
   return <section className={styles.connections} aria-labelledby="event-connections-title" aria-busy={loading}>
     <div className={styles.connectionsHeading}>
       <div><h2 id="event-connections-title">Conexões deste evento</h2>
-        <p>Consulte a configuração atual e abra o recurso que deseja preparar. Um endpoint ativo ainda precisa ter sua entrega validada.</p></div>
+        <p>Consulte a configuração atual e abra o recurso que deseja preparar. Disponível = fundação Evolvia configurável. Planejada = ficha explicativa, sem conector. Endpoint ativo ainda precisa ter a entrega validada no destino.</p></div>
       <button type="button" className={styles.clearFilters} disabled={loading} onClick={() => setRevision((value) => value + 1)}>Atualizar conexões</button>
     </div>
     {loading ? <p role="status">Consultando as configurações do evento…</p> :
@@ -432,7 +443,7 @@ export default function IntegrationsHub({ eventId }: { eventId: string }) {
       {diagnosticError && <p role="alert">{diagnosticError}</p>}
       <p>Ambiente: {payload.asaas.environment === 'local' ? 'simulação local' : payload.asaas.environment === 'production' ? 'produção' : 'sandbox de testes'}.</p>
       <p role={payload.asaas.state === 'BLOCKED' ? 'alert' : 'status'}>{payload.asaas.message}</p>
-      <p>A configuração não comprova criação de cobrança, pagamento ou recebimento de webhook.</p>
+      <p>Diagnóstico somente leitura: não ativa o conector Asaas neste Hub e não comprova criação de cobrança, pagamento ou recebimento de webhook.</p>
     </section>}
 
     <EventConnections key={eventId} eventId={eventId} items={payload.items} onOpen={(code) => {
