@@ -190,6 +190,30 @@ test('Wizard inicia rascunho privado para um tipo canônico', async () => {
   assert.match(eventData.slug, /^rascunho-[a-f0-9]{24}$/u);
 });
 
+test('política distingue null explícito de campo de data omitido', () => {
+  const gravado = {
+    startDate: new Date('2026-10-16T12:00:00.000Z'),
+    endDate: new Date('2026-10-18T12:00:00.000Z'),
+  };
+
+  const omitido = agendaResultante({ name: 'Só o nome' }, gravado);
+  assert.equal(omitido.gravaStartDate, false);
+  assert.equal(omitido.gravaEndDate, false);
+  assert.equal(omitido.endDate, gravado.endDate);
+
+  const terminoLimpo = agendaResultante({ endDate: null }, gravado);
+  assert.equal(terminoLimpo.gravaStartDate, false);
+  assert.equal(terminoLimpo.gravaEndDate, true);
+  assert.equal(terminoLimpo.startDate, gravado.startDate);
+  assert.equal(terminoLimpo.endDate, null);
+
+  const inicioLimpo = agendaResultante({ startDate: null }, gravado);
+  assert.equal(inicioLimpo.gravaStartDate, true);
+  assert.equal(inicioLimpo.gravaEndDate, false);
+  assert.equal(inicioLimpo.startDate, null);
+  assert.equal(inicioLimpo.endDate, gravado.endDate);
+});
+
 test('limpar só o término grava endDate null no Event sem apagar o início', async () => {
   const service = serviceWith(async () => {});
   const changes = [];
