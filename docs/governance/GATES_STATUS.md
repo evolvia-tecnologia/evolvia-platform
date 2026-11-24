@@ -1,4 +1,16 @@
 
+
+## Publicação em homologação de G5.8 e G7.4 — 23/11/2026
+
+Implementação **96,9%**; conclusão comprovada **73,0%**; **89/93** unidades integradas; **0/11 Gates encerrados**.
+
+O publicador registrou `99a041a128ac6d8d3cd35c908d5e6e5bf01b1204` na tentativa 2. A API e o PostgreSQL responderam prontos. O gate público confirmou HTTPS 200, ocultação da versão do proxy e redirecionamento 308. Os commits de G5.8 e G7.4 integram essa versão. O aceite de G5.8 depende de recebimento autorizado. O de G7.4 depende da jornada autenticada da carta e do aceite humano. [Evidência de publicação](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/45259500761/job/138127736334)
+
+| Gate | Nome | Implementação | Conclusão | Pontos |
+|---|---|---:|---:|---:|
+| 5 | Submissão pelo autor | 100,0% | 75,0% | 24/32 |
+| 7 | Decisão científica | 100,0% | 75,0% | 18/24 |
+
 ## Reconciliação G5.8 I/T — 23/11/2026 (PR #708 integrada)
 
 Implementação **96,9%**; conclusão comprovada **72,3%**; **89/93** unidades integradas; **0/11 Gates encerrados**.
