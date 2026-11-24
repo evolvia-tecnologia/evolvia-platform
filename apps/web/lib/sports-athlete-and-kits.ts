@@ -57,7 +57,7 @@ export function readPublishedAthletePrompts(payload: unknown): PublishedAthleteP
     if (!PROMPT_LABEL.test(label)) continue;
     seen.add(row.code);
     prompts.push({ code: row.code, label, required: row.required === true });
-    if (prompts.length === 12) break;
+    if (prompts.length === ATHLETE_FORM_CODES.size) break;
   }
   return prompts;
 }

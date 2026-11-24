@@ -138,7 +138,7 @@ export default function ParticipantRegistrationEditor({ slug, token }: { slug: s
         if (field.type === 'TEXTAREA') return <label key={field.code}>{field.label}
           <textarea rows={4} required={field.required} maxLength={2000} value={typeof value === 'string' ? value : ''} onChange={(event) => update(field, event.target.value)} />
           {(field.code === 'emergency_contact' || field.code === 'guardian') && (
-            <small>Dado sensível: use só o necessário para o regulamento do evento.</small>
+            <small>Dado sensível: informe apenas o necessário para o regulamento do evento.</small>
           )}
         </label>;
         if (field.type === 'PHONE') return <InternationalPhoneInput key={field.code} label={field.label} value={String(value ?? '')} required={field.required} disabled={busy} onChange={(next) => update(field, next)} />;

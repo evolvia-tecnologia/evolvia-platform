@@ -30,6 +30,14 @@ test('a página só anuncia campos de atleta que a ficha publicou', () => {
     { code: 'shirt_size', label: 'Tamanho da camisa', required: false },
   ]);
   assert.deepEqual(readPublishedAthletePrompts(null), []);
+  const allCodes = [
+    'full_name', 'preferred_name', 'birth_date', 'identity_document', 'email', 'phone',
+    'country', 'city', 'state', 'team', 'estimated_pace', 'emergency_contact', 'guardian', 'shirt_size',
+  ];
+  const allPrompts = readPublishedAthletePrompts({
+    fields: allCodes.map((code) => ({ code, label: code.replaceAll('_', ' '), enabled: true })),
+  });
+  assert.equal(allPrompts.length, allCodes.length, 'todos os códigos de atleta publicados devem aparecer');
 });
 
 test('tamanhos publicados vêm da ficha e não do saldo', () => {
