@@ -12,9 +12,16 @@ const modules = {
   '../lib/api': url('export class ApiError extends Error{};export const getToken=()=>null;export const api=()=>{throw new Error("Unexpected request");};'),
   '../lib/event-flow': url(compile('../lib/event-flow.ts')),
   '../lib/event-status-labels': url(compile('../lib/event-status-labels.ts')),
+  '../lib/operator-journey': url(compile('../lib/operator-journey.ts')),
   './event-admin-dashboard.module.css': url('export default new Proxy({},{get:(_,key)=>key});'),
   './accessibility-panel': url('export default function AccessibilityPanel(){return null;}'),
 };
+modules['../lib/operator-workspace-nav'] = url(
+  compile('../lib/operator-workspace-nav.ts').replace(
+    /from ['"]\.\/operator-journey['"]/u,
+    `from ${JSON.stringify(modules['../lib/operator-journey'])}`,
+  ),
+);
 function rewriteImports(source) {
   const unknown = [];
   const rewritten = source.replace(/from ['"]([^'"]+)['"]/g, (_, name) => {
