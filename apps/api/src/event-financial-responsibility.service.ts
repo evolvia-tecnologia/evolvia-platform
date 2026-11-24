@@ -1,4 +1,5 @@
 import { readOrPrepareFiscalDraft } from './nfse-draft-store';
+import { prepareFiscalSandbox } from './nfse-sandbox-preparation';
 import type { FiscalSetup } from './nfse-draft-policy';
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { MembershipRole, Prisma } from '@prisma/client';
@@ -31,6 +32,10 @@ export class EventFinancialResponsibilityService {
 
   fiscalDraft(userId: string, eventId: string, receiptId: string, command?: { setup: FiscalSetup }) {
     return readOrPrepareFiscalDraft(this.prisma, userId, eventId, receiptId, command);
+  }
+
+  prepareSandbox(userId: string, eventId: string, receiptId: string) {
+    return prepareFiscalSandbox(this.prisma, userId, eventId, receiptId);
   }
 
   private async eventFor(userId: string, eventId: string) {

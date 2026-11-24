@@ -164,3 +164,39 @@ test('cancelamento do checkout após a leitura impede persistir prévia e audito
   assert.equal(await db.fiscalReceiptDraft.count({ where: { receiptId: receipt.id } }), 0);
   assert.equal(await db.auditLog.count({ where: { entityId: receipt.id, action: 'nfse.draft_prepared' } }), 0);
 });
+
+test('preparação sandbox persiste um único vínculo por recibo sob concorrência', async t => {
+  const { db, token, outsider, org, receipt, url, setup, send } = await fiscalFixture(t);
+  const endpoint = url.replace(/nfse-draft$/, 'nfse-sandbox/preparation');
+  const prepare = auth => fetch(endpoint, { method: 'PUT', headers: { authorization: 'Bearer ' + auth } });
+  const config = { EVOLVIA_NFSE_SANDBOX_PROVIDER: 'enotas', EVOLVIA_NFSE_SANDBOX_ORGANIZATION_ID: org.id,
+    EVOLVIA_NFSE_SANDBOX_MUNICIPALITY: setup.municipalityIbgeCode };
+  for (const [key, value] of Object.entries(config)) {
+    const original = process.env[key];
+    process.env[key] = value;
+    t.after(() => { if (original === undefined) delete process.env[key]; else process.env[key] = original; });
+  }
+  assert.equal((await prepare(token)).status, 404);
+  const draft = await (await send(token, setup)).json();
+  assert.equal((await prepare(outsider.token)).status, 404);
+  process.env.EVOLVIA_NFSE_SANDBOX_MUNICIPALITY = '0000000';
+  assert.equal((await prepare(token)).status, 503);
+  process.env.EVOLVIA_NFSE_SANDBOX_MUNICIPALITY = setup.municipalityIbgeCode;
+  const responses = await Promise.all(Array.from({ length: 5 }, () => prepare(token)));
+  const records = [];
+  for (const response of responses) {
+    assert.equal(response.status, 200);
+    records.push(await response.json());
+  }
+  for (const record of records) {
+    assert.deepEqual(record, records[0]);
+    assert.equal(record.idempotencyKey, draft.idempotencyKey);
+    assert.equal(record.issueAuthorized, false);
+    assert.equal(record.status, 'PREPARED');
+  }
+  process.env.EVOLVIA_NFSE_SANDBOX_PROVIDER = 'notazz';
+  assert.equal((await prepare(token)).status, 409);
+  const logs = await db.auditLog.findMany({ where: { entityId: receipt.id, action: 'nfse.sandbox_prepared' } });
+  assert.equal(logs.length, 1);
+  assert.equal(logs[0].metadata, null);
+});

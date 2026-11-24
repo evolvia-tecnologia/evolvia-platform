@@ -22,6 +22,11 @@ export class EventFinancialResponsibilityController {
     return prepareFiscalAdapterPreview(provider, draft);
   }
 
+  @Put('receipts/:receiptId/nfse-sandbox/preparation')
+  prepareSandbox(@Req() request: AuthenticatedRequest, @Param('eventId') eventId: string, @Param('receiptId') receiptId: string) {
+    return this.responsibility.prepareSandbox(request.user!.id, eventId, receiptId);
+  }
+
   @Put('receipts/:receiptId/nfse-draft')
   prepareFiscalDraft(@Req() request: AuthenticatedRequest, @Param('eventId') eventId: string,
     @Param('receiptId') receiptId: string, @Body() setup: FiscalSetup) {

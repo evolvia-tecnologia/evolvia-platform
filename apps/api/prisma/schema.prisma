@@ -2543,6 +2543,8 @@ model EventCommunicationDraft {
 }
 
 model FiscalReceiptDraft {
+  sandboxProvider      String? @db.VarChar(20)
+  sandboxPreparedAt    DateTime?
   receiptId            String @id
   receipt              EventRegistrationPaymentReceipt @relation(fields: [receiptId], references: [id], onDelete: Restrict)
   idempotencyKey       String @db.Char(64)
