@@ -201,8 +201,16 @@ test('B2 parity: posto e totem produzem a mesma etiqueta legada e por categoria 
       styles: { preferred_name: { align: 'center', bold: true, color: '#1d4ed8', fontFamily: 'serif', fontSizeMm: 3.5 } },
     }],
   };
+  const bothCodes = { ...category, categoryLabelTemplates: [{
+    ...category.categoryLabelTemplates[0], fields: ['institution', 'preferred_name', 'qr', 'barcode'],
+  }] };
+  const barcodeOnly = { ...category, categoryLabelTemplates: [{
+    ...category.categoryLabelTemplates[0], fields: ['institution', 'preferred_name', 'barcode'],
+  }] };
   try {
-    for (const [kind, config] of [['legado', legacy], ['categoria', category]]) {
+    for (const [kind, config] of [
+      ['legado', legacy], ['categoria', category], ['categoria ambos', bothCodes], ['categoria barras', barcodeOnly],
+    ]) {
       const posto = await setup(config, data, protocol).badge('user_1', 'event_1', { reservationId });
       const { checkedInAt, alreadyCheckedIn, ...totem } = await kiosk(config).selfServicePrint(
         'congresso', { method: 'PROTOCOL', value: protocol },
@@ -214,11 +222,16 @@ test('B2 parity: posto e totem produzem a mesma etiqueta legada e por categoria 
       const { emissao, ...postoImprimivel } = posto;
       assert.deepEqual(totem, postoImprimivel, 'B2: ' + kind + ' deve imprimir o mesmo payload no posto e no totem');
       assert.doesNotMatch(JSON.stringify(totem), /52998224725|pessoal@example\.test/u);
-      if (kind === 'categoria') {
-        assert.deepEqual(totem.orderedContent.map((item) => item.code),
-          ['institution', 'preferred_name', 'qr']);
+      if (kind !== 'legado') {
+        const codes = kind === 'categoria ambos' ? ['institution', 'preferred_name', 'qr', 'barcode']
+          : kind === 'categoria barras' ? ['institution', 'preferred_name', 'barcode']
+            : ['institution', 'preferred_name', 'qr'];
+        assert.deepEqual(totem.orderedContent.map((item) => item.code), codes);
         assert.equal(totem.orderedContent[1].style.bold, true);
-        assert.match(totem.qr, /^EVQ1\./u);
+        if (kind === 'categoria barras') assert.equal(totem.qr, null);
+        else assert.match(totem.qr, /^EVQ1\./u);
+        if (kind === 'categoria') assert.equal(totem.barcode, null);
+        else assert.match(totem.barcode, /^EVB1\./u);
       } else {
         assert.equal(totem.orderedContent, undefined);
         assert.match(totem.barcode, /^EVB1\./u);

@@ -18,7 +18,7 @@ test('prévia renderizada invalida filtro antigo, descarta resposta atrasada e p
   let tree=render();hooks.run();await tick();tree=render();hooks.run();assert.equal(button(tree).props.disabled,false);
   button(tree).props.onClick();assert.equal(mock.pending.length,1);mock.pending[0].resolve(response('Antigo'));await tick();tree=render();assert.match(text(tree),/Antigo/);
   nodes(tree).find(n=>n.type==='select'&&n.props['aria-label']==='Situação financeira').props.onChange({target:{value:'PAID'}});tree=render();assert.doesNotMatch(text(tree),/Antigo/);
-  button(tree).props.onClick();const body=JSON.parse(mock.requests.at(-1).options.body);assert.deepEqual(body,{categoryIds:[],payment:'PAID',page:1});assert.match(mock.requests.at(-1).path,/event-a\/communication\/audience\/preview$/);
+  button(tree).props.onClick();const body=JSON.parse(mock.requests.at(-1).options.body);assert.deepEqual(body,{categoryIds:[],payment:'PAID',filterMode:'AND',page:1});assert.match(mock.requests.at(-1).path,/event-a\/communication\/audience\/preview$/);
   // Simulates a delayed result after a filter changed before completion.
   nodes(tree).find(n=>n.type==='select'&&n.props['aria-label']==='Situação financeira').props.onChange({target:{value:'ZERO'}});tree=render();
   mock.pending[1].resolve(response('RespostaAtrasada'));await tick();tree=render();assert.doesNotMatch(text(tree),/RespostaAtrasada/);assert.equal(button(tree).props.disabled,false);
@@ -56,5 +56,22 @@ test('autores e coautores possuem opção própria, situação científica e con
   mock.pending.at(-1).resolve({...response('Coautora'),audience:'ALL_SCIENTIFIC_AUTHORS',matchedRegistrations:0,matchedAuthors:4,missingEmail:1,duplicates:2});await tick();tree=render();
   assert.match(text(tree),/4 autorias científicas/);assert.match(text(tree),/1 sem e-mail válido/);assert.match(text(tree),/2 contatos repetidos/);assert.match(text(tree),/não é autorização nem confirmação de envio/);
   nodes(tree).find(n=>n.props?.['aria-label']==='Público').props.onChange({target:{value:'CORRESPONDING_AUTHORS'}});tree=render();assert.doesNotMatch(text(tree),/Coautora/);
+});
+
+test('combinação E/OU envia filterMode e PAID menciona compra múltipla, sem prometer envio', async () => {
+  let tree = render();
+  nodes(tree).find((n) => n.props?.['aria-label'] === 'Público').props.onChange({ target: { value: 'CONFIRMED_REGISTRATIONS' } });
+  tree = render(); hooks.run(); await tick(); tree = render();
+  assert.match(text(tree), /checkout individual ou compra múltipla paga/u);
+  assert.match(text(tree), /Consentimento e outbox serão revalidados/u);
+  const mode = nodes(tree).find((n) => n.type === 'select' && n.props['aria-label'] === 'Combinação dos filtros');
+  assert.equal(mode.props.value, 'AND');
+  assert.equal(mode.props.disabled, false);
+  mode.props.onChange({ target: { value: 'OR' } }); tree = render();
+  button(tree).props.onClick();
+  assert.deepEqual(JSON.parse(mock.requests.at(-1).options.body), { categoryIds: [], payment: 'ALL', filterMode: 'OR', page: 1 });
+  mock.pending.at(-1).resolve({ ...response('Pago'), sendingAvailable: false }); await tick(); tree = render();
+  assert.match(text(tree), /sendingAvailable=false/u);
+  assert.doesNotMatch(text(tree), /E-mail enviado com sucesso|Mensagem enviada/u);
 });
 
