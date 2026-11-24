@@ -68,7 +68,7 @@ export default function CredentialLabel({ label, preview = false }: { label: Cre
     </div>
   ) : null;
 
-  const barcodeNode = label.barcode ? (
+  const barcodeNode = label.barcode && !layout.invalidBarcode ? (
     <div className={styles.barcode}><CredentialBarcode value={label.barcode} /></div>
   ) : null;
 
@@ -107,6 +107,7 @@ export default function CredentialLabel({ label, preview = false }: { label: Cre
   return preview ? <>
     {fitWarning && <p role="alert">{emptyOrdered
       ? 'A etiqueta está sem campos preenchidos. Adicione um campo ou QR antes de imprimir.'
+      : layout.invalidBarcode ? 'Código de barras inválido. Atualize a credencial antes de imprimir.'
       : missingOrderedQr
       ? 'O código QR da credencial não está disponível. Não imprima esta etiqueta; tente novamente após atualizar a inscrição.'
       : missingOrderedBarcode ? 'O código de barras da categoria não está disponível. Não imprima esta etiqueta; tente novamente após atualizar a inscrição.'

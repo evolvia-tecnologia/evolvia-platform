@@ -258,3 +258,13 @@ test('medição usa avanço por glifo e geometria CSS — não largura média po
   assert.equal(tall.bothCodes,true);
   assert.equal(tall.codesMode,'both');
 });
+
+test('código incompatível com Code128 mantém a prévia acessível e bloqueia impressão', () => {
+  for (const orderedContent of [undefined, [{ kind: 'barcode', code: 'barcode', value: '' }]]) {
+    const label = { ...base, barcode: 'EVB1.ação', orderedContent };
+    const preview = nodes(Label({ label, preview: true }));
+    assert.ok(preview.some(node => node.props?.role === 'alert' && /barras inválido/u.test(text(node))));
+    assert.ok(!preview.some(node => node.type === 'barcode'));
+    assert.equal(Label({ label }), null);
+  }
+});

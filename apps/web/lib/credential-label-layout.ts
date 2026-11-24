@@ -218,8 +218,7 @@ function resolveCodesGeometry(input: {
     : 0;
 
   const barcodeFitsOptically = !showBarcode
-    || modules == null
-    || barcodeWidthMm + 1e-6 >= opticalBarcodeWidth;
+    || (modules != null && barcodeWidthMm + 1e-6 >= opticalBarcodeWidth);
 
   return {
     qrSize,
@@ -230,6 +229,7 @@ function resolveCodesGeometry(input: {
     codesRowHeight,
     opticalBarcodeWidth,
     barcodeFitsOptically,
+    invalidBarcode: showBarcode && modules == null,
     codesInnerWidth,
   };
 }
@@ -358,6 +358,7 @@ export function credentialLabelLayout(label: CredentialLabelData) {
     barcodeHeight: codes.barcodeHeight,
     barcodeWidthMm: codes.barcodeWidthMm,
     codesRowHeight: codes.codesRowHeight,
+    invalidBarcode: codes.invalidBarcode,
     measuredHeightMm: measuredHeight,
     estimatedFitRatio: fitRatio,
     fitWarning,
