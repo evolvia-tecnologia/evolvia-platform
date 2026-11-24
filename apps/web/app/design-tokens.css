@@ -52,12 +52,19 @@
   --color-surface-soft: #edf4ff;
   --color-text: #10233d;
   --color-text-strong: #111a2f;
-  --color-text-muted: #5d6f87;
+  --color-text-muted: #5c6d85;
   --color-text-subtle: #71809a;
   --color-on-dark: #ffffff;
   --color-on-dark-muted: #e6ebf5;
   --color-border: #d9e2ef;
   --color-border-strong: #c6d3e5;
+  /* Contorno que identifica um componente: campo, botao, alternador.
+     WCAG 2.2 criterio 1.4.11 exige 3:1, aferido contra a superficie clara
+     mais escura (--color-surface-violet-soft, #f4eaff) e nao contra #ffffff:
+     medir so contra branco deixa passar cor que reprova. #748399 da 3,85:1
+     sobre branco e 3,31:1 no pior caso. Divisor decorativo segue em
+     --color-border. Medido por tests/e2e/specs/tokens-contraste.spec.ts. */
+  --color-border-interactive: #748399;
   --color-focus-on-light: #0b64e5;
   --color-focus-on-dark: #8fc5ff;
   --color-focus: var(--color-focus-on-dark);
