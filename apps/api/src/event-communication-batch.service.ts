@@ -1,6 +1,7 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { randomUUID } from 'node:crypto';
+import { bulkDeliveryConfig } from './event-communication-delivery';
 import { AuthorizationService } from './authorization.service';
 import { EVENT_EDITOR_ROLES } from './membership-policy';
 import { PrismaService } from './prisma.service';
@@ -39,7 +40,17 @@ export class EventCommunicationBatchService {
     const batches = await this.prisma.eventCommunicationBatch.findMany({ where: scope,
       select: { id: true, draftId: true, draftRevision: true, recipientCount: true, status: true, createdAt: true },
       orderBy: { createdAt: 'desc' }, take: 100 });
-    return { batches: batches.map(batch => this.summary(batch)), sendingAvailable: false };
+    const config = bulkDeliveryConfig();
+    const sendingAvailable = config?.eventId === eventId && config.organizationId === scope.organizationId;
+    const groups = await this.prisma.eventCommunicationRecipient.groupBy({ by: ['batchId', 'status'],
+      where: { ...scope, batchId: { in: batches.map(batch => batch.id) } }, _count: { _all: true } });
+    const counts = new Map(groups.map(group => [group.batchId + '/' + group.status, group._count._all]));
+    return { sendingAvailable, batches: batches.map(batch => {
+      const count = (status: string) => counts.get(batch.id + '/' + status) ?? 0;
+      return { ...this.summary(batch), sendingAvailable, acceptedCount: count('ACCEPTED'),
+        receivedCount: count('RECEIVED'), pendingCount: count('PENDING'), claimedCount: count('CLAIMED'),
+        unknownCount: count('UNKNOWN'), failedCount: count('FAILED'), cancelledCount: count('CANCELLED') };
+    }) };
   }
 
   async cancel(userId: string, eventId: string, batchId: string) {
