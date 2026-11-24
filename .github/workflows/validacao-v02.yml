@@ -49,6 +49,9 @@ jobs:
       - name: Instalar o Poppler
         run: sudo apt-get update -qq && sudo apt-get install -y -qq poppler-utils
 
+      - name: Validar provisionamento do proprietário em isolamento
+        run: node --test scripts/provisionar-proprietario-master.test.mjs
+
       - name: Validar API
         working-directory: apps/api
         env:
@@ -477,6 +480,7 @@ jobs:
             --env-file .env.ci \
             -p "$COMPOSE_PROJECT_NAME" \
             run --rm --no-deps \
+            -v "$PWD/scripts/provisionar-proprietario-master.policy.mjs:/scripts/provisionar-proprietario-master.policy.mjs:ro" \
             -v "$PWD/apps/api/tests-postgres:/app/tests-postgres:ro" \
             api node --test "tests-postgres/*.test.mjs"
 
