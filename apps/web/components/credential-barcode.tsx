@@ -18,7 +18,9 @@ export default function CredentialBarcode({ value }: { value: string }) {
     return { path: pieces.join(''), width: x };
   }, [modules]);
 
-  return <svg role="img" aria-label="Código de barras da etiqueta" viewBox={`0 0 ${bars.width} 40`} preserveAspectRatio="none" style={{ width: '100%', height: '100%', background: '#fff' }}>
+  // xMidYMid meet preserva proporção das barras (zona de silêncio + módulo).
+  // Esticar o Code128 (aspect ratio forçado) prejudicava a leitura física.
+  return <svg role="img" aria-label="Código de barras da etiqueta" viewBox={`0 0 ${bars.width} 40`} preserveAspectRatio="xMidYMid meet" style={{ width: '100%', height: '100%', background: '#fff' }}>
     <path fill="#111" d={bars.path} />
   </svg>;
 }

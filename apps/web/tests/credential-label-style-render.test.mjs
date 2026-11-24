@@ -46,7 +46,7 @@ function inspect(preview) {
   const sheet = nodes(tree).find((node) => node.type === 'section');
   assert.ok(sheet, 'a etiqueta precisa renderizar em ambos os modos');
   const rows = nodes(sheet).filter((node) => node.type === 'p');
-  const qr = nodes(sheet).find((node) => node.props?.className === 'orderedQr');
+  const qr = nodes(sheet).find((node) => node.props?.className === 'orderedQr' || node.props?.className === 'codes');
   return { tree, sheet, rows, qr };
 }
 
@@ -80,7 +80,7 @@ test('QR sem estilo salvo mantém alinhamento padrão, sem inventar um estilo de
     { code: 'qr', kind: 'qr', value: '' },
   ] };
   const tree = CredentialLabel({ label, preview: true });
-  const qr = nodes(tree).find((node) => node.props?.className === 'orderedQr');
+  const qr = nodes(tree).find((node) => node.props?.className === 'orderedQr' || node.props?.className === 'codes');
   assert.ok(qr);
   assert.equal(qr.props.style, undefined);
   assert.equal(nodes(tree).find((node) => node.type === 'section').props['data-fit-warning'], false);

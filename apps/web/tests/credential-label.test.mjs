@@ -14,8 +14,17 @@ const base={eventName:'Evento',name:'Nome do participante',company:'Instituiçã
 test('etiqueta sem linhas opcionais permanece renderizável e com dimensões finitas',()=>{
  for(const lines of [undefined,null,[]]){const tree=Label({label:{...base,lines},preview:true});const n=nodes(tree).find(x=>x.type==='section');assert.ok(n,'a prévia precisa conter a etiqueta');assert.match(text(tree),/Nome do participante/);assert.equal(n.props.style.width,'90mm');assert.ok(Number.isFinite(n.props.style['--label-scale']));assert.equal(nodes(n).filter(x=>x.props?.className==='line').length,0);}
 });
-test('texto ocupa área própria e barcode é irmão da área QR, sem dividir a coluna de texto',()=>{
- const tree=Label({label:{...base,lines:['Área'],barcode:'EVB1.demo'},preview:true});const n=nodes(tree).find(x=>x.type==='section');assert.ok(n,'a prévia precisa conter a etiqueta');assert.deepEqual(n.props.children.filter(Boolean).map(x=>x.props.className),['copy','codes','barcode']);assert.equal(n.props['data-qr'],true);assert.equal(n.props['data-barcode'],true);
+test('texto ocupa área própria e QR+barras ficam lado a lado na faixa de códigos',()=>{
+ const tree=Label({label:{...base,lines:['Área'],barcode:'EVB1.demo'},preview:true});
+ const n=nodes(tree).find(x=>x.type==='section');
+ assert.ok(n,'a prévia precisa conter a etiqueta');
+ assert.deepEqual(n.props.children.filter(Boolean).map(x=>x.props.className),['copy','codesRow']);
+ assert.equal(n.props['data-codes'],'both');
+ assert.equal(n.props['data-qr'],false,'com ambos os códigos o QR sai da coluna lateral');
+ assert.equal(n.props['data-barcode'],true,'faixa inferior ativa para o par QR+barras');
+ const row=n.props.children.filter(Boolean).find(x=>x.props.className==='codesRow');
+ assert.equal(row.props['data-codes'],'both');
+ assert.deepEqual(row.props.children.filter(Boolean).map(x=>x.props.className),['codes','barcode']);
 });
 test('nome legado longo não sofre clamp silencioso e etiqueta pequena avisa sobre legibilidade',()=>{
  const css=readFileSync(new URL('../components/credential-label.module.css',import.meta.url),'utf8');
@@ -138,8 +147,28 @@ test('QR e barras ordenados usam um único layout e bloqueiam ausência do códi
       {code:'qr',kind:'qr',value:''}, {code:'barcode',kind:'barcode',value:''}]};
   const sheet=nodes(Label({label:both,preview:true})).find(n=>n.type==='section');
   assert.equal(sheet.props['data-fit-warning'],false);
-  assert.ok(nodes(Label({label:both,preview:true})).some(n=>n.props?.className==='orderedBarcode'));
+  assert.equal(sheet.props['data-codes'],'both');
+  assert.ok(nodes(Label({label:both,preview:true})).some(n=>n.props?.className==='codesRow'));
+  assert.ok(nodes(Label({label:both,preview:true})).some(n=>n.props?.className==='barcode'));
   assert.equal(nodes(Label({label:{...both,barcode:null},preview:true})).find(n=>n.type==='section').props['data-fit-warning'],true);
   assert.equal(nodes(Label({label:{...both,qr:null},preview:true})).find(n=>n.type==='section').props['data-fit-warning'],true);
   assert.equal(nodes(Label({label:{...both,heightMm:20,widthMm:40},preview:true})).find(n=>n.type==='section').props['data-fit-warning'],true);
+});
+
+test('9×4 cm com ambos os códigos limita a largura das barras e preserva proporção', () => {
+  const css=readFileSync(new URL('../components/credential-label.module.css',import.meta.url),'utf8');
+  const barcodeSrc=readFileSync(new URL('../components/credential-barcode.tsx',import.meta.url),'utf8');
+  assert.match(css,/\.codesRow\[data-codes="both"\]/u);
+  assert.match(css,/--label-barcode-width/u);
+  assert.doesNotMatch(css,/\.barcode \{[^}]*grid-column:\s*1\s*\/\s*-1/u,'barras não ocupam a grade inteira');
+  assert.match(barcodeSrc,/preserveAspectRatio="xMidYMid meet"/u);
+  assert.doesNotMatch(barcodeSrc,/preserveAspectRatio="none"/u);
+  const both={...base,barcode:'EVB1.demo',widthMm:90,heightMm:40};
+  const sheet=nodes(Label({label:both,preview:true})).find(n=>n.type==='section');
+  const barcodeW=Number.parseFloat(sheet.props.style['--label-barcode-width']);
+  const qrW=Number.parseFloat(sheet.props.style['--label-qr-size']);
+  const barH=Number.parseFloat(sheet.props.style['--label-barcode-height']);
+  assert.ok(barcodeW < 90 - qrW,'largura das barras deixa espaço ao QR e às margens');
+  assert.ok(barH <= 5.5,'altura das barras não domina a etiqueta 9×4');
+  assert.ok(qrW >= 12 && qrW <= 14,'QR em modo ambos fica na faixa legível sem exagero');
 });
