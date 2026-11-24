@@ -71,7 +71,10 @@ test('Geral oferece Informações do evento nos perfis, com destino canônico e 
     ['FAIR_EXHIBITION', 'Feira'], ['ENTERTAINMENT', 'Show ou entretenimento'],
     ['SOCIAL_COMMUNITY', 'Corrida'],
   ]) {
-    await withTree(async () => { throw new Error('Não deve buscar com payload autorizado'); }, false,
+    await withTree(async (path) => {
+      assert.equal(path, '/events/evento-qa/operators/me/capabilities');
+      return { papel: 'OWNER', escopado: false, acoes: [] };
+    }, false,
       ({ Workspace }) => React.createElement(Workspace, { eventId: 'evento-qa', section: 'overview', payload: eventPayload(profile, eventType) }, 'Conteúdo'),
       async (tree) => {
         const nav = tree.root.findByProps({ 'aria-label': 'Navegação do evento' });
@@ -89,7 +92,10 @@ test('Geral oferece Informações do evento nos perfis, com destino canônico e 
 });
 
 test('menu móvel fecha após escolher Informações e links ocultos saem da ordem de tabulação', async () => {
-  await withTree(async () => ({}), true,
+  await withTree(async (path) => {
+    assert.equal(path, '/events/evento-qa/operators/me/capabilities');
+    return { papel: 'OWNER', escopado: false, acoes: [] };
+  }, true,
     ({ Workspace }) => React.createElement(Workspace, { eventId: 'evento-qa', section: 'overview', payload: eventPayload() }, 'Conteúdo'),
     async (tree) => {
       const toggle = () => tree.root.findByProps({ 'aria-controls': 'event-admin-navigation' });
@@ -107,7 +113,7 @@ test('menu móvel fecha após escolher Informações e links ocultos saem da ord
 
 test('visão geral carregada oferece edição de informações sem gravar dados nem publicar', async () => {
   const calls = [];
-  await withTree(async (path, options) => { calls.push({ path, method: options?.method }); return eventPayload(); }, false,
+  await withTree(async (path, options) => { calls.push({ path, method: options?.method }); if (path === '/events/evento-qa/operators/me/capabilities') return { papel: 'OWNER', escopado: false, acoes: [] }; return eventPayload(); }, false,
     ({ Dashboard }) => React.createElement(Dashboard, { eventId: 'evento-qa', section: 'overview' }),
     async (tree) => {
       const card = tree.root.findAllByType('article').find((article) => article.findAllByType('h3').some((h3) => text(h3) === 'Informações do evento'));
@@ -137,5 +143,19 @@ test('erro de autorização não oferece Informações no fallback do operador o
     async (tree) => {
       assert.match(JSON.stringify(tree.toJSON()), /Acesso negado/);
       assert.equal(tree.root.findAllByType('a').some((link) => link.props.href.includes('/configuracao')), false);
+    });
+});
+
+
+test('payload válido sem confirmação de papel não abre menu de organizador', async () => {
+  await withTree(async (path) => {
+    assert.equal(path, '/events/evento-qa/operators/me/capabilities');
+    throw new ApiError('Acesso negado', 403);
+  }, false,
+    ({ Workspace }) => React.createElement(Workspace, { eventId: 'evento-qa', section: 'overview', payload: eventPayload() }, 'CONTEUDO_PRIVADO'),
+    async (tree) => {
+      assert.match(JSON.stringify(tree.toJSON()), /Não foi possível verificar suas permissões/);
+      assert.doesNotMatch(JSON.stringify(tree.toJSON()), /CONTEUDO_PRIVADO/);
+      assert.equal(tree.root.findAllByType('a').some(link => link.props.href?.includes('/configuracao')), false);
     });
 });
