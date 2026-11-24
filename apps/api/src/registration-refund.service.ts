@@ -581,8 +581,13 @@ export class RegistrationRefundService {
     } } } };
     const select = { organizationId: true, status: true, preparedAmountCents: true, sandboxPaymentId: true,
       preparedCheckout: { select: fields }, preparedOrderCheckout: { select: fields } } as const;
-    const request = await this.prisma.registrationRefundRequest.findFirst({ where, select });
-    if (!request) throw new NotFoundException('Pedido não encontrado.');
+    const initial = await this.prisma.registrationRefundRequest.findFirst({
+      where, select: { ...select, sandboxOperation: { select: { status: true, attempts: true } } },
+    });
+    if (!initial) throw new NotFoundException('Pedido não encontrado.');
+    const { sandboxOperation, ...request } = initial;
+    // A duplicate already in flight before rejection is not an explicit retry.
+    const retryRequested = sandboxOperation?.status === 'FAILED' && sandboxOperation.attempts === 1;
     const { organizationId } = request;
     const token = process.env.ASAAS_REFUND_SANDBOX_TOKEN?.trim();
     if (!token || process.env.ASAAS_REFUND_SANDBOX_ORGANIZATION_ID !== organizationId ||
@@ -629,7 +634,7 @@ export class RegistrationRefundService {
           AND "SandboxRefundOperation"."eventId" = ${eventId}
           AND "SandboxRefundOperation"."paymentId" = ${op.paymentId}
           AND "SandboxRefundOperation"."amountCents" = ${op.amountCents}
-          AND ${!observed.matched && observed.eligible}`;
+          AND ${retryRequested && !observed.matched && observed.eligible}`;
       if (inserted && !observed.matched && !observed.eligible) throw new ConflictException('Cobrança indisponível para nova operação.');
       return inserted === 1 && !observed.matched;
     });
