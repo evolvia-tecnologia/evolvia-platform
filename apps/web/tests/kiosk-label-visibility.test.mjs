@@ -24,8 +24,12 @@ const labelModules = {
   './credential-barcode': data('export default "barcode";'),
   './credential-qr': data('export default "qr";'),
   './credential-label.module.css': cssProxy,
+  '../lib/credential-label-layout': data(compile('../lib/credential-label-layout.ts')),
 };
-const labelSource = compile('../components/credential-label.tsx').replace(/from ['"]([^'"]+)['"]/g, (_, key) => `from ${JSON.stringify(labelModules[key])}`);
+const labelSource = compile('../components/credential-label.tsx').replace(/from ['"]([^'"]+)['"]/g, (_, key) => {
+  assert.ok(labelModules[key], `módulo de etiqueta não mapeado: ${key}`);
+  return `from ${JSON.stringify(labelModules[key])}`;
+});
 const labelUrl = data(labelSource);
 const kioskModules = {
   react: hooksUrl,

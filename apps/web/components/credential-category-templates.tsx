@@ -317,7 +317,7 @@ export default function CredentialCategoryTemplates({
               : savedTemplate
                 ? 'Modelo salvo e utilizado na impressão desta categoria.'
                 : 'Etiqueta histórica em uso nesta categoria (sem modelo próprio salvo).'}</p>
-            <p>Dados fictícios para visualização · {widthMm / 10} × {heightMm / 10} cm. A impressão utiliza dados reais da inscrição.</p>
+            <p>Dados fictícios para visualização · {widthMm / 10} × {heightMm / 10} cm. Reduzir para caber ativo. A impressão utiliza o mesmo layout e dados reais da inscrição.</p>
             <CredentialLabel label={preview} preview />
           </aside>
         </div>

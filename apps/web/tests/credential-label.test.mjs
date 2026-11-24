@@ -4,9 +4,10 @@ import {readFileSync} from 'node:fs';
 import ts from 'typescript';
 const url=s=>'data:text/javascript;base64,'+Buffer.from(s).toString('base64');
 const compile=p=>ts.transpileModule(readFileSync(new URL(p,import.meta.url),'utf8'),{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX}}).outputText;
-const modules={react:url('export const useEffect=()=>{}; export const useRef=v=>({current:v}); export const useState=v=>[typeof v==="function"?v():v,()=>{}];'),'react/jsx-runtime':url('export const Fragment=Symbol.for("react.fragment");export const jsx=(type,props)=>({type,props});export const jsxs=jsx;'),'./print-surface':url('export default "print-surface";'),'./credential-barcode':url('export default "barcode";'),'./credential-qr':url('export default "qr";'),'./credential-label':url('export default "label";'),'../lib/api':url('export const api=(...args)=>globalThis.__labelSaveApi(...args);')};
+const modules={react:url('export const useEffect=()=>{}; export const useRef=v=>({current:v}); export const useState=v=>[typeof v==="function"?v():v,()=>{}];'),'react/jsx-runtime':url('export const Fragment=Symbol.for("react.fragment");export const jsx=(type,props)=>({type,props});export const jsxs=jsx;'),'./print-surface':url('export default "print-surface";'),'./credential-barcode':url('export default "barcode";'),'./credential-qr':url('export default "qr";'),'./credential-label':url('export default "label";'),'../lib/api':url('export const api=(...args)=>globalThis.__labelSaveApi(...args);'),'../lib/credential-label-layout':url(compile('../lib/credential-label-layout.ts'))};
 async function load(p,css){return (await import(url(compile(p).replace(/from ['"]([^'"]+)['"]/g,(_,name)=>'from '+JSON.stringify(name===css?url('export default new Proxy({},{get:(_,key)=>key});'):modules[name]??name))))).default;}
 const Label=await load('../components/credential-label.tsx','./credential-label.module.css');
+const {credentialLabelLayout,LABEL_SIZE_PRESETS}=await import(modules['../lib/credential-label-layout']);
 const Settings=await load('../components/credential-label-settings.tsx','./credential-label-settings.module.css');
 const nodes=n=>Array.isArray(n)?n.flatMap(nodes):n&&typeof n==='object'?[n,...nodes(n.props?.children)]:[];
 const text=n=>Array.isArray(n)?n.map(text).join(''):n&&typeof n==='object'?text(n.props?.children):String(n??'');
@@ -171,4 +172,55 @@ test('9×4 cm com ambos os códigos limita a largura das barras e preserva propo
   assert.ok(barcodeW < 90 - qrW,'largura das barras deixa espaço ao QR e às margens');
   assert.ok(barH <= 5.5,'altura das barras não domina a etiqueta 9×4');
   assert.ok(qrW >= 12 && qrW <= 14,'QR em modo ambos fica na faixa legível sem exagero');
+});
+
+test('todos os presets oficiais cobrem QR, barras, ambos e nenhum sem corte silencioso', () => {
+  const css=readFileSync(new URL('../components/credential-label.module.css',import.meta.url),'utf8');
+  assert.doesNotMatch(css,/overflow:\s*hidden/u,'impressão não corta conteúdo com overflow hidden');
+  assert.equal(LABEL_SIZE_PRESETS.length,5,'lista oficial de tamanhos');
+  for (const size of LABEL_SIZE_PRESETS) {
+    const short={...base,widthMm:size.widthMm,heightMm:size.heightMm,name:'Ana',company:'Org',category:'VIP',lines:[],barcode:null};
+    const longName='Participante Internacional '.repeat(8);
+    const variants=[
+      { ...short, qr:'EVQ1.demo', barcode:null },
+      { ...short, qr:null, barcode:'EVB1.demo', codeMode:'BARCODE' },
+      { ...short, qr:'EVQ1.demo', barcode:'EVB1.demo' },
+      { ...short, qr:null, barcode:null, codeMode:undefined, name:longName },
+      { ...short, name:null, company:null, category:null, lines:[], qr:'EVQ1.demo',
+        orderedContent:[{code:'preferred_name',kind:'text',value:'Bia',style:{align:'center',bold:true,color:'#111827',fontSizeMm:4}},
+          {code:'qr',kind:'qr',value:''}] },
+      { ...short, name:null, company:null, category:null, lines:[], qr:'EVQ1.demo', barcode:'EVB1.demo',
+        orderedContent:[{code:'preferred_name',kind:'text',value:longName},
+          {code:'qr',kind:'qr',value:''},{code:'barcode',kind:'barcode',value:''}] },
+    ];
+    for (const label of variants) {
+      const preview=Label({label,preview:true});
+      const sheet=nodes(preview).find(n=>n.type==='section');
+      assert.ok(sheet,`${size.preset} precisa renderizar prévia`);
+      assert.equal(sheet.props.style.width,`${size.widthMm}mm`);
+      assert.equal(sheet.props.style.height,`${size.heightMm}mm`);
+      assert.equal(sheet.props['data-reduce-to-fit'],true);
+      assert.ok(Number.isFinite(sheet.props.style['--label-scale']));
+      const layout=credentialLabelLayout(label);
+      assert.equal(layout.reduceToFit,true);
+      const print=Label({label,preview:false});
+      if (layout.fitWarning) {
+        assert.equal(print,null,`${size.preset} ilegível não imprime`);
+        assert.ok(nodes(preview).some(n=>n.props?.role==='alert'),`${size.preset} avisa na prévia`);
+      } else {
+        assert.equal(print.type,'print-surface',`${size.preset} legível usa a mesma superfície`);
+        assert.equal(print.props.widthMm,size.widthMm);
+        assert.equal(print.props.heightMm,size.heightMm);
+      }
+    }
+  }
+});
+
+test('motor compartilhado reduz para caber e bloqueia abaixo do limiar em 8×3', () => {
+  const crowded={...base,widthMm:80,heightMm:30,name:'Nome '.repeat(40),company:'Empresa '.repeat(20),lines:['Cargo '.repeat(20)],barcode:'EVB1.demo'};
+  const layout=credentialLabelLayout(crowded);
+  assert.equal(layout.reduceToFit,true);
+  assert.ok(layout.scale < 1);
+  assert.equal(layout.fitWarning,true);
+  assert.ok(layout.bothCodes || layout.showBarcode);
 });

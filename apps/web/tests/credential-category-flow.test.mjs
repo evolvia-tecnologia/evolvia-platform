@@ -50,16 +50,18 @@ test('busca e lista para impressão exibem nome, inscrição, ações e confirma
 });
 
 test('a credencial respeita ordem do modelo e mantém implementação antiga para legado', async () => {
-  const [label, service, policy] = await Promise.all([
+  const [label, layout, service, policy] = await Promise.all([
     read('../components/credential-label.tsx'),
+    read('../lib/credential-label-layout.ts'),
     read('../../api/src/event-desk.service.ts'),
     read('../../api/src/credential-category-template.policy.ts'),
   ]);
-  assert.match(label, /orderedContent\?: Array/u);
+  assert.match(layout, /orderedContent\?: Array/u);
   assert.match(label, /ordered\.forEach\(\(item, index\)/u);
   assert.match(label, /styles\.codesRow/u);
   assert.match(label, /<CredentialQr code=\{label\.qr\} compact/u);
   assert.match(label, /: \[[\s\S]*label\.name/u);
+  assert.match(layout, /reduceToFit/u);
   assert.match(service, /const template = categoryLabelTemplates\(config\?\.config\)\.find/u);
   assert.match(service, /if \(!template\) return \{ \.\.\.credential, emissao: \{ sequence, concluida: false \} \};/u,
     'categoria sem modelo explícito deve conservar a impressão histórica');
@@ -91,8 +93,11 @@ test('formatação permite centro/esquerda/direita, negrito, cor e prévia sincr
 });
 
 test('QR alinha horizontalmente e o primeiro texto mantém destaque mesmo após QR', async () => {
-  const label = await read('../components/credential-label.tsx');
-  assert.match(label, /const firstTextIndex = ordered\?\.findIndex\(\(item\) => item\.kind === 'text'\) \?\? -1;/u);
+  const [label, layout] = await Promise.all([
+    read('../components/credential-label.tsx'),
+    read('../lib/credential-label-layout.ts'),
+  ]);
+  assert.match(layout, /const firstTextIndex = ordered\?\.findIndex\(\(item\) => item\.kind === 'text'\) \?\? -1;/u);
   assert.match(label, /className=\{index === firstTextIndex \? styles\.orderedFirst : styles\.line\}/u);
   assert.match(label, /orderedQrAlign === 'left' \? 'start' : orderedQrAlign === 'right' \? 'end' : 'center'/u);
   assert.match(label, /justifySelf: qrJustify as/u);

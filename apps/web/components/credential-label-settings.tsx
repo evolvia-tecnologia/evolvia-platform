@@ -111,7 +111,7 @@ export default function CredentialLabelSettings({
   }
 
   return <section className={styles.settings} aria-labelledby="label-settings-title">
-    <header><h3 id="label-settings-title">Papel e impressão</h3><p>O tamanho do papel vale para todas as categorias. A prévia única acima mostra a etiqueta usada na impressão da categoria selecionada.</p></header>
+    <header><h3 id="label-settings-title">Papel e impressão</h3><p>O tamanho do papel vale para todas as categorias. Novas configurações nascem em 8×3 cm. “Reduzir para caber” fica sempre ativo na prévia e na impressão. A prévia única acima mostra a etiqueta usada na impressão da categoria selecionada.</p></header>
     <div className={styles.form}>
     <fieldset className={styles.group}>
     <legend>1. Tamanho da etiqueta</legend>

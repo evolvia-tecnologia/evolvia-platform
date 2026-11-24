@@ -6,12 +6,16 @@ import ts from 'typescript';
 // Exercise the rendered JSX props, rather than only matching source strings.
 // No browser login, participant data, printer, or physical print is simulated.
 const asModule = (source) => 'data:text/javascript;base64,' + Buffer.from(source).toString('base64');
+const compile = (p) => ts.transpileModule(readFileSync(new URL(p, import.meta.url), 'utf8'), {
+  compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX },
+}).outputText;
 const dependencies = {
   react: asModule('export const useEffect=()=>{}; export const useRef=v=>({current:v}); export const useState=v=>[v,()=>{}];'),
   'react/jsx-runtime': asModule('export const Fragment=Symbol.for("react.fragment");export const jsx=(type,props)=>({type,props});export const jsxs=jsx;'),
   './print-surface': asModule('export default "print-surface";'),
   './credential-barcode': asModule('export default "barcode";'),
   './credential-qr': asModule('export default "qr";'),
+  '../lib/credential-label-layout': asModule(compile('../lib/credential-label-layout.ts')),
 };
 const source = readFileSync(new URL('../components/credential-label.tsx', import.meta.url), 'utf8');
 const js = ts.transpileModule(source, {

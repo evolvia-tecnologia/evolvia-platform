@@ -207,10 +207,12 @@ export function labelFieldAllowed(code: string): boolean {
 }
 
 export function defaultLabelConfig(): LabelConfig {
+  // Ciclo 04 / P0 fundador: novas categorias e eventos nascem em 8×3 cm.
+  // Modelos personalizados já persistidos continuam intactos via readLabelConfig.
   return {
-    preset: '9x4',
-    widthMm: 90,
-    heightMm: 40,
+    preset: '8x3',
+    widthMm: 80,
+    heightMm: 30,
     showName: true,
     nameField: 'preferred_name',
     showCompany: true,
