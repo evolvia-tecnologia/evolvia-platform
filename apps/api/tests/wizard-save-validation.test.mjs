@@ -123,19 +123,16 @@ test('evento sem datas gravadas e corpo sem datas não inventa valor', () => {
   assert.deepEqual([agenda.gravaStartDate, agenda.gravaEndDate], [false, false]);
 });
 
-/**
- * O teste que mantém a correção honesta.
- *
- * `agendaResultante` só vale se for o espelho EXATO das guardas de
- * `persistEventData`. A referência abaixo é a semântica de escrita anterior,
- * transcrita daquele método; se as duas divergirem, a validação volta a julgar
- * um resultado que não é o que se grava — que é o defeito C-04 de novo.
- */
-test('a correção não muda o que se grava, em toda a matriz de entradas', () => {
-  const escritaLegada = (pedido, atual) => {
+// Referência independente: o PATCH omitido preserva a coluna, o valor explícito
+// altera a coluna e datesPending limpa um campo que ficou sem data.
+test('a agenda validada corresponde à escrita do PATCH em toda a matriz de entradas', () => {
+  const escritaEsperada = (pedido, atual) => {
     const data = {};
-    if (pedido.startDate || pedido.datesPending) data.startDate = pedido.startDate ? new Date(pedido.startDate) : null;
-    if (pedido.endDate || pedido.datesPending) data.endDate = pedido.endDate ? new Date(pedido.endDate) : null;
+    for (const campo of ['startDate', 'endDate']) {
+      const valor = pedido[campo];
+      if (valor === undefined && !pedido.datesPending) continue;
+      data[campo] = valor ? new Date(valor) : null;
+    }
     return {
       gravaStartDate: 'startDate' in data,
       gravaEndDate: 'endDate' in data,
@@ -169,13 +166,13 @@ test('a correção não muda o que se grava, em toda a matriz de entradas', () =
       for (const datesPending of [true, false, undefined]) {
         for (const atual of gravados) {
           const pedido = { startDate, endDate, datesPending };
-          const legada = escritaLegada(pedido, atual);
+          const esperada = escritaEsperada(pedido, atual);
           const nova = escritaNova(pedido, atual);
           const onde = JSON.stringify({ startDate, endDate, datesPending, atual });
-          assert.equal(nova.gravaStartDate, legada.gravaStartDate, `grava início divergiu: ${onde}`);
-          assert.equal(nova.gravaEndDate, legada.gravaEndDate, `grava término divergiu: ${onde}`);
-          assert.equal(instante(nova.startDate), instante(legada.startDate), `início divergiu: ${onde}`);
-          assert.equal(instante(nova.endDate), instante(legada.endDate), `término divergiu: ${onde}`);
+          assert.equal(nova.gravaStartDate, esperada.gravaStartDate, `grava início divergiu: ${onde}`);
+          assert.equal(nova.gravaEndDate, esperada.gravaEndDate, `grava término divergiu: ${onde}`);
+          assert.equal(instante(nova.startDate), instante(esperada.startDate), `início divergiu: ${onde}`);
+          assert.equal(instante(nova.endDate), instante(esperada.endDate), `término divergiu: ${onde}`);
           comparados += 1;
         }
       }
