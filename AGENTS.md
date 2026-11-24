@@ -60,6 +60,20 @@ avançar.
 - Nenhuma tarefa é concluída apenas porque código foi gerado. Exija evidência de
   testes, riscos residuais, rollback e estado do PR.
 
+## Critério permanente de entrega
+
+Decisão [EVO-022](docs/governance/DECISIONS.md#evo-022--critério-permanente-de-entrega). Vale para organizador, operador, participante e qualquer outro
+perfil. Cada ajuste percorre a jornada da pessoa afetada e as regressões
+aplicáveis. A evidência fica no PR, junto do código:
+
+- navegação por perfil, com nome claro, poucos passos e acesso compatível com a permissão;
+- interface no CSS e na identidade existentes, com hierarquia visual e acessibilidade;
+- feedback de salvar, carregar, concluir e falhar igual ao resultado real, preservando o que foi digitado;
+- código que reutiliza os contratos existentes, com responsabilidade clara e sem duplicação desnecessária;
+- autorização no servidor, isolamento entre organizações e eventos, validação de entrada, proteção de dados e teste do caminho de abuso aplicável.
+
+O que não foi percorrido ou testado fica pendente. Não declarar o critério como cumprido sem essa evidência.
+
 ## Gate mínimo de entrega
 
 Conforme o impacto, validar:

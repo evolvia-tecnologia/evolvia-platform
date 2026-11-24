@@ -23,6 +23,7 @@ status `SUBSTITUÍDA` e aponta para a sucessora.
 | EVO-015 | Modo Lançamento prioriza fatias verticais utilizáveis em `develop` e homologação. | ACEITA em 22/09/2026 | Cada lote reúne tela + API + banco + testes + homologação quando aplicável; segurança, tenant, LGPD, auditoria, idempotência e rollback são incorporados. Abertura pública, `main` e produção continuam dependentes de Go/No-Go explícito. |
 | EVO-016 | Login continua pelo e-mail. CPF ou passaporte é a chave do histórico de participação da própria pessoa. | ACEITA em 04/10/2026 | Documento não autentica. Digitar o documento de outra pessoa não revela o histórico. A organização vê só o evento dela. Contrato em [operacao-do-evento.md](../operacao-do-evento.md). |
 | EVO-017 | A operação do evento incorpora as fatias 1 a 17 de [operacao-do-evento.md](../operacao-do-evento.md). | ACEITA em 04/10/2026 como direção, não como entrega | O Orquestrador incorpora uma fatia por vez, com tela, API, banco e testes. Inclui avisos por e-mail, prazo com hora, fila, científico operacional, programação pública, certificado sem taxa, reembolso visível, o link de transmissão para quem já está inscrito e o complemento do credenciamento. Fora de escopo: doação, assento, anais, DOI, WhatsApp, aplicativo nativo, upload de vídeo, comentário na transmissão, senha compartilhada do evento, grupo como módulo, permissão menu a menu e captcha. |
+| EVO-022 | Toda entrega passa pelo critério permanente de navegação, interface, feedback, código e segurança. | ACEITA em 10/11/2026 | Cada ajuste percorre a jornada da pessoa afetada e as regressões aplicáveis. A evidência fica no PR, junto do código. Esconder um controle não substitui autorização no servidor. |
 
 ## Nova decisão
 
@@ -73,3 +74,22 @@ Work coordena e integra; Codex mantém G2/financeiro/fiscal; Claude mantém oper
 Meta de 100% no dia não dispensa backend deny-by-default, tenant/LGPD, integridade financeira, CI obrigatório, revisão independente ou evidência de publicação. Revisar delta novo uma vez por SHA, sem auditorias/leituras repetidas ou commits artificiais por rodada. Macrociclos concluem resultados verticais; bloqueio reproduzível é registrado uma vez antes de alternar para tarefa livre.
 
 Medição EVO-018 preservada: 93 critérios/11 Gates e I/T/D/F somente por prova. Agendamento e comentário de fila não comprovam execução externa. Rodadas aceitas pelo serviço não garantem ativação; sessões Claude/Gemini/Cursor exigem ACK/commit. Sem main/produção/infra/secrets/billing, pagamentos/e-mails reais ou APIs pagas. Compatibilidade, migrations aditivas e rollback permanecem obrigatórios. Rollback desta direção redistribui o próximo corte sem apagar trabalho.
+
+
+## EVO-022 — Critério permanente de entrega
+
+Status: ACEITA pelo fundador em 10/11/2026. Vale para organizador, operador, participante e qualquer outro perfil. Não altera escopo funcional, não autoriza produção e não substitui EVO-002, EVO-012 nem o gate mínimo de [AGENTS.md](../../AGENTS.md).
+
+Contexto: entregas recentes separavam descoberta, aparência, feedback e segurança. A alternativa de tratar isso como preferência de cada sessão foi recusada. O critério fica no repositório para acompanhar o código.
+
+Decisão: nenhum ajuste está pronto só porque compila. A entrega precisa mostrar, no PR:
+
+1. Navegação por perfil. A pessoa encontra a tarefa com nome claro, em poucos passos, e só vê o que a permissão dela permite. O que ela não pode fazer não aparece como caminho morto.
+2. Interface consistente. Componente, cor, fonte, espaçamento e estado vêm do CSS e da identidade já usados. A hierarquia mostra uma ação principal. O texto está em português, legível por teclado e por leitor de tela, sem bloco concorrente no meio dos dados.
+3. Feedback confiável. Salvar, carregar, concluir e falhar refletem o resultado confirmado. Dado digitado permanece na tela quando a gravação falha. Sucesso não aparece antes da confirmação nem some com uma resposta atrasada.
+4. Código organizado. Reutiliza contrato, componente e política existentes. Cada módulo tem uma responsabilidade. Não duplica regra que já tem dono.
+5. Segurança. Autorização no servidor, isolamento de organização e evento, validação da entrada, mínimo de dados na resposta e teste do caminho de abuso aplicável. A interface não é a barreira.
+
+Cada ajuste percorre a jornada da pessoa afetada e as regressões do fluxo vizinho. O handoff registra o que foi exercitado, o SHA, o que ficou pendente e o rollback. O que não foi comprovado permanece pendente.
+
+Impacto: PRs passam a carregar essa evidência junto da mudança. Risco: transformar o critério em texto decorativo; mitigação: o handoff cita o caminho percorrido e o teste, não uma declaração genérica. Sem migration e sem mudança de runtime. Rollback: reverter este registro não apaga código já entregue.
