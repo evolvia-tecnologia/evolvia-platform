@@ -2,7 +2,7 @@ import { BadRequestException, GoneException, Injectable, NotFoundException } fro
 import { CapabilityStatus, EventStatus, MembershipRole, Prisma, RegistrationReservationStatus } from '@prisma/client';
 import { createHash } from 'node:crypto';
 import { AuthorizationService } from './authorization.service';
-import { verifyCredentialScan, issueCheckInCode } from './check-in-policy';
+import { verifyCredentialScan, issueCheckInCode, issueBarcodeValue } from './check-in-policy';
 import { activeCheckedInAt, recordCheckIn } from './check-in-record';
 import { printedCredential } from './credential-label';
 import { categoryLabelTemplates, categoryBadgeItems } from './credential-category-template.policy';
@@ -207,7 +207,8 @@ export class CheckInService {
       orderedContent: categoryBadgeItems(reservation.registrationData, categoryTemplate.fields, categoryTemplate.styles),
       qr: categoryTemplate.fields.includes('qr')
         ? issueCheckInCode(event.id, reservation.id, process.env.JWT_SECRET ?? '') : null,
-      barcode: null,
+      barcode: categoryTemplate.fields.includes('barcode')
+        ? issueBarcodeValue(event.id, reservation.id, process.env.JWT_SECRET ?? '') : null,
     } : label;
     const scope = { reservationId: reservation.id, eventId: event.id, organizationId: event.organizationId! };
     const created = await this.prisma.$transaction((tx) => recordCheckIn(
