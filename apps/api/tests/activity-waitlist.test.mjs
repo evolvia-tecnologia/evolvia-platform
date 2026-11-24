@@ -498,7 +498,7 @@ function harness(overrides = {}) {
   return { service, state };
 }
 
-test('a terceira falha serializável da fila vira conflito e outro erro não repete', async () => {
+test('a quinta falha serializável da fila vira conflito e outro erro não repete', async () => {
   const serialization = () => new Prisma.PrismaClientKnownRequestError('serialization', { code: 'P2034', clientVersion: 'test' });
   let attempts = 0;
   const exhausted = new ActivityWaitlistService({
@@ -517,7 +517,7 @@ test('a terceira falha serializável da fila vira conflito e outro erro não rep
       return true;
     },
   );
-  assert.equal(attempts, 3);
+  assert.equal(attempts, 5);
 
   let otherAttempts = 0;
   const other = new ActivityWaitlistService({
@@ -532,3 +532,42 @@ test('a terceira falha serializável da fila vira conflito e outro erro não rep
   assert.equal(otherAttempts, 1);
 });
 
+
+test('retentativas P2034 e P2002 aguardam fora da transação e releem o estado', async () => {
+  const businessError = new Error(ACTIVITY_FULL_REASON);
+  for (const code of ['P2034', 'P2002']) {
+    let attempts = 0;
+    const waits = [];
+    let inTransaction = false;
+    const service = new ActivityWaitlistService({
+      $transaction: async (_run, options) => {
+        assert.equal(options.isolationLevel, 'Serializable');
+        assert.equal(inTransaction, false);
+        inTransaction = true;
+        attempts += 1;
+        try {
+          if (attempts <= 2) throw new Prisma.PrismaClientKnownRequestError('collision', { code, clientVersion: 'test' });
+          throw businessError;
+        } finally {
+          inTransaction = false;
+        }
+      },
+    }, {}, {});
+    const originalTimer = globalThis.setTimeout;
+    const originalRandom = Math.random;
+    try {
+      Math.random = () => 0.5;
+      globalThis.setTimeout = (callback, delay) => {
+        assert.equal(inTransaction, false);
+        waits.push(delay);
+        queueMicrotask(callback);
+      };
+      await assert.rejects(() => service.serializable(async () => {}), (error) => error === businessError);
+      assert.equal(attempts, 3);
+      assert.deepEqual(waits, [50, 100]);
+    } finally {
+      globalThis.setTimeout = originalTimer;
+      Math.random = originalRandom;
+    }
+  }
+});

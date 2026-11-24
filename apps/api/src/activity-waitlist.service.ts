@@ -24,6 +24,9 @@ import { PrismaService } from './prisma.service';
 
 const CATALOG_LIMIT = 200;
 const NAME_LIMIT = 100;
+const WAITLIST_MAX_ATTEMPTS = 5;
+const WAITLIST_RETRY_BASE_MS = 25;
+const WAITLIST_RETRY_CAP_MS = 400;
 
 type Scope = { eventId: string; organizationId: string; reservationId: string };
 type Block = { id: string; startAt: Date; endAt: Date };
@@ -112,13 +115,21 @@ export class ActivityWaitlistService {
   }
 
   private async serializable(run: (tx: Prisma.TransactionClient) => Promise<void>) {
-    for (let attempt = 0; attempt < 3; attempt += 1) {
+    for (let attempt = 0; attempt < WAITLIST_MAX_ATTEMPTS; attempt += 1) {
       try {
         await this.prisma.$transaction(run, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
         return;
       } catch (error) {
         if (error instanceof Prisma.PrismaClientKnownRequestError && (error.code === 'P2034' || error.code === 'P2002')) {
-          if (attempt < 2) continue;
+          if (attempt + 1 < WAITLIST_MAX_ATTEMPTS) {
+            // A transação anterior já encerrou. Espere fora dela para evitar
+            // novas colisões entre concorrentes que disputam a mesma vaga.
+            const baseMs = Math.min(WAITLIST_RETRY_CAP_MS, WAITLIST_RETRY_BASE_MS * 2 ** attempt);
+            const maxMs = Math.min(WAITLIST_RETRY_CAP_MS, baseMs * 3);
+            const delayMs = baseMs + Math.floor(Math.random() * (maxMs - baseMs + 1));
+            await new Promise<void>((resolve) => setTimeout(resolve, delayMs));
+            continue;
+          }
           throw new ConflictException(ACTIVITY_WAITLIST_RETRY);
         }
         throw error;
