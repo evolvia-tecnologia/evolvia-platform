@@ -208,14 +208,13 @@ export function labelFieldAllowed(code: string): boolean {
 
 export function defaultLabelConfig(): LabelConfig {
   return {
-    preset: '9x4',
-    widthMm: 90,
-    heightMm: 40,
+    preset: '8x3',
+    ...LABEL_PRESETS['8x3'],
     showName: true,
     nameField: 'preferred_name',
     showCompany: true,
     companyField: 'institution',
-    extraFields: [],
+    extraFields: ['city_state'],
     showCategory: true,
     codeMode: 'QR',
   };
@@ -224,21 +223,25 @@ export function defaultLabelConfig(): LabelConfig {
 export function readLabelConfig(config: unknown): LabelConfig {
   const defaults = defaultLabelConfig();
   if (!config || typeof config !== 'object' || Array.isArray(config)) return defaults;
-  const label = (config as { label?: unknown }).label;
-  if (!label || typeof label !== 'object' || Array.isArray(label)) return defaults;
+  const { label, categoryLabelTemplates } = config as { label?: unknown; categoryLabelTemplates?: unknown };
+  const hasSavedTemplate = Array.isArray(categoryLabelTemplates) && categoryLabelTemplates.length > 0;
+  if (!label && !hasSavedTemplate) return defaults;
+  // Existing layouts may rely on the old implicit paper or omit extraFields.
+  const legacy = { ...defaults, preset: '9x4' as const, ...LABEL_PRESETS['9x4'], extraFields: [] };
+  if (!label || typeof label !== 'object' || Array.isArray(label)) return legacy;
   try {
     // Old printer settings may predate extraFields or other optional controls.
     // Hydrate only known keys on READ: a missing key must not reset valid
     // historical name/company fields, paper size, category or barcode mode.
     // Writes still use the strict normalizeLabelConfig contract below.
     const stored = label as Record<string, unknown>;
-    const hydrated: Record<string, unknown> = { ...defaults };
+    const hydrated: Record<string, unknown> = { ...legacy };
     for (const key of Object.keys(defaults)) {
       if (Object.prototype.hasOwnProperty.call(stored, key)) hydrated[key] = stored[key];
     }
     return normalizeLabelConfig(hydrated);
   } catch {
-    return defaults;
+    return legacy;
   }
 }
 

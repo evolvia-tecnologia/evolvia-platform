@@ -95,13 +95,22 @@ test('o totem começa sem buscas e só aceita as que o organizador ligou', () =>
 
 test('a etiqueta térmica já vem com nome, empresa e QR Code', () => {
   const label = defaultLabelConfig();
-  assert.equal(label.preset, '9x4');
-  assert.deepEqual([label.widthMm, label.heightMm], [90, 40]);
+  assert.equal(label.preset, '8x3');
+  assert.deepEqual([label.widthMm, label.heightMm], [80, 30]);
   assert.equal(label.nameField, 'preferred_name');
   assert.equal(label.companyField, 'institution');
   assert.equal(label.codeMode, 'QR');
   assert.equal(label.showCategory, true);
   assert.deepEqual(readLabelConfig(undefined), label);
+  assert.deepEqual(readLabelConfig({ categoryLabelTemplates: [] }), label);
+  assert.deepEqual(labelText({}, 'Geral', label).lines, []);
+  assert.deepEqual(label.extraFields, ['city_state']);
+  const existing = { categoryLabelTemplates: [{ categoryId: 'existing-category', fields: ['qr'] }] };
+  assert.equal(readLabelConfig(existing).preset, '9x4');
+  assert.deepEqual(readLabelConfig({ label: { codeMode: 'BARCODE' } }).extraFields, []);
+  const reads = Array.from({ length: 10 }, () => readLabelConfig({}));
+  reads[0].extraFields.pop();
+  assert.deepEqual(reads[1], label);
   const custom = normalizeLabelConfig({
     ...label,
     preset: '4x2',
