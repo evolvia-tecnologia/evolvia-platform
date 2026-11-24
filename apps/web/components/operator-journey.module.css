@@ -1,13 +1,14 @@
-/* Tela do operador restrito (CL-R2.2). Usa os tokens do design system, com
-   valor de reserva explícito para o caso de o token não existir na página. */
+/* Tela do operador restrito (CL-R2.2).
+   Os nomes --space-2 e --space-4 já existem na escala e valem 2px e 4px.
+   O espaçamento desta tela usa os degraus de 8px e 16px. */
 
 .card {
   display: grid;
-  gap: var(--space-4, 1rem);
-  padding: var(--space-5, 1.25rem);
-  border: 1px solid var(--color-border, #7889a6);
-  border-radius: var(--radius-md, 10px);
-  background: var(--color-surface, #fff);
+  gap: var(--space-16);
+  padding: var(--space-20);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
 }
 
 .card > p,
@@ -18,38 +19,39 @@
 
 .card p {
   max-width: 68ch;
-  line-height: 1.55;
+  line-height: var(--line-height-body);
 }
 
 .eyebrow {
-  font-size: 0.75rem;
-  letter-spacing: 0.08em;
-  color: var(--color-text-muted, #4a5568);
+  font-size: var(--font-size-xs);
+  letter-spacing: var(--letter-spacing-kicker);
+  color: var(--color-text-muted);
 }
 
 .resumo {
-  font-weight: 600;
+  font-weight: var(--font-weight-medium);
 }
 
 .papel {
-  font-weight: 400;
-  color: var(--color-text-muted, #4a5568);
+  font-weight: var(--font-weight-regular);
+  color: var(--color-text-muted);
 }
 
 .aviso,
 .error {
-  padding: var(--space-3, 0.75rem);
-  border-radius: var(--radius-sm, 8px);
-  border: 1px solid var(--color-border, #7889a6);
+  padding: var(--space-12);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border);
 }
 
 .error {
-  border-color: var(--color-danger-border, #a33);
+  border-color: var(--color-danger);
+  color: var(--color-danger);
 }
 
 .grupo {
   display: grid;
-  gap: var(--space-2, 0.5rem);
+  gap: var(--space-8);
 }
 
 .grupo ul {
@@ -57,17 +59,17 @@
   margin: 0;
   padding: 0;
   display: grid;
-  gap: var(--space-2, 0.5rem);
+  gap: var(--space-8);
 }
 
 .grupo li {
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
-  gap: var(--space-2, 0.5rem);
-  padding: var(--space-2, 0.5rem) var(--space-3, 0.75rem);
-  border: 1px solid var(--color-border, #7889a6);
-  border-radius: var(--radius-sm, 8px);
+  gap: var(--space-8);
+  padding: var(--space-8) var(--space-12);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
 }
 
 .nome {
@@ -78,26 +80,26 @@
    linha. Quem não distingue as cores, ou lê por leitor de tela, recebe a mesma
    informação. */
 .liberada {
-  border-left: 4px solid var(--color-success-border, #2f6f4f);
+  border-left: 4px solid var(--color-success);
 }
 
 .indisponivel {
   opacity: 0.85;
-  border-left: 4px solid var(--color-border, #7889a6);
+  border-left: 4px solid var(--color-border);
 }
 
 .marca,
 .marcaFora,
 .selo {
-  font-size: 0.75rem;
-  padding: 0.1rem 0.45rem;
-  border-radius: 999px;
-  border: 1px solid var(--color-border, #7889a6);
+  font-size: var(--font-size-xs);
+  padding: var(--space-2) var(--space-8);
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--color-border);
   white-space: nowrap;
 }
 
 .marca {
-  border-color: var(--color-success-border, #2f6f4f);
+  border-color: var(--color-success);
 }
 
 .selo {
@@ -105,17 +107,20 @@
 }
 
 .nota {
-  color: var(--color-text-muted, #4a5568);
-  font-size: 0.9rem;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
 }
 
 .abrir,
 .atualizar {
-  display: inline-block;
-  padding: var(--space-3, 0.75rem) var(--space-4, 1rem);
-  border-radius: var(--radius-sm, 8px);
-  border: 1px solid var(--color-border, #7889a6);
-  background: var(--color-surface, #fff);
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--space-44);
+  padding: var(--space-12) var(--space-16);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text);
   font: inherit;
   cursor: pointer;
 }
@@ -127,7 +132,7 @@
 
 .abrir:focus-visible,
 .atualizar:focus-visible {
-  outline: 2px solid var(--color-focus, #1b4f9c);
+  outline: 3px solid var(--color-focus-on-light);
   outline-offset: 2px;
 }
 
@@ -135,7 +140,7 @@
 @media (max-width: 400px) {
   .grupo li {
     display: grid;
-    gap: var(--space-1, 0.25rem);
+    gap: var(--space-4);
   }
 
   .marca,
