@@ -25,7 +25,10 @@ test('texto ocupa área própria e QR+barras ficam lado a lado na faixa de códi
  assert.equal(n.props['data-barcode'],true,'faixa inferior ativa para o par QR+barras');
  const row=n.props.children.filter(Boolean).find(x=>x.props.className==='codesRow');
  assert.equal(row.props['data-codes'],'both');
- assert.deepEqual(row.props.children.filter(Boolean).map(x=>x.props.className),['codes','barcode']);
+ const rowKids=Array.isArray(row.props.children)
+  ? row.props.children
+  : [].concat(row.props.children?.props?.children ?? []);
+ assert.deepEqual(rowKids.filter(Boolean).map(x=>x.props.className),['codes','barcode']);
 });
 test('nome legado longo não sofre clamp silencioso e etiqueta pequena avisa sobre legibilidade',()=>{
  const css=readFileSync(new URL('../components/credential-label.module.css',import.meta.url),'utf8');

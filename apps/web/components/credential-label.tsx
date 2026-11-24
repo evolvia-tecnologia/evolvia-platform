@@ -74,7 +74,7 @@ export default function CredentialLabel({ label, preview = false }: { label: Cre
 
   const bottomRow = bottomCodes ? (
     <div className={styles.codesRow} data-codes={codesMode}>
-      {bothCodes ? [qrNode, barcodeNode] : barcodeNode}
+      {bothCodes ? <>{qrNode}{barcodeNode}</> : barcodeNode}
     </div>
   ) : null;
 
@@ -100,7 +100,7 @@ export default function CredentialLabel({ label, preview = false }: { label: Cre
         ]}
       {ordered && sideQr ? qrNode : null}
     </div>
-    {!ordered && sideQr ? <div className={styles.codes}><CredentialQr code={label.qr!} compact /></div> : null}
+    {!ordered && sideQr ? qrNode : null}
     {bottomRow}
   </section>;
 
