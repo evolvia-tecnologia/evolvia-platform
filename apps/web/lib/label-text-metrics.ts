@@ -45,7 +45,7 @@ function glyphAdvanceEm(char: string, fontFamily: LabelFontFamily, bold: boolean
           : 500
   );
   const familyScale = fontFamily === 'serif' ? GEORGIA_SCALE : 1;
-  const weightScale = bold && fontFamily !== 'mono' ? ARIAL_BOLD_SCALE : 1;
+  const weightScale = bold ? ARIAL_BOLD_SCALE : 1;
   return (base / 1000) * familyScale * weightScale;
 }
 
