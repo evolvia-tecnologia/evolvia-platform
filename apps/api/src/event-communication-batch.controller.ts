@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Req, UseGuards } from '@nestjs/common';
 import { AuthGuard, AuthenticatedRequest } from './auth.guard';
 import { EventCommunicationBatchService } from './event-communication-batch.service';
 
@@ -10,6 +10,12 @@ export class EventCommunicationBatchController {
   @Get()
   list(@Req() request: AuthenticatedRequest, @Param('eventId') eventId: string) {
     return this.batches.list(request.user!.id, eventId);
+  }
+
+  @Post(':batchId/cancel')
+  cancel(@Req() request: AuthenticatedRequest, @Param('eventId') eventId: string,
+    @Param('batchId', ParseUUIDPipe) batchId: string) {
+    return this.batches.cancel(request.user!.id, eventId, batchId);
   }
 
   @Post()

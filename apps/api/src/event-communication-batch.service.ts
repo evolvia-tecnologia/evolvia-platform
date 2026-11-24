@@ -42,6 +42,38 @@ export class EventCommunicationBatchService {
     return { batches: batches.map(batch => this.summary(batch)), sendingAvailable: false };
   }
 
+  async cancel(userId: string, eventId: string, batchId: string) {
+    const scope = await this.scope(userId, eventId);
+    return this.prisma.$transaction(async tx => {
+      const member = await tx.organizationMembership.findFirst({ where: {
+        organizationId: scope.organizationId, organization: { status: 'ACTIVE' },
+        userId, status: 'ACTIVE', role: { in: [...EVENT_EDITOR_ROLES] },
+      }, select: { id: true } });
+      if (!member) throw new NotFoundException('Evento não encontrado.');
+
+      const where = { id: batchId, ...scope };
+      const changed = await tx.eventCommunicationBatch.updateMany({
+        where: { ...where, status: 'PREPARED' }, data: { status: 'CANCELLED' },
+      });
+      const batch = await tx.eventCommunicationBatch.findFirst({ where });
+      if (!batch) throw new NotFoundException('Lote não encontrado.');
+      if (batch.status !== 'CANCELLED') throw new ConflictException('O lote já iniciou o processamento.');
+      if (changed.count) {
+        const recipients = await tx.eventCommunicationRecipient.updateMany({
+          where: { ...scope, batchId, status: 'PENDING' }, data: { status: 'CANCELLED' },
+        });
+        if (recipients.count !== batch.recipientCount) {
+          throw new ConflictException('Há destinatários em processamento. Consulte o histórico.');
+        }
+        await tx.auditLog.create({ data: { ...scope, actorUserId: userId,
+          action: 'event.communication_batch_cancelled', entityType: 'EventCommunicationBatch',
+          entityId: batchId, metadata: { recipientCount: recipients.count },
+        } });
+      }
+      return this.summary(batch);
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted });
+  }
+
   async prepare(userId: string, eventId: string, raw: unknown) {
     const scope = await this.scope(userId, eventId);
     let input: ReturnType<typeof normalizeCommunicationBatch>;

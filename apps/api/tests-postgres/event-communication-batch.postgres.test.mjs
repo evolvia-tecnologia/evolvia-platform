@@ -77,4 +77,18 @@ test('G6.8 PG: lote PREPARED durável, criptografado e idempotente sem envio nem
     emailEnvelope: 'not-a-real-email',
   } }));
   assert.equal(await prisma.eventCommunicationRecipient.count({ where: { batchId } }), 2);
+  await assert.rejects(service.cancel('unknown-user', event.id, batchId));
+  await assert.rejects(service.cancel(owner.id, event.id, randomUUID()), err => err.getStatus?.() === 404);
+  await prisma.eventCommunicationRecipient.update({ where: { id: recipients[0].id }, data: { status: 'UNKNOWN' } });
+  await assert.rejects(service.cancel(owner.id, event.id, batchId), err => err.getStatus?.() === 409);
+  assert.equal((await service.list(owner.id, event.id)).batches[0].status, 'PREPARED');
+  assert.equal(await prisma.eventCommunicationRecipient.count({ where: { batchId, status: 'PENDING' } }), 1);
+  await prisma.eventCommunicationRecipient.update({ where: { id: recipients[0].id }, data: { status: 'PENDING' } });
+  const cancelled = await Promise.all([service.cancel(owner.id, event.id, batchId),
+    service.cancel(owner.id, event.id, batchId)]);
+  assert.ok(cancelled.every(batch => batch.status === 'CANCELLED'));
+  assert.equal(await prisma.eventCommunicationRecipient.count({ where: { batchId, status: 'CANCELLED' } }), 2);
+  assert.equal(await prisma.auditLog.count({ where: { eventId: event.id, entityId: batchId,
+    action: 'event.communication_batch_cancelled' } }), 1);
+  assert.equal((await service.prepare(owner.id, event.id, payload)).status, 'CANCELLED');
 });
