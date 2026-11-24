@@ -420,9 +420,14 @@ export default function IntegrationsHub({ eventId }: { eventId: string }) {
     }`);
   }
 
-  const readyCount = payload.items.filter((item) => item.availability === 'READY').length;
-  const preparingCount = payload.items.filter((item) => item.availability === 'PREPARING').length;
-  const plannedCount = payload.items.filter((item) => item.availability === 'PLANNED').length;
+  let readyCount = 0;
+  let preparingCount = 0;
+  let plannedCount = 0;
+  for (const item of payload.items) {
+    if (item.availability === 'READY') readyCount += 1;
+    else if (item.availability === 'PREPARING') preparingCount += 1;
+    else plannedCount += 1;
+  }
 
   return <div className={styles.hub}>
     <section className={styles.hero} aria-labelledby="integrations-title">
