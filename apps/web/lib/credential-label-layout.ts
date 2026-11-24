@@ -1,10 +1,17 @@
 /**
  * Motor compartilhado de layout físico da etiqueta (prévia = posto = totem = impressão).
  *
+ * Mede altura total com a geometria real do CSS (padding, gaps, line-height, pads
+ * da categoria) + área dos códigos Evolvia (QR e Code128). Não usa largura média
+ * por caractere: a tipografia passa por `label-text-metrics` (avanço por glifo).
+ *
  * "Reduzir para caber" está SEMPRE ativo: a escala tipográfica desce até
  * MIN_LEGIBLE_SCALE. Abaixo disso, fitWarning bloqueia impressão — nunca
- * usamos overflow hidden para esconder conteúdo.
+ * overflow:hidden para esconder conteúdo.
  */
+
+import { code128Modules } from './code128';
+import { measureTextBlockHeightMm, type LabelFontFamily, type MeasureOpts } from './label-text-metrics';
 
 export type CredentialLabelFieldStyle = {
   align: 'left' | 'center' | 'right';
@@ -43,18 +50,224 @@ export const LABEL_SIZE_PRESETS = [
   { preset: '10x5', label: '10×5 cm', widthMm: 100, heightMm: 50 },
 ] as const;
 
-/** Margem interna + gap mínimo entre texto e códigos (mm). */
-export const LABEL_PAD_MM = 3;
-/** Zona de silêncio lateral ao redor do conjunto de códigos (mm). */
-export const LABEL_QUIET_MM = 1.5;
+/** Espelha `credential-label.module.css` — padding do sheet/preview. */
+export const LABEL_PAD_MM = 1.5;
+/** Gap da grade entre cópia e faixa de códigos. */
+export const LABEL_SHEET_GAP_MM = 1;
+/** Gap entre blocos de texto (escala com --label-scale). */
+export const LABEL_COPY_GAP_MM = 0.6;
+/** Gap horizontal QR ↔ barras na faixa. */
+export const LABEL_CODES_GAP_MM = 2;
+/** Padding horizontal da faixa de códigos (zona de silêncio). */
+export const LABEL_CODES_PAD_X_MM = 1.5;
 /** Escala mínima ainda considerada legível em impressora térmica. */
 export const MIN_LEGIBLE_SCALE = 0.65;
 /** Piso absoluto da escala visual (prévia); impressão já foi bloqueada antes. */
 export const MIN_PREVIEW_SCALE = 0.24;
 /** QR abaixo deste tamanho (mm) não é legível o bastante para liberar impressão. */
 export const MIN_QR_MM = 12;
+/**
+ * Largura mínima de módulo Code128 (mm) para leitura óptica térmica.
+ * O SVG Evolvia usa `preserveAspectRatio="xMidYMid meet"` — esticar destrói a leitura.
+ */
+export const MIN_BARCODE_MODULE_MM = 0.25;
+
+type TypoStyle = {
+  fontMm: number;
+  lineHeight: number;
+  bold?: boolean;
+  uppercase?: boolean;
+  letterSpacingEm?: number;
+  padYMm?: number;
+  padXMm?: number;
+};
+
+/** Tipografia do CSS da etiqueta (valores em mm / unitless). */
+const TYPO = {
+  event: { fontMm: 2.2, lineHeight: 1.2, uppercase: true, letterSpacingEm: 0.04 } satisfies TypoStyle,
+  name: { fontMm: 4.2, lineHeight: 1.05, bold: true, uppercase: true } satisfies TypoStyle,
+  company: { fontMm: 3.2, lineHeight: 1.1, bold: true, uppercase: true } satisfies TypoStyle,
+  line: { fontMm: 2.4, lineHeight: 1.1 } satisfies TypoStyle,
+  category: {
+    fontMm: 2.6, lineHeight: 1.1, bold: true, uppercase: true, letterSpacingEm: 0.04,
+    padYMm: 0.4, padXMm: 1.4,
+  } satisfies TypoStyle,
+  orderedFirst: { fontMm: 4.2, lineHeight: 1.05, bold: true } satisfies TypoStyle,
+} as const;
 
 export type CredentialLabelLayout = ReturnType<typeof credentialLabelLayout>;
+
+function barcodeModuleUnits(value: string): number | null {
+  try {
+    return [...code128Modules(value)].reduce((sum, digit) => sum + Number(digit), 0);
+  } catch {
+    return null;
+  }
+}
+
+function measureBlock(
+  text: string,
+  maxWidthMm: number,
+  typo: TypoStyle,
+  scale: number,
+  overrides?: { fontFamily?: LabelFontFamily; fontSizeMm?: number; bold?: boolean },
+) {
+  const fontSizeMm = overrides?.fontSizeMm ?? typo.fontMm;
+  const opts: MeasureOpts = {
+    fontFamily: overrides?.fontFamily ?? 'sans',
+    bold: overrides?.bold ?? typo.bold,
+    uppercase: typo.uppercase,
+    letterSpacingEm: typo.letterSpacingEm,
+  };
+  const padX = (typo.padXMm ?? 0) * scale;
+  return measureTextBlockHeightMm({
+    text,
+    maxWidthMm: Math.max(0, maxWidthMm - padX * 2),
+    fontSizeMm,
+    lineHeight: typo.lineHeight,
+    scale,
+    padYMm: typo.padYMm,
+    opts,
+  });
+}
+
+function measureCopyHeightMm(input: {
+  label: CredentialLabelData;
+  ordered: NonNullable<CredentialLabelData['orderedContent']> | null;
+  firstTextIndex: number;
+  textWidthMm: number;
+  scale: number;
+}): number {
+  const { label, ordered, firstTextIndex, textWidthMm, scale } = input;
+  const gap = LABEL_COPY_GAP_MM * scale;
+  const blocks: number[] = [];
+
+  if (ordered) {
+    ordered.forEach((item, index) => {
+      if (item.kind !== 'text') return;
+      const isFirst = index === firstTextIndex;
+      const typo: TypoStyle = isFirst
+        ? { ...TYPO.orderedFirst, fontMm: item.style?.fontSizeMm ?? TYPO.orderedFirst.fontMm }
+        : {
+          fontMm: item.style?.fontSizeMm ?? TYPO.line.fontMm,
+          lineHeight: TYPO.line.lineHeight,
+          bold: item.style?.bold,
+        };
+      blocks.push(measureBlock(item.value, textWidthMm, typo, scale, {
+        fontFamily: item.style?.fontFamily,
+        fontSizeMm: item.style?.fontSizeMm,
+        bold: item.style?.bold,
+      }).heightMm);
+    });
+  } else {
+    if (label.eventName) blocks.push(measureBlock(label.eventName, textWidthMm, TYPO.event, scale).heightMm);
+    if (label.name) blocks.push(measureBlock(label.name, textWidthMm, TYPO.name, scale).heightMm);
+    if (label.company) blocks.push(measureBlock(label.company, textWidthMm, TYPO.company, scale).heightMm);
+    for (const line of Array.isArray(label.lines) ? label.lines : []) {
+      blocks.push(measureBlock(line, textWidthMm, TYPO.line, scale).heightMm);
+    }
+    if (label.category) blocks.push(measureBlock(label.category, textWidthMm, TYPO.category, scale).heightMm);
+  }
+
+  if (!blocks.length) return 0;
+  return blocks.reduce((sum, height) => sum + height, 0) + Math.max(0, blocks.length - 1) * gap;
+}
+
+function resolveCodesGeometry(input: {
+  label: CredentialLabelData;
+  bothCodes: boolean;
+  showQr: boolean;
+  showBarcode: boolean;
+  bottomCodes: boolean;
+  sideQr: boolean;
+  ordered: boolean;
+}) {
+  const { label, bothCodes, showQr, showBarcode, bottomCodes, sideQr, ordered } = input;
+  const innerWidth = Math.max(0, label.widthMm - LABEL_PAD_MM * 2);
+  const codesInnerWidth = Math.max(0, innerWidth - LABEL_CODES_PAD_X_MM * 2);
+
+  const barcodeHeight = !showBarcode
+    ? 0
+    : Math.min(5.5, Math.max(3.2, label.heightMm * 0.12));
+
+  // Altura útil para o QR quando compartilha a faixa inferior com barras.
+  const codesBudget = Math.max(0, label.heightMm - LABEL_PAD_MM * 2 - LABEL_SHEET_GAP_MM);
+  const qrCap = bothCodes
+    ? Math.min(14, label.widthMm * 0.28, Math.max(barcodeHeight, codesBudget * 0.55))
+    : Math.min(sideQr ? 24 : 16, label.widthMm * (sideQr ? 0.36 : 0.34), codesBudget);
+
+  const qrSize = showQr ? Math.max(0, qrCap) : 0;
+  const orderedQrSize = showQr && ordered
+    ? Math.max(0, Math.min(bothCodes ? 14 : 16, label.widthMm * (bothCodes ? 0.28 : 0.34), codesBudget))
+    : (showQr ? qrSize : 0);
+  const fitQrSize = ordered ? orderedQrSize : qrSize;
+
+  const modules = showBarcode && label.barcode ? barcodeModuleUnits(label.barcode) : null;
+  const opticalBarcodeWidth = modules != null ? modules * MIN_BARCODE_MODULE_MM : 0;
+
+  let barcodeWidthMm = 0;
+  if (showBarcode) {
+    const qrReserve = bothCodes ? fitQrSize + LABEL_CODES_GAP_MM : 0;
+    const available = Math.max(0, codesInnerWidth - qrReserve);
+    // Largura alocada = o que a faixa oferece; leitura exige ≥ opticalBarcodeWidth.
+    barcodeWidthMm = Math.max(0, available);
+  }
+
+  const codesRowHeight = bottomCodes
+    ? Math.max(bothCodes ? fitQrSize : 0, barcodeHeight) + (bothCodes || showBarcode ? 0.5 : 0)
+    : 0;
+
+  const barcodeFitsOptically = !showBarcode
+    || modules == null
+    || barcodeWidthMm + 1e-6 >= opticalBarcodeWidth;
+
+  return {
+    qrSize,
+    orderedQrSize,
+    fitQrSize,
+    barcodeHeight,
+    barcodeWidthMm,
+    codesRowHeight,
+    opticalBarcodeWidth,
+    barcodeFitsOptically,
+    codesInnerWidth,
+  };
+}
+
+function totalHeightAtScale(input: {
+  label: CredentialLabelData;
+  ordered: NonNullable<CredentialLabelData['orderedContent']> | null;
+  firstTextIndex: number;
+  sideQr: boolean;
+  bottomCodes: boolean;
+  fitQrSize: number;
+  codesRowHeight: number;
+  scale: number;
+}): number {
+  const { label, sideQr, bottomCodes, fitQrSize, codesRowHeight, scale } = input;
+  const textWidthMm = Math.max(
+    6,
+    label.widthMm - LABEL_PAD_MM * 2 - (sideQr ? fitQrSize + LABEL_SHEET_GAP_MM : 0),
+  );
+  const copyHeight = measureCopyHeightMm({
+    label,
+    ordered: input.ordered,
+    firstTextIndex: input.firstTextIndex,
+    textWidthMm,
+    scale,
+  });
+
+  if (sideQr && !bottomCodes) {
+    // Grade de duas colunas: a altura é o máximo entre cópia e QR + pads.
+    return LABEL_PAD_MM * 2 + Math.max(copyHeight, fitQrSize);
+  }
+
+  if (bottomCodes) {
+    return LABEL_PAD_MM * 2 + LABEL_SHEET_GAP_MM + copyHeight + codesRowHeight;
+  }
+
+  return LABEL_PAD_MM * 2 + copyHeight;
+}
 
 export function credentialLabelLayout(label: CredentialLabelData) {
   const lines = Array.isArray(label.lines) ? label.lines : [];
@@ -79,68 +292,49 @@ export function credentialLabelLayout(label: CredentialLabelData) {
   const sideQr = showQr && !showBarcode;
   const bottomCodes = bothCodes || (showBarcode && !showQr);
 
-  const barcodeHeight = Math.min(5.5, Math.max(3.2, label.heightMm * 0.12));
-  const availableHeight = label.heightMm - LABEL_PAD_MM - (bottomCodes
-    ? (bothCodes
-      ? Math.max(Math.min(14, label.widthMm * 0.28, label.heightMm * 0.42), barcodeHeight) + 1.5
-      : barcodeHeight + 1)
-    : 0);
+  const codes = resolveCodesGeometry({
+    label,
+    bothCodes,
+    showQr,
+    showBarcode,
+    bottomCodes,
+    sideQr,
+    ordered: Boolean(ordered),
+  });
 
-  const qrSize = !showQr
-    ? 0
-    : bothCodes
-      ? Math.max(0, Math.min(14, label.widthMm * 0.28, availableHeight))
-      : Math.max(0, Math.min(24, label.widthMm * 0.36, availableHeight));
-  const orderedQrSize = hasOrderedQr
-    ? Math.max(0, Math.min(bothCodes ? 14 : 16, label.widthMm * (bothCodes ? 0.28 : 0.34), availableHeight))
-    : 0;
-
-  const barcodeWidthMm = !showBarcode
-    ? 0
-    : Math.max(
-      18,
-      bothCodes
-        ? label.widthMm - LABEL_PAD_MM - LABEL_QUIET_MM * 2 - (ordered ? orderedQrSize : qrSize) - 2
-        : label.widthMm - LABEL_PAD_MM - LABEL_QUIET_MM * 2,
-    );
-
-  const textWidthMm = Math.max(6, label.widthMm - LABEL_PAD_MM - (sideQr ? (ordered ? orderedQrSize : qrSize) + 1 : 0));
-  const approxLines = (value: string, emphasis = false) =>
-    Math.max(1, Math.ceil(value.length / Math.max(5, Math.floor(textWidthMm / (emphasis ? 2.2 : 1.35)))));
-  const orderedTextOnlyHeight = ordered?.reduce((height, item, index) => {
-    if (item.kind === 'qr' || item.kind === 'barcode') return height;
-    const fontMm = item.style?.fontSizeMm ?? (index === firstTextIndex ? 4.2 : 2.4);
-    const charsPerLine = Math.max(4, Math.floor(textWidthMm / (fontMm * 0.55)));
-    return height + Math.max(1, Math.ceil(item.value.length / charsPerLine)) * fontMm * 1.15 + 0.6;
-  }, 0) ?? 0;
-
-  const codesRowHeight = bottomCodes
-    ? (bothCodes ? Math.max(ordered ? orderedQrSize : qrSize, barcodeHeight) : barcodeHeight) + 0.5
-    : 0;
-  const rows = ordered
-    ? 1 + ordered.filter((item) => item.kind === 'text').length
-    : 1 + (label.name ? 1 : 0) + (label.company ? 1 : 0) + lines.length + (label.category ? 1 : 0);
-  const legacyTextOnlyHeight = 2.64 + (label.name ? approxLines(label.name, true) * 4.5 : 0)
-    + (label.company ? approxLines(label.company) * 3.5 : 0)
-    + lines.reduce((height, line) => height + approxLines(line) * 2.7, 0)
-    + (label.category ? approxLines(label.category) * 3.5 : 0)
-    + Math.max(0, rows - 1) * 0.6;
-  const textOnlyHeight = ordered ? orderedTextOnlyHeight : legacyTextOnlyHeight;
-  const textBudget = label.heightMm - LABEL_PAD_MM - (bottomCodes ? codesRowHeight + 1 : 0);
-  const estimatedFitRatio = textOnlyHeight > 0
-    ? Math.max(0, textBudget) / textOnlyHeight
-    : (bottomCodes ? codesRowHeight : (ordered ? orderedQrSize : qrSize)) <= label.heightMm - LABEL_PAD_MM ? 1 : 0;
-
-  // Reduzir para caber: sempre aplica escala; impressão só se >= MIN_LEGIBLE_SCALE.
   const reduceToFit = true;
-  const scale = reduceToFit
-    ? Math.min(1, Math.max(MIN_PREVIEW_SCALE, estimatedFitRatio))
-    : 1;
+  const heightAt = (scale: number) => totalHeightAtScale({
+    label: { ...label, lines },
+    ordered,
+    firstTextIndex,
+    sideQr,
+    bottomCodes,
+    fitQrSize: codes.fitQrSize,
+    codesRowHeight: codes.codesRowHeight,
+    scale,
+  });
 
-  const fitQrSize = ordered ? orderedQrSize : qrSize;
+  // Busca a maior escala em que a altura total (textos + gaps + códigos) cabe.
+  let scale = 1;
+  if (heightAt(1) > label.heightMm + 1e-6) {
+    let low = MIN_PREVIEW_SCALE;
+    let high = 1;
+    for (let i = 0; i < 18; i += 1) {
+      const mid = (low + high) / 2;
+      if (heightAt(mid) <= label.heightMm + 1e-6) low = mid;
+      else high = mid;
+    }
+    scale = low;
+  }
+  scale = Math.min(1, Math.max(MIN_PREVIEW_SCALE, scale));
+
+  const measuredHeight = heightAt(scale);
+  const fitRatio = measuredHeight > 0 ? Math.min(1, label.heightMm / measuredHeight) : 1;
   const fitWarning = emptyOrdered || missingOrderedQr || missingOrderedBarcode || missingLegacyQr || missingLegacyBarcode
-    || estimatedFitRatio < MIN_LEGIBLE_SCALE
-    || (showQr && fitQrSize < MIN_QR_MM);
+    || scale < MIN_LEGIBLE_SCALE
+    || measuredHeight > label.heightMm + 0.05
+    || (showQr && codes.fitQrSize < MIN_QR_MM)
+    || !codes.barcodeFitsOptically;
 
   return {
     ordered,
@@ -159,12 +353,13 @@ export function credentialLabelLayout(label: CredentialLabelData) {
     missingLegacyBarcode,
     reduceToFit,
     scale,
-    qrSize,
-    orderedQrSize,
-    barcodeHeight,
-    barcodeWidthMm,
-    codesRowHeight,
-    estimatedFitRatio,
+    qrSize: codes.qrSize,
+    orderedQrSize: codes.orderedQrSize,
+    barcodeHeight: codes.barcodeHeight,
+    barcodeWidthMm: codes.barcodeWidthMm,
+    codesRowHeight: codes.codesRowHeight,
+    measuredHeightMm: measuredHeight,
+    estimatedFitRatio: fitRatio,
     fitWarning,
   };
 }

@@ -4,7 +4,8 @@ import {readFileSync} from 'node:fs';
 import ts from 'typescript';
 const url=s=>'data:text/javascript;base64,'+Buffer.from(s).toString('base64');
 const compile=p=>ts.transpileModule(readFileSync(new URL(p,import.meta.url),'utf8'),{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX}}).outputText;
-const modules={react:url('export const useEffect=()=>{}; export const useRef=v=>({current:v}); export const useState=v=>[typeof v==="function"?v():v,()=>{}];'),'react/jsx-runtime':url('export const Fragment=Symbol.for("react.fragment");export const jsx=(type,props)=>({type,props});export const jsxs=jsx;'),'./print-surface':url('export default "print-surface";'),'./credential-barcode':url('export default "barcode";'),'./credential-qr':url('export default "qr";'),'./credential-label':url('export default "label";'),'../lib/api':url('export const api=(...args)=>globalThis.__labelSaveApi(...args);'),'../lib/credential-label-layout':url(compile('../lib/credential-label-layout.ts'))};
+const layoutModule=(()=>{const metrics=url(compile('../lib/label-text-metrics.ts'));const code128=url(compile('../lib/code128.ts'));return url(compile('../lib/credential-label-layout.ts').replace(/from ['"]\.\/label-text-metrics['"]/g,`from ${JSON.stringify(metrics)}`).replace(/from ['"]\.\/code128['"]/g,`from ${JSON.stringify(code128)}`));})();
+const modules={react:url('export const useEffect=()=>{}; export const useRef=v=>({current:v}); export const useState=v=>[typeof v==="function"?v():v,()=>{}];'),'react/jsx-runtime':url('export const Fragment=Symbol.for("react.fragment");export const jsx=(type,props)=>({type,props});export const jsxs=jsx;'),'./print-surface':url('export default "print-surface";'),'./credential-barcode':url('export default "barcode";'),'./credential-qr':url('export default "qr";'),'./credential-label':url('export default "label";'),'../lib/api':url('export const api=(...args)=>globalThis.__labelSaveApi(...args);'),'../lib/credential-label-layout':layoutModule};
 async function load(p,css){return (await import(url(compile(p).replace(/from ['"]([^'"]+)['"]/g,(_,name)=>'from '+JSON.stringify(name===css?url('export default new Proxy({},{get:(_,key)=>key});'):modules[name]??name))))).default;}
 const Label=await load('../components/credential-label.tsx','./credential-label.module.css');
 const {credentialLabelLayout,LABEL_SIZE_PRESETS}=await import(modules['../lib/credential-label-layout']);
@@ -131,17 +132,20 @@ test('editor global isola eventos e não expõe erro técnico de outro tenant',(
 });
 
 
-test('bloqueia prévia de texto comprimido a cerca de metade antes da impressão térmica', () => {
- const label={...base,qr:null,widthMm:60,heightMm:15,
-   orderedContent:[{code:'preferred_name',kind:'text',value:'Participante'.repeat(10)}]};
+test('bloqueia prévia quando a medição real exige escala abaixo do limiar legível', () => {
+ const label={...base,qr:null,widthMm:60,heightMm:12,name:null,company:null,category:null,lines:[],
+   orderedContent:[{code:'preferred_name',kind:'text',value:'Participante Internacional '.repeat(12)}]};
+ const layout=credentialLabelLayout(label);
  const preview=Label({label,preview:true});
  const sheet=nodes(preview).find(node=>node.type==='section');
  const scale=Number(sheet.props.style['--label-scale']);
- assert.ok(scale>.4 && scale<.65,
-   'fixture deve cobrir escala antes considerada imprimível no limiar de 40%');
+ assert.equal(scale,layout.scale,'prévia e motor compartilham a mesma escala medida');
+ assert.ok(scale < 0.65,'escala fica abaixo do limiar térmico de legibilidade');
+ assert.equal(layout.fitWarning,true);
  assert.equal(sheet.props['data-fit-warning'],true,
-   'texto reduzido em mais de 35% não deve ser impresso automaticamente');
+   'impressão bloqueada quando a medição real não cabe com legibilidade');
  assert.ok(nodes(preview).some(node=>node.props?.role==='alert'));
+ assert.equal(Label({label,preview:false}),null,'mesma decisão bloqueia a superfície de impressão');
 });
 
 
@@ -226,4 +230,31 @@ test('motor compartilhado reduz para caber e bloqueia abaixo do limiar em 8×3',
   assert.ok(layout.scale < 1);
   assert.equal(layout.fitWarning,true);
   assert.ok(layout.bothCodes || layout.showBarcode);
+  assert.ok(layout.measuredHeightMm > 0,'altura total medida inclui tipografia e códigos');
+});
+
+test('medição usa avanço por glifo e geometria CSS — não largura média por caractere', async () => {
+  const layoutSrc=readFileSync(new URL('../lib/credential-label-layout.ts',import.meta.url),'utf8');
+  const metricsSrc=readFileSync(new URL('../lib/label-text-metrics.ts',import.meta.url),'utf8');
+  assert.match(layoutSrc,/label-text-metrics/u);
+  assert.match(layoutSrc,/LABEL_PAD_MM|LABEL_SHEET_GAP_MM|LABEL_COPY_GAP_MM/u);
+  assert.match(layoutSrc,/code128Modules/u);
+  assert.doesNotMatch(layoutSrc,/fontMm \* 0\.55|textWidthMm \/ \(emphasis/u);
+  assert.doesNotMatch(metricsSrc,/avg(Char|Width)|meanWidth|averageChar/iu);
+  assert.match(metricsSrc,/Não usa largura média por caractere/u);
+  assert.match(metricsSrc,/glyphAdvanceEm|measureRunWidthMm|wrapTextToWidth/u);
+
+  const metricsUrl=url(compile('../lib/label-text-metrics.ts'));
+  const {measureRunWidthMm,wrapTextToWidth}=await import(metricsUrl);
+  const narrow=measureRunWidthMm('iiii',4.2);
+  const wide=measureRunWidthMm('WWWW',4.2);
+  assert.ok(wide > narrow * 1.5,'W e i têm avanços distintos — não média única');
+  assert.ok(wrapTextToWidth('Nome completo do participante',20,4.2,{uppercase:true}).length >= 2);
+
+  const short=credentialLabelLayout({...base,name:'Ana',company:null,category:null,lines:[],barcode:null,widthMm:80,heightMm:30});
+  const tall=credentialLabelLayout({...base,name:'Ana',company:'Org',category:'VIP',lines:['Cargo'],barcode:'EVB1.demo',widthMm:80,heightMm:30});
+  assert.ok(tall.measuredHeightMm > short.measuredHeightMm,
+    'altura total cresce com linhas, gaps e faixa de códigos reais');
+  assert.equal(tall.bothCodes,true);
+  assert.equal(tall.codesMode,'both');
 });

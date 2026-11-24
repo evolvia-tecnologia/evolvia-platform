@@ -15,7 +15,13 @@ const dependencies = {
   './print-surface': asModule('export default "print-surface";'),
   './credential-barcode': asModule('export default "barcode";'),
   './credential-qr': asModule('export default "qr";'),
-  '../lib/credential-label-layout': asModule(compile('../lib/credential-label-layout.ts')),
+  '../lib/credential-label-layout': (() => {
+    const metrics = asModule(compile('../lib/label-text-metrics.ts'));
+    const code128 = asModule(compile('../lib/code128.ts'));
+    return asModule(compile('../lib/credential-label-layout.ts')
+      .replace(/from ['"]\.\/label-text-metrics['"]/g, `from ${JSON.stringify(metrics)}`)
+      .replace(/from ['"]\.\/code128['"]/g, `from ${JSON.stringify(code128)}`));
+  })(),
 };
 const source = readFileSync(new URL('../components/credential-label.tsx', import.meta.url), 'utf8');
 const js = ts.transpileModule(source, {
