@@ -277,7 +277,12 @@ test('as sequências crescem e não se repetem', LIMITE, async () => {
   const primeira = await c.emitir(pessoa);
   const segunda = await c.emitir(pessoa);
   assert.equal(primeira.json.emissao.sequence, 1);
-  assert.equal(segunda.json.emissao.sequence, 2);
+  assert.deepEqual([primeira.json.widthMm, primeira.json.heightMm], [80, 30]);
+  const { emissao: primeiraTentativa, ...primeiroModelo } = primeira.json;
+  const { emissao: segundaTentativa, ...segundoModelo } = segunda.json;
+  assert.deepEqual(segundoModelo, primeiroModelo);
+  assert.equal(primeiraTentativa.sequence, 1);
+  assert.equal(segundaTentativa.sequence, 2);
   assert.deepEqual((await c.tentativas(pessoa)).map((t) => t.sequence), [1, 2]);
 });
 

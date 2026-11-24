@@ -305,7 +305,12 @@ function labelValue(data: Record<string, unknown>, code: string): string {
   const value = data[code];
   // Never truncate the historical label path before layout can measure it.
   // The shared renderer scales text and warns about unreadable paper sizes.
-  if (typeof value === 'string') return value.trim();
+  if (typeof value === 'string' && value.trim()) return value.trim();
+  if (code === 'institution') {
+    const company = [data.company, data.company_name, data.organization]
+      .find((candidate): candidate is string => typeof candidate === 'string' && Boolean(candidate.trim()));
+    if (company) return company.trim();
+  }
   if (typeof value === 'number' && Number.isFinite(value)) return String(value);
   if (code === 'city_state') {
     return [labelValue(data, 'city'), labelValue(data, 'state')].filter(Boolean).join(' / ');

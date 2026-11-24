@@ -105,6 +105,9 @@ test('a etiqueta térmica já vem com nome, empresa e QR Code', () => {
   assert.deepEqual(readLabelConfig({ categoryLabelTemplates: [] }), label);
   assert.deepEqual(labelText({}, 'Geral', label).lines, []);
   assert.deepEqual(label.extraFields, ['city_state']);
+  const aliases = labelText({ institution: '', company_name: ' Empresa ', city_state: '', city: 'Campinas', state: 'SP' }, 'Geral', label);
+  assert.equal(aliases.company, 'Empresa');
+  assert.deepEqual(aliases.lines, ['Campinas / SP']);
   const existing = { categoryLabelTemplates: [{ categoryId: 'existing-category', fields: ['qr'] }] };
   assert.equal(readLabelConfig(existing).preset, '9x4');
   assert.deepEqual(readLabelConfig({ label: { codeMode: 'BARCODE' } }).extraFields, []);

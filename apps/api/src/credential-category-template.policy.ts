@@ -128,7 +128,7 @@ export function updateCategoryLabelTemplate(config: unknown, categoryId: string,
   if (index === -1) stored.push(updated);
   else stored[index] = updated;
   // Persist the effective paper on first customization so new layouts stay 8x3.
-  const firstLayout = current.label === undefined && (!Array.isArray(raw) || raw.length === 0);
+  const firstLayout = current.label == null && (!Array.isArray(raw) || raw.length === 0);
   return { ...current, ...(firstLayout ? { label: defaultLabelConfig() } : {}), categoryLabelTemplates: stored };
 }
 
