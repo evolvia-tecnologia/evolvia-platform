@@ -184,3 +184,16 @@ test('modelo por categoria vazio ou sem dados preenchidos avisa e nunca imprime 
     .find((node) => node.type === 'section').props['data-fit-warning'], false,
     'modelo com conteúdo continua imprimível mesmo sem QR opcional');
 });
+
+test('QR de categoria ocupa coluna própria com a mesma largura medida na prévia e impressão', () => {
+  for (const preview of [true, false]) {
+    const { sheet, qr } = inspect(preview);
+    const children = sheet.props.children.filter(Boolean);
+    assert.deepEqual(children.map(node => node.props.className), ['copy', 'orderedQr']);
+    assert.equal(children[1], qr);
+    assert.equal(nodes(children[0]).includes(qr), false);
+    assert.equal(sheet.props.style['--label-qr-size'], sheet.props.style['--ordered-qr-size']);
+    assert.equal(sheet.props['data-qr'], true);
+    assert.equal(sheet.props['data-barcode'], false);
+  }
+});
