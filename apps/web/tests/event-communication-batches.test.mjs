@@ -80,3 +80,22 @@ test('histórico só oferece autorização se o backend habilitar e o lote estiv
   assert.equal(button('Autorizar envio'), undefined);
   assert.equal(button('Cancelar lote'), undefined);
 });
+
+test('histórico detalha resultados distintos sem oferecer novo envio', async t => {
+  globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+  const batch = { id: 'lote-misto', draftRevision: 1, recipientCount: 4, status: 'PARTIAL',
+    receivedCount: 1, failedCount: 1, cancelledCount: 2, createdAt: '2026-11-24T13:00:00Z' };
+  const Component = loadPanel(async () => ({ batches: [batch], sendingAvailable: true }));
+  let tree;
+  await act(async () => {
+    tree = renderer.create(React.createElement(Component, { eventId: 'evento-A', history: true }));
+  });
+  t.after(() => act(async () => tree.unmount()));
+  const item = tree.root.findByType('li');
+  assert.match(item.findByType('strong').children.join(''), /Resultados distintos/);
+  const details = item.findAllByType('span').map(span => span.children.join('')).join(' ');
+  assert.match(details, /Recebidos: 1/);
+  assert.match(details, /Falhas: 1/);
+  assert.match(details, /Cancelados: 2/);
+  assert.equal(item.findAllByType('button').length, 0);
+});
