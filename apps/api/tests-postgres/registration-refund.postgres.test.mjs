@@ -758,7 +758,15 @@ async function verifyRefundRecovery(t, amountCents, refundEvent) {
   assert.equal(record.amountCents, amountCents);
   assert.equal(record.attempts, 1);
   assert.ok(record.reconciledAt);
+  const { verifySandboxRefund } = await import('../scripts/verify-sandbox-refund.mjs');
+  await assert.rejects(verifySandboxRefund(prisma, event.id, req.id), /pendente/);
+  await assert.rejects(verifySandboxRefund(prisma, 'outro-evento', req.id), /indisponível/);
   history[0].status = 'DONE';
+  const proof = await verifySandboxRefund(prisma, event.id, req.id);
+  assert.match(proof.evidenceHash, /^[a-f0-9]{64}$/);
+  assert.deepEqual(proof, { environment: 'SANDBOX', status: 'RECONCILED', amountCents, evidenceHash: proof.evidenceHash });
+  assert.deepEqual(await verifySandboxRefund(prisma, event.id, req.id), proof);
+  assert.equal(posts, 1);
   // Rebuild the local projection using the persisted provider history.
   await prisma.$executeRaw`DELETE FROM "SandboxRefundOperation" WHERE "requestId" = ${req.id}`;
   for (const invalid of [(amountCents + 0.1) / 100, (amountCents / 100).toFixed(2), (amountCents + 1) / 100, null]) {
