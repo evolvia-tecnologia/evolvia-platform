@@ -203,7 +203,11 @@ export default function AreaMasterPage() {
   // `useState` em vez de ler no corpo: `suportaWebAuthn` toca em `window`, e no
   // primeiro render do servidor ele não existe.
   const [suportado, setSuportado] = useState(true);
-  useEffect(() => { setSuportado(suportaWebAuthn()); }, []);
+  const [inscricaoHabilitada, setInscricaoHabilitada] = useState(false);
+  useEffect(() => {
+    setSuportado(suportaWebAuthn());
+    setInscricaoHabilitada(['homologacao.evolviatecnologia.com', 'localhost'].includes(window.location.hostname));
+  }, []);
 
   useEffect(() => {
     if (!getToken()) {
@@ -419,7 +423,7 @@ export default function AreaMasterPage() {
           {erro && <div className="error" role="alert">{erro}</div>}
 
           {aviso && <p role="status">{aviso}</p>}
-          {suportado && ['homologacao.evolviatecnologia.com', 'localhost'].includes(window.location.hostname) &&
+          {suportado && inscricaoHabilitada &&
             <details>
               <summary>Cadastrar chave com autorização temporária</summary>
               <form onSubmit={event => { event.preventDefault(); void registrarPorAutorizacao(); }}>

@@ -6,7 +6,7 @@ import { AbrirInscricaoMasterDto, ConsumirInscricaoMasterDto, CatalogoDto, Conce
 import type { AuthenticatedRequest } from './auth.guard.ts';
 import type { RequisicaoMaster } from './platform-master.guard.ts';
 
-type Requisicao = AuthenticatedRequest & RequisicaoMaster & { socket: { remoteAddress?: string } };
+type Requisicao = AuthenticatedRequest & RequisicaoMaster & { ip?: string; socket: { remoteAddress?: string } };
 
 /**
  * Rotas da Área Master (#665).
@@ -56,13 +56,13 @@ export class PlatformMasterController {
   @Post('enrollment/challenge')
   @UseGuards(AuthGuard)
   abrirInscricao(@Req() req: Requisicao, @Body() corpo: AbrirInscricaoMasterDto) {
-    return this.servico.abrirInscricao(req.user!.id, req.user!.email, corpo, req.socket.remoteAddress ?? '');
+    return this.servico.abrirInscricao(req.user!.id, req.user!.email, corpo, req.ip ?? req.socket.remoteAddress ?? '');
   }
 
   @Post('enrollment/credential')
   @UseGuards(AuthGuard)
   consumirInscricao(@Req() req: Requisicao, @Body() corpo: ConsumirInscricaoMasterDto) {
-    return this.servico.consumirInscricao(req.user!.id, corpo, req.socket.remoteAddress ?? '');
+    return this.servico.consumirInscricao(req.user!.id, corpo, req.ip ?? req.socket.remoteAddress ?? '');
   }
 
   @Post('credentials/challenge')

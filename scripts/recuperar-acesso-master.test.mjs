@@ -246,3 +246,9 @@ test('recusa emissão sem ambiente de homologação explícito', () => {
     assert.equal(decidirEntrada(base(), { ...AMBIENTE, EVOLVIA_AMBIENTE: ambiente }).autorizado, false);
   }
 });
+
+test('marcador de produção na senha não classifica o banco como produção', () => {
+  const env = { ...AMBIENTE, DATABASE_URL: 'postgresql://teste:prod@homologacao-db/evolvia' };
+  assert.equal(decidirEntrada(base(), env).autorizado, true);
+  assert.equal(decidirEntrada(base(), { ...env, DATABASE_URL: env.DATABASE_URL + '-prod' }).motivo, MOTIVOS.producao);
+});

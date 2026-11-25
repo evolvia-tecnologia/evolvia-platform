@@ -48,7 +48,7 @@
  *     sessao e UPDATE, nao DELETE: assim a sessao invalidada continua auditavel.
  */
 
-import { createHash } from 'node:crypto';
+import { createHash, randomInt } from 'node:crypto';
 
 /** As duas finalidades. Entram no digest, entao nao sao intercambiaveis. */
 export const FINALIDADES = Object.freeze(['BOOTSTRAP', 'RECOVERY']);
@@ -207,7 +207,7 @@ export function decidirEntrada(entrada, env = {}) {
   const banco = env.DATABASE_URL;
   const host = hostDoBanco(banco);
   if (host === null) return recusa(MOTIVOS.sem_banco);
-  if (pareceProducao(host, banco, env.NODE_ENV, env.EVOLVIA_AMBIENTE)) return recusa(MOTIVOS.producao);
+  if (pareceProducao(host, new URL(banco).pathname, env.NODE_ENV, env.EVOLVIA_AMBIENTE)) return recusa(MOTIVOS.producao);
   if (env.EVOLVIA_AMBIENTE !== 'homologacao') return recusa('Defina o ambiente autorizado de homologação antes de abrir a janela.');
   if (entrada.confirmarHost !== host) return recusa(MOTIVOS.host_nao_confirmado);
 
@@ -392,6 +392,6 @@ ${MARCA};
 export function idEstiloCuid() {
   const alfabeto = 'abcdefghijklmnopqrstuvwxyz0123456789';
   let saida = 'c';
-  for (let i = 0; i < 24; i += 1) saida += alfabeto[Math.floor(Math.random() * alfabeto.length)];
+  for (let i = 0; i < 24; i += 1) saida += alfabeto[randomInt(alfabeto.length)];
   return saida;
 }
