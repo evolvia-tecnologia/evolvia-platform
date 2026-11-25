@@ -4,6 +4,8 @@ import { EventDeskService } from '../dist/event-desk.service.js';
 import { CheckInService } from '../dist/check-in.service.js';
 import { readLabelConfig, normalizeLabelConfig, mergeLabelConfig, DeskPolicyError } from '../dist/event-desk-policy.js';
 
+import { updateCategoryLabelTemplate } from '../dist/credential-category-template.policy.js';
+
 const categoryId = 'cm12345678901234567890001';
 const reservationId = 'reservation12345';
 const secret = 'legacy-label-regression-secret-0123456789abcdef';
@@ -209,7 +211,7 @@ test('B2 parity: posto e totem produzem a mesma etiqueta legada e por categoria 
   }] };
   try {
     for (const [kind, config] of [
-      ['legado', legacy], ['categoria', category], ['categoria ambos', bothCodes], ['categoria barras', barcodeOnly],
+      ['novo', { selfService: legacy.selfService }], ['legado', legacy], ['categoria', category], ['categoria ambos', bothCodes], ['categoria barras', barcodeOnly],
     ]) {
       const posto = await setup(config, data, protocol).badge('user_1', 'event_1', { reservationId });
       const { checkedInAt, alreadyCheckedIn, ...totem } = await kiosk(config).selfServicePrint(
@@ -222,7 +224,14 @@ test('B2 parity: posto e totem produzem a mesma etiqueta legada e por categoria 
       const { emissao, ...postoImprimivel } = posto;
       assert.deepEqual(totem, postoImprimivel, 'B2: ' + kind + ' deve imprimir o mesmo payload no posto e no totem');
       assert.doesNotMatch(JSON.stringify(totem), /52998224725|pessoal@example\.test/u);
-      if (kind !== 'legado') {
+      if (kind === 'novo') {
+        assert.deepEqual([totem.widthMm, totem.heightMm], [80, 30]);
+        assert.equal(totem.name, data.preferred_name);
+        assert.match(totem.qr, /^EVQ1\./u);
+        assert.equal(totem.barcode, null);
+        const saved = updateCategoryLabelTemplate(config, categoryId, ['preferred_name', 'qr']);
+        assert.equal(readLabelConfig(saved).preset, '8x3');
+      } else if (kind !== 'legado') {
         const codes = kind === 'categoria ambos' ? ['institution', 'preferred_name', 'qr', 'barcode']
           : kind === 'categoria barras' ? ['institution', 'preferred_name', 'barcode']
             : ['institution', 'preferred_name', 'qr'];
