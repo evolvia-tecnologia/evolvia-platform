@@ -16,7 +16,7 @@ import {
 
 const SEGREDO = randomBytes(32).toString('base64url');
 const IDENT = 'cmasteridentidade000000001';
-const AMBIENTE = { DATABASE_URL: 'postgresql://evolvia:x@homologacao-db:5432/evolvia', NODE_ENV: 'test' };
+const AMBIENTE = { DATABASE_URL: 'postgresql://evolvia:x@homologacao-db:5432/evolvia', NODE_ENV: 'test', EVOLVIA_AMBIENTE: 'homologacao' };
 
 const base = (extra = {}) => ({
   finalidade: 'BOOTSTRAP', email: 'titular@evolvia-ci.local', identidade: IDENT,
@@ -239,4 +239,10 @@ test('a flag de transferencia e lida de ponta a ponta, para ser recusada', () =>
 test('--minutos tem o padrao, e o padrao e curto', () => {
   assert.equal(lerArgumentos([]).minutos, JANELA_PADRAO_MINUTOS);
   assert.ok(JANELA_PADRAO_MINUTOS <= 15, 'janela padrao longa e janela aberta');
+});
+
+test('recusa emissão sem ambiente de homologação explícito', () => {
+  for (const ambiente of [undefined, 'dev', 'ci']) {
+    assert.equal(decidirEntrada(base(), { ...AMBIENTE, EVOLVIA_AMBIENTE: ambiente }).autorizado, false);
+  }
 });

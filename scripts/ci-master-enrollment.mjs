@@ -69,6 +69,11 @@ try {
   await evaluate("Array.from(document.querySelectorAll('button')).find(b=>b.textContent.includes('Entrar com a chave')).click()");
   await waitFor("document.body.innerText.includes('Visão geral da plataforma')", 'autenticação do proprietário');
   assert.equal(sql(`SELECT count(*) FROM "PlatformMasterSession" WHERE "identityId"='${identidade}' AND "revokedAt" IS NULL`), '1');
+  const recuperacao = randomBytes(32).toString('base64url');
+  sql(abrirJanela({ finalidade: 'RECOVERY', email, identidade, nota, correlacao: randomUUID(), minutos: 5, segredo: recuperacao }));
+  assert.equal(sql(`SELECT count(*) FROM "PlatformMasterSession" WHERE "identityId"='${identidade}' AND "revokedAt" IS NULL`), '0');
+  assert.equal(sql(`SELECT count(*) FROM "PlatformWebAuthnCredential" WHERE "identityId"='${identidade}'`), '0');
+  console.log('Recuperação revogou a sessão e a credencial anteriores.');
   console.log('PostgreSQL e Chromium confirmaram inscrição, consumo único registrado e autenticação posterior.');
 } finally {
   await stopChrome(browser);

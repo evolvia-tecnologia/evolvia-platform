@@ -208,6 +208,7 @@ export function decidirEntrada(entrada, env = {}) {
   const host = hostDoBanco(banco);
   if (host === null) return recusa(MOTIVOS.sem_banco);
   if (pareceProducao(host, banco, env.NODE_ENV, env.EVOLVIA_AMBIENTE)) return recusa(MOTIVOS.producao);
+  if (env.EVOLVIA_AMBIENTE !== 'homologacao') return recusa('Defina o ambiente autorizado de homologação antes de abrir a janela.');
   if (entrada.confirmarHost !== host) return recusa(MOTIVOS.host_nao_confirmado);
 
   // Lida para ser recusada, antes de qualquer sucesso possivel.
