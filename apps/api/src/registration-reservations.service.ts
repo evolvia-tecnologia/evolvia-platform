@@ -696,7 +696,7 @@ export class RegistrationReservationsService {
     slug: string,
     rawInput: PublicRegistrationInput,
     rawIdempotencyKey?: string,
-    options?: { actorUserId?: string; desk?: boolean; waitlistUserId?: string },
+    options?: { actorUserId?: string; desk?: boolean; waitlistUserId?: string; participantAccount?: { id: string; email: string } },
   ) {
     let input: PublicRegistrationInput;
     let idempotencyKey: string;
@@ -894,13 +894,15 @@ export class RegistrationReservationsService {
             data: {
               organizationId: event.organizationId,
               eventId: event.id,
-              actorUserId: options?.actorUserId ?? options?.waitlistUserId,
+              actorUserId: options?.actorUserId ?? options?.waitlistUserId ?? options?.participantAccount?.id,
               action: 'registration.reservation_created',
               entityType: 'EventRegistrationReservation',
               entityId: reservation.id,
               metadata: {
                 status,
-                channel: options?.desk ? 'desk' : offer ? 'waitlist' : 'public',
+                channel: options?.desk ? 'desk' : offer ? 'waitlist'
+                  : options?.participantAccount && sha256(options.participantAccount.email.trim().toLowerCase()) === emailHash
+                    ? 'participant_account' : 'public',
                 hasBenefit: Boolean(benefit),
                 benefitKind: benefit?.kind ?? null,
                 basePriceCents: lot.priceCents,

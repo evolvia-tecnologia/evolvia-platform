@@ -1,5 +1,7 @@
 import { Body, Controller, Get, Param, Post, Req, UseGuards } from '@nestjs/common';
 import { AuthGuard, AuthenticatedRequest } from './auth.guard';
+import { assertAccessRate, type AccessShieldRequest } from './access-shield';
+import type { ParticipantAccessInput } from './participant-area-policy';
 import { ParticipantDashboardService } from './participant-dashboard.service';
 
 @UseGuards(AuthGuard)
@@ -10,6 +12,12 @@ export class ParticipantDashboardController {
   @Get('me')
   get(@Req() request: AuthenticatedRequest) {
     return this.dashboard.get(request.user!.id);
+  }
+
+  @Post('registration/session')
+  openRegistration(@Req() request: AccessShieldRequest, @Body() body: ParticipantAccessInput) {
+    assertAccessRate(request, 'participant-session', 8);
+    return this.dashboard.openRegistration(body);
   }
 
   @Post('links')

@@ -124,7 +124,9 @@ export default function ParticipantEntryPage() {
       await api<{ accepted: boolean }>('/auth/email-verification/request', { method: 'POST', body: '{}' });
       setNotice('Enviamos um novo link. Confira sua caixa de entrada e também a pasta de spam.');
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'Não foi possível enviar o link de confirmação.');
+      setError(caught instanceof ApiError && caught.status >= 500
+        ? 'O serviço de confirmação está indisponível. Use o protocolo e o documento nesta tela para abrir sua inscrição.'
+        : caught instanceof Error ? caught.message : 'Não foi possível enviar o link de confirmação.');
     } finally { setBusy(false); }
   }
 
@@ -176,6 +178,21 @@ export default function ParticipantEntryPage() {
       await load();
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Não foi possível confirmar o histórico.');
+    } finally { setBusy(false); }
+  }
+
+  async function openRegistration(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const data = new FormData(event.currentTarget);
+    setBusy(true); setError(''); setNotice('');
+    try {
+      const session = await api<{ slug: string; accessToken: string }>('/participant/registration/session', {
+        method: 'POST',
+        body: JSON.stringify({ protocol: data.get('protocol'), identityDocument: data.get('identityDocument') }),
+      });
+      setSelected({ slug: session.slug, token: session.accessToken });
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'Não foi possível abrir a inscrição.');
     } finally { setBusy(false); }
   }
 
@@ -250,19 +267,12 @@ export default function ParticipantEntryPage() {
           <div><h1>Meus eventos</h1><p>Olá, {dashboard.user.name}. Aqui estão suas inscrições em eventos ativos.</p></div>
           <div className={styles.headingActions}><Link className={styles.textButton} href="/acesso">Trocar de área</Link><button type="button" className={styles.textButton} onClick={logout}>Sair da conta</button></div>
         </div>
-        {!dashboard.emailVerified ? <section className={styles.card} aria-labelledby="verify-email-title">
-          <h2 id="verify-email-title">Confirme seu e-mail para acessar inscrições</h2>
-          <p>A confirmação de <strong>{dashboard.user.email}</strong> protege suas inscrições quando a conta reúne eventos diferentes. Verifique sua caixa de entrada; se não recebeu o link, tente reenviar.</p>
-          {notice && <p role="status">{notice}</p>}
-          {error && <p role="alert" className={styles.error}>{error}</p>}
-          <button type="button" onClick={() => void requestVerification()} disabled={busy}>{busy ? 'Enviando…' : 'Reenviar link de confirmação'}</button>
-          <p>Você ainda pode usar a área do organizador. Somente a reunião e a abertura de inscrições ficam bloqueadas até a confirmação.</p>
-        </section> : selected ? <>
+        {selected ? <>
           <button className={styles.textButton} type="button" onClick={closeEvent}>← Voltar aos meus eventos</button>
           <ParticipantArea key={selected.slug} slug={selected.slug} initialAccessToken={selected.token} onExit={exitEvent} />
         </> : <>
           {error && <p role="alert" className={styles.error}>{error}</p>}
-          {!dashboard.linked && <section className={styles.card} aria-labelledby="link-title">
+          {dashboard.emailVerified && !dashboard.linked && <section className={styles.card} aria-labelledby="link-title">
             <h2 id="link-title">Encontrar minhas inscrições</h2>
             <p>Já se inscreveu em um evento? Informe o documento usado naquela inscrição. Vamos procurar as inscrições com o e-mail confirmado desta conta: <strong>{dashboard.user.email}</strong>. Se ainda não se inscreveu, <Link href="/eventos">explore os eventos</Link>.</p>
             <form className={styles.form} onSubmit={link}>
@@ -281,7 +291,7 @@ export default function ParticipantEntryPage() {
             </form>
             <p>Se a inscrição foi feita com outro e-mail, entre com a conta correspondente.</p>
           </section>}
-          {dashboard.linked && dashboard.events.length === 0 && <p>Nenhuma inscrição ativa encontrada para esta conta.</p>}
+          {(dashboard.linked || !dashboard.emailVerified) && dashboard.events.length === 0 && <p>Nenhuma inscrição ativa encontrada para esta conta.</p>}
           {dashboard.emailVerified && <section className={styles.card} aria-labelledby="history-title">
             <h2 id="history-title">Histórico do documento</h2>
             <p>Depois de trocar o e-mail, o histórico só aparece quando o e-mail que já comprovou o documento confirma o pedido. Digitar o documento de outra pessoa não lista eventos, nomes nem e-mails.</p>
@@ -324,10 +334,25 @@ export default function ParticipantEntryPage() {
               <button type="button" onClick={() => openEvent(item.slug)} disabled={busy}>Abrir inscrição</button>
             </li>)}
           </ul>}
+          {!dashboard.emailVerified && <>
+            {dashboard.events.length === 0 && <p><Link href="/eventos">Encontrar eventos</Link></p>}
+            <details><summary>Localizar outra inscrição</summary>
+              <form className={styles.form} onSubmit={openRegistration}>
+            <label>Protocolo da inscrição<input name="protocol" placeholder="EVO-…" autoComplete="off" maxLength={20} required /></label>
+            <label>CPF ou documento estrangeiro<input name="identityDocument" autoComplete="off" maxLength={50} required /></label>
+            <button type="submit" disabled={busy}>Abrir minha inscrição</button>
+          </form>
+            </details>
+            <details><summary>Reunir o histórico de vários eventos</summary>
+              <p>Confirme o e-mail para reunir inscrições anteriores.</p>
+              <button type="button" onClick={() => void requestVerification()} disabled={busy}>Reenviar link de confirmação</button>
+            </details>
+            {notice && <p role="status">{notice}</p>}
+          </>}
           <p>Usou outro e-mail em alguma inscrição? Saia desta conta e entre com o e-mail usado nela.</p>
         </>}
       </>}
     </main>
-    {!(dashboard?.emailVerified && selected) && <EvaScreenSupport guide="participant" />}
+    {!selected && <EvaScreenSupport guide="participant" />}
   </>;
 }

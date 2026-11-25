@@ -322,12 +322,13 @@ function RegistrationForm({
     setSending(true);
     setError('');
     try {
+      const accountHeaders = offerHeaders();
       const target = offerLotId
         ? `/api/participant/events/${encodeURIComponent(slug)}/waitlist/${encodeURIComponent(offerLotId)}/accept`
-        : `/api/public/events/${encodeURIComponent(slug)}/registration/reservations`;
+        : `/api/public/events/${encodeURIComponent(slug)}/registration/${accountHeaders.Authorization ? 'account-reservations' : 'reservations'}`;
       const response = await fetch(target, {
         method: 'POST',
-        headers: { 'content-type': 'application/json', 'idempotency-key': idempotencyKey, ...(offerLotId ? offerHeaders() : {}) },
+        headers: { 'content-type': 'application/json', 'idempotency-key': idempotencyKey, ...accountHeaders },
         body: JSON.stringify({
           categoryId,
           lotId,

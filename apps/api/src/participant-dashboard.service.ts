@@ -3,7 +3,7 @@ import { ConflictException, ForbiddenException, HttpException, HttpStatus, Injec
 import { EventStatus, Prisma, RegistrationReservationStatus } from '@prisma/client';
 import { PrismaService } from './prisma.service';
 import { ParticipantAreaService } from './participant-area.service';
-import { ParticipantAreaPolicyError, normalizeIdentityDocument, participantHash } from './participant-area-policy';
+import { ParticipantAreaPolicyError, normalizeIdentityDocument, normalizeParticipantAccess, participantHash, type ParticipantAccessInput } from './participant-area-policy';
 import {
   HISTORY_CONFIRM_FAILURE,
   HISTORY_GRANT_RECOVERY_CONSENT,
@@ -87,12 +87,17 @@ export class ParticipantDashboardService {
 
   async get(userId: string) {
     const user = await this.userScope(userId);
+    const registrations = await this.directRegistrations(userId, user.emailHash);
+    const directIds = registrations.map(item => item.id);
     if (!user.emailVerifiedAt) {
       return {
-        user: { name: user.name, email: user.email },
-        emailVerified: false,
-        linked: false,
-        events: [],
+        user: { name: user.name, email: user.email }, emailVerified: false,
+        linked: registrations.length > 0,
+        events: registrations.map(({ event, status }) => ({
+          slug: event.slug, name: event.name, profileCode: event.profileCode,
+          startDate: event.startDate?.toISOString() ?? null, endDate: event.endDate?.toISOString() ?? null,
+          venue: event.venue, status,
+        })),
       };
     }
     const links = await this.prisma.participantIdentityLink.findMany({
@@ -100,7 +105,7 @@ export class ParticipantDashboardService {
     });
     const ownHashes = links.filter((link) => link.emailHash === user.emailHash).map((link) => link.identityHash);
     const grants = this.controlledGrants(links);
-    if (ownHashes.length === 0 && grants.length === 0) {
+    if (ownHashes.length === 0 && grants.length === 0 && directIds.length === 0) {
       return { user: { name: user.name, email: user.email }, emailVerified: true, linked: false, events: [] };
     }
     const now = new Date();
@@ -108,6 +113,7 @@ export class ParticipantDashboardService {
       where: {
         AND: [
           { OR: [
+            ...(directIds.length ? [{ id: { in: directIds } }] : []),
             ...(ownHashes.length > 0 ? [{ emailHash: user.emailHash, identityHash: { in: ownHashes } }] : []),
             ...grants.map((grant) => ({
               identityHash: grant.identityHash,
@@ -127,7 +133,7 @@ export class ParticipantDashboardService {
         name: true, slug: true, startDate: true, endDate: true, profileCode: true, venue: true,
       } } },
     });
-    const visible = reservations.filter((item) => includeReservation({
+    const visible = reservations.filter((item) => directIds.includes(item.id) || includeReservation({
       sameAccount: item.emailHash === user.emailHash && ownHashes.includes(item.identityHash),
       grantorControlled: grantorControlsReservation({ identityHash: item.identityHash, emailHash: item.emailHash, grants }),
       confirmed: item.status === RegistrationReservationStatus.CONFIRMED,
@@ -142,8 +148,62 @@ export class ParticipantDashboardService {
     };
   }
 
+  private async directRegistrations(userId: string, emailHash: string, slug?: string) {
+    const now = new Date();
+    const records = await this.prisma.auditLog.findMany({
+      where: { actorUserId: userId, action: 'registration.reservation_created',
+        entityType: 'EventRegistrationReservation', metadata: { path: ['channel'], equals: 'participant_account' } },
+      select: { entityId: true },
+    });
+    const reservationIds = records.flatMap(record => record.entityId ? [record.entityId] : []);
+    const ownership: Prisma.EventRegistrationReservationWhereInput[] = [
+      { waitlistEntry: { userId } },
+      ...(reservationIds.length ? [{ id: { in: reservationIds } }] : []),
+    ];
+    return this.prisma.eventRegistrationReservation.findMany({
+      where: {
+        emailHash,
+        event: { ...(slug === undefined ? {} : { slug }), status: EventStatus.PUBLISHED, OR: [{ endDate: null }, { endDate: { gte: now } }] },
+        AND: [
+          { OR: ownership },
+          { OR: [
+            { status: RegistrationReservationStatus.CONFIRMED },
+            { status: RegistrationReservationStatus.PENDING_PAYMENT, expiresAt: { gt: now } },
+          ] },
+        ],
+      },
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      select: { id: true, organizationId: true, eventId: true, status: true, event: { select: {
+        slug: true, name: true, profileCode: true, startDate: true, endDate: true, venue: true,
+      } } },
+    });
+  }
+
+  async openRegistration(input: ParticipantAccessInput) {
+    const denied = 'Não foi possível abrir a inscrição com esse protocolo e documento.';
+    let access: ReturnType<typeof normalizeParticipantAccess>;
+    try { access = normalizeParticipantAccess(input); }
+    catch { throw new UnauthorizedException(denied); }
+    const registration = await this.prisma.eventRegistrationReservation.findFirst({
+      where: {
+        protocol: access.protocol, identityHash: participantHash(access.identityDocument),
+        event: { status: EventStatus.PUBLISHED },
+      },
+      select: { event: { select: { slug: true } } },
+    });
+    if (!registration?.event.slug) throw new UnauthorizedException(denied);
+    const slug = registration.event.slug;
+    const session = await this.participantArea.createSession(slug, access);
+    return { slug, accessToken: session.accessToken };
+  }
+
   async enterEvent(userId: string, slug: string) {
-    const user = await this.userScope(userId, true);
+    const user = await this.userScope(userId);
+    const [directReservation] = await this.directRegistrations(userId, user.emailHash, slug.trim().toLowerCase());
+    if (directReservation) {
+      return this.participantArea.createSessionForReservation(directReservation.eventId, directReservation.organizationId, directReservation.id);
+    }
+    if (!user.emailVerifiedAt) throw new NotFoundException('Inscrição não encontrada.');
     const links = await this.prisma.participantIdentityLink.findMany({
       where: { userId }, select: { identityHash: true, emailHash: true, historyGrantSource: true, grantorEmailHashes: true },
     });

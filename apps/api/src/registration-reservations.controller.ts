@@ -1,4 +1,5 @@
-import { Body, Controller, Get, Headers, Param, Post, Res, Req } from '@nestjs/common';
+import { Body, Controller, Get, Headers, Param, Post, Res, Req, UseGuards } from '@nestjs/common';
+import { AuthGuard, AuthenticatedRequest } from './auth.guard';
 import { assertAccessRate, type AccessShieldRequest } from './access-shield';
 import { PublicRegistrationInput } from './registration-reservations-policy';
 import { PublicRegistrationOrderInput } from './registration-order-policy';
@@ -61,6 +62,17 @@ export class RegistrationReservationsController {
     @Body() input: PublicRegistrationInput,
   ) {
     return this.reservations.reserve(slug, input, idempotencyKey);
+  }
+
+  @UseGuards(AuthGuard)
+  @Post('account-reservations')
+  reserveWithAccount(
+    @Req() request: AuthenticatedRequest,
+    @Param('slug') slug: string,
+    @Headers('idempotency-key') idempotencyKey: string | undefined,
+    @Body() input: PublicRegistrationInput,
+  ) {
+    return this.reservations.reserve(slug, input, idempotencyKey, { participantAccount: request.user! });
   }
 
   @Post('reservations/:protocol/category-proof')

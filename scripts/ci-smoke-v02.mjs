@@ -680,7 +680,14 @@ assert.deepEqual(publicTerms.bytes, termsPdf);
 assert.match(publicTerms.response.headers.get('content-type') ?? '', /application\/pdf/u);
 assert.equal(publicTerms.response.headers.get('x-content-type-options'), 'nosniff');
 assert.match(publicTerms.response.headers.get('content-security-policy') ?? '', /sandbox/u);
-await request(termsPath, { method: 'POST', token: ownerToken, body: termsBody, expected: 409 });
+const restoredTerms = await request(termsPath, { method: 'POST', token: ownerToken, body: termsBody, expected: 201 });
+assert.equal(restoredTerms.version, termsAttached.version);
+const restoredPdf = await requestBinary(`/public/events/${completedEvent.slug}/registration/terms`);
+assert.deepEqual(restoredPdf.bytes, termsPdf);
+await request(termsPath, {
+  method: 'POST', token: ownerToken, expected: 409,
+  body: { ...termsBody, contentBase64: Buffer.concat([termsPdf, Buffer.from('\n%different-version')]).toString('base64') },
+});
 
 const publicPage = await request(`/public/events/${completedEvent.slug}`);
 assert.equal(publicPage.event.slug, completedEvent.slug);
@@ -837,6 +844,54 @@ await request('/participant/links', {
   method: 'POST', expected: 403, token: participantAccount.token,
   body: { identityDocument: reservationBody.answers.identity_document },
 });
+// Reingresso real por conta sem confirmação de e-mail nem protocolo.
+const directEmail = `direct-${runId}@evolvia-ci.local`;
+const directAccount = await request('/auth/participant/register', {
+  method: 'POST', expected: 201, body: { name: 'Participante Acesso Direto', email: directEmail, password },
+});
+await request(`/public/events/${completedEvent.slug}/registration/account-reservations`, {
+  method: 'POST', expected: 401,
+  headers: { 'idempotency-key': `ci-direct-unauth-${runId}` },
+  body: reservationBody,
+});
+const directReservation = await request(`/public/events/${completedEvent.slug}/registration/account-reservations`, {
+  method: 'POST', expected: 201, token: directAccount.token,
+  headers: { 'idempotency-key': `ci-direct-${runId}` },
+  body: { ...reservationBody, benefitCode: undefined,
+    answers: { ...reservationBody.answers, identity_document: `DOC-DIRECT-${runId}`, email: directEmail },
+  },
+});
+const directLogin = await request('/auth/login', {
+  method: 'POST', expected: 201, body: { email: directEmail, password },
+});
+const directDashboard = await request('/participant/me', { token: directLogin.token });
+assert.equal(directDashboard.emailVerified, false);
+assert.equal(directDashboard.linked, true);
+assert.equal(directDashboard.events.length, 1);
+assert.equal(directDashboard.events[0].slug, completedEvent.slug);
+const directSession = await request(`/participant/events/${completedEvent.slug}/sessions`, {
+  method: 'POST', expected: 201, token: directLogin.token, body: {},
+});
+const directArea = await request(`/public/events/${completedEvent.slug}/participant/me`, { token: directSession.accessToken });
+assert.equal(directArea.registration.protocol, directReservation.protocol);
+const directReload = await request('/participant/me', { token: directLogin.token });
+assert.deepEqual(directReload.events, directDashboard.events);
+await request(`/participant/events/${completedEvent.slug}/sessions`, {
+  method: 'POST', expected: 404, token: participantAccount.token, body: {},
+});
+
+const directVerification = createHmac('sha256', process.env.JWT_SECRET ?? '')
+  .update(`email-verification:${directAccount.user.id}`).digest('hex');
+await request('/auth/email-verification/confirm', {
+  method: 'POST', expected: 201, body: { token: directVerification },
+});
+const verifiedDirectDashboard = await request('/participant/me', { token: directLogin.token });
+assert.equal(verifiedDirectDashboard.emailVerified, true);
+assert.deepEqual(verifiedDirectDashboard.events, directDashboard.events);
+await request(`/participant/events/${completedEvent.slug}/sessions`, {
+  method: 'POST', expected: 201, token: directLogin.token, body: {},
+});
+
 const verificationToken = createHmac('sha256', process.env.JWT_SECRET ?? '')
   .update(`email-verification:${participantAccount.user.id}`)
   .digest('hex');

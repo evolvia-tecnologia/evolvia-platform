@@ -14,15 +14,34 @@ function user(id, email) {
   return { id, email, name: id, emailVerifiedAt: now, emailHash: hash(email) };
 }
 
+function matchEvent(event, where) {
+  if (!where) return true;
+  if (where.AND && !where.AND.every((part) => matchEvent(event, part))) return false;
+  if (where.OR && !where.OR.some((part) => matchEvent(event, part))) return false;
+  if (where.slug !== undefined && event.slug !== where.slug) return false;
+  if (where.status !== undefined && event.status !== where.status) return false;
+  if (where.ownerId !== undefined && event.ownerId !== where.ownerId) return false;
+  if (where.endDate === null && event.endDate !== null) return false;
+  if (where.endDate?.gte && (event.endDate === null || event.endDate < where.endDate.gte)) return false;
+  return true;
+}
+
 function matchReservation(item, where) {
   if (!where) return true;
-  if (where.AND) return where.AND.every((part) => matchReservation(item, part));
-  if (where.OR) return where.OR.some((part) => matchReservation(item, part));
+  // The real Prisma engine combines top-level scalar fields with AND/OR.
+  // Returning early from a logical clause discarded emailHash and could make
+  // a forged request appear to own another participant's reservation.
+  if (where.AND && !where.AND.every((part) => matchReservation(item, part))) return false;
+  if (where.OR && !where.OR.some((part) => matchReservation(item, part))) return false;
+  if (where.id?.in && !where.id.in.includes(item.id)) return false;
+  if (typeof where.id === 'string' && item.id !== where.id) return false;
   if (where.identityHash?.in && !where.identityHash.in.includes(item.identityHash)) return false;
   if (typeof where.identityHash === 'string' && item.identityHash !== where.identityHash) return false;
   if (where.emailHash && item.emailHash !== where.emailHash) return false;
   if (where.status && item.status !== where.status) return false;
-  if (where.event?.slug && item.slug !== where.event.slug) return false;
+  if (where.waitlistEntry && item.waitlistEntry?.userId !== where.waitlistEntry.userId) return false;
+  if (where.event && !matchEvent(item.event, where.event)) return false;
+  if (where.expiresAt?.gt && (!item.expiresAt || item.expiresAt <= where.expiresAt.gt)) return false;
   return true;
 }
 
@@ -40,8 +59,8 @@ function createHarness() {
   const intruso = user('intruso-1', 'intruso@example.test');
   const solicitante = user('solicitante-1', 'solicitante@example.test');
   const quarto = user('quarto-1', 'quarto@example.test');
-  const titularEvent = { name: 'Congresso titular', slug: 'congresso-titular', startDate: now, endDate: null, profileCode: 'SCIENTIFIC_EVENT', venue: 'SP' };
-  const intrusoEvent = { name: 'Curso intruso', slug: 'curso-intruso', startDate: now, endDate: null, profileCode: 'CORPORATE_TRAINING', venue: 'RJ' };
+  const titularEvent = { status: 'PUBLISHED', name: 'Congresso titular', slug: 'congresso-titular', startDate: now, endDate: null, profileCode: 'SCIENTIFIC_EVENT', venue: 'SP' };
+  const intrusoEvent = { status: 'PUBLISHED', name: 'Curso intruso', slug: 'curso-intruso', startDate: now, endDate: null, profileCode: 'CORPORATE_TRAINING', venue: 'RJ' };
   const state = {
     users: [titular, intruso, solicitante, quarto],
     links: [
@@ -121,7 +140,18 @@ function createHarness() {
       findMany: async ({ where }) => state.reservations.filter((item) => matchReservation(item, where)),
       findFirst: async ({ where }) => state.reservations.find((item) => matchReservation(item, where)) ?? null,
     },
-    auditLog: { create: async () => ({ id: 'audit' }) },
+    auditLog: {
+      create: async () => ({ id: 'audit' }),
+      findMany: async ({ where, select }) => {
+        assert.equal(where.action, 'registration.reservation_created');
+        assert.equal(where.entityType, 'EventRegistrationReservation');
+        assert.deepEqual(where.metadata, { path: ['channel'], equals: 'participant_account' });
+        assert.deepEqual(select, { entityId: true });
+        // The recovery fixture has no account-created reservations. An identity
+        // match or consent grant must never manufacture an audit-backed owner.
+        return [];
+      },
+    },
     $transaction: async (fn) => fn(prisma),
   };
 
@@ -338,4 +368,25 @@ test('erro não concorrente não é repetido e confirmante sem e-mail verificado
   await assert.rejects(() => dashboard.confirmHistoryRecovery(titular.id, { recoveryId: recovery.id }, now), (error) => error.getStatus() === 404);
   assert.equal(recovery.consumedAt, null);
   assert.equal(state.upserts.length, 0);
+});
+
+test('organizador em homologação não herda inscrição de participante por ser dono do evento', async () => {
+  const { dashboard, state, intruso } = createHarness();
+  const oldBase = process.env.EVOLVIA_PUBLIC_BASE_URL;
+  try {
+    process.env.EVOLVIA_PUBLIC_BASE_URL = 'https://homologacao.evolviatecnologia.com';
+    state.links = state.links.filter((link) => link.userId !== intruso.id);
+    state.reservations = [{ ...state.reservations[0], emailHash: intruso.emailHash,
+      event: { ...state.reservations[0].event, ownerId: intruso.id } }];
+    const listing = await dashboard.get(intruso.id);
+    assert.deepEqual(listing.events, []);
+    await assert.rejects(() => dashboard.enterEvent(intruso.id, 'congresso-titular'), (error) => {
+      assert.equal(error.getStatus(), 404);
+      return true;
+    });
+    assert.equal(state.sessions.length, 0);
+  } finally {
+    if (oldBase === undefined) delete process.env.EVOLVIA_PUBLIC_BASE_URL;
+    else process.env.EVOLVIA_PUBLIC_BASE_URL = oldBase;
+  }
 });
