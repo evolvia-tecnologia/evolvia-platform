@@ -5,8 +5,8 @@ type Props = {
   label: string;
   value: string;
   onChange: (value: string) => void;
-  maxLength: number;
-  disabled: boolean;
+  maxLength?: number;
+  disabled?: boolean;
   placeholder?: string;
   rows?: number;
   help?: string;
@@ -30,7 +30,7 @@ export default function PublicationPlainTextField({
     {rows
       ? <textarea {...control} rows={rows} onChange={event => onChange(event.target.value)} />
       : <input {...control} type="text" onChange={event => onChange(event.target.value)} />}
-    <span id={id + '-count'} className={styles.fieldCounter}>{value.length} de {maxLength} caracteres</span>
+    <span id={id + '-count'} className={styles.fieldCounter}>{value.length}{maxLength !== undefined && ` de ${maxLength}`} caracteres</span>
     {error && <small id={id + '-error'} className={styles.fieldError}>{error}</small>}
   </div>;
 }
