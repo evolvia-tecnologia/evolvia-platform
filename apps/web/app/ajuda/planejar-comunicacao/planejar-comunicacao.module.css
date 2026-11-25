@@ -1,0 +1,616 @@
+.backLink,
+.nextLinks a,
+.resetButton {
+  min-height: var(--space-44);
+  min-width: var(--space-44);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.backLink,
+.nextLinks a {
+  color: var(--color-brand-blue-600);
+  text-underline-offset: 4px;
+}
+
+.backLink:hover,
+.nextLinks a:hover {
+  color: var(--color-brand-blue-700);
+  text-decoration: underline;
+}
+
+.backLink:focus-visible,
+.nextLinks a:focus-visible,
+.resetButton:focus-visible,
+.option input:focus-visible,
+.option:focus-within {
+  outline: 3px solid var(--color-focus-on-light);
+  outline-offset: 3px;
+}
+
+.main {
+  min-height: calc(100svh - var(--space-64));
+  padding: clamp(var(--space-28), 6vw, var(--space-72)) var(--space-20);
+  background: var(--color-canvas);
+}
+
+.article {
+  width: min(920px, 100%);
+  min-width: 0;
+  margin: 0 auto;
+  padding: clamp(var(--space-24), 5vw, var(--space-56));
+  border: 1px solid var(--color-on-dark-muted);
+  border-radius: var(--radius-xl);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-elevated);
+}
+
+.eyebrow {
+  margin: var(--space-20) 0 var(--space-8);
+  color: var(--color-brand-navy-800);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: var(--letter-spacing-kicker);
+}
+
+.article h1,
+.planner h2,
+.result h3,
+.group legend,
+.checkpointTitle,
+.actionSection h4,
+.risks h4 {
+  margin: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--color-text);
+}
+
+.article h1 {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-size: var(--font-size-display-md);
+  line-height: var(--line-height-tight);
+}
+
+.lead,
+.plannerLead,
+.fieldHint,
+.resultNote,
+.announcement,
+.optionHelp,
+.checkpointDetail,
+.next p {
+  max-width: 760px;
+  margin: var(--space-16) 0 0;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-lg);
+  line-height: var(--line-height-relaxed);
+  overflow-wrap: anywhere;
+}
+
+.notice {
+  margin: var(--space-28) 0;
+  padding: var(--space-16) var(--space-20);
+  display: grid;
+  gap: var(--space-4);
+  border: 1px solid var(--color-warning);
+  border-radius: var(--radius-field);
+  background: var(--color-danger-surface);
+  color: var(--color-warning);
+  line-height: var(--line-height-body);
+  overflow-wrap: anywhere;
+}
+
+.planner {
+  margin: var(--space-36) 0 0;
+  min-width: 0;
+}
+
+.planner h2 {
+  font-size: var(--font-size-2xl);
+  line-height: var(--line-height-heading);
+}
+
+.plannerLead,
+.fieldHint {
+  margin-top: var(--space-8);
+  font-size: var(--font-size-md);
+}
+
+.group {
+  margin: var(--space-20) 0 0;
+  padding: var(--space-20);
+  min-width: 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-field);
+  background: var(--color-surface-subtle);
+}
+
+.group legend {
+  padding: 0 var(--space-8);
+  color: var(--color-brand-navy-800);
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-bold);
+  line-height: var(--line-height-heading);
+}
+
+.option {
+  display: grid;
+  grid-template-columns: var(--space-44) minmax(0, 1fr);
+  gap: var(--space-12);
+  align-items: start;
+  margin: var(--space-16) 0 0;
+  min-width: 0;
+  padding: var(--space-12);
+  border: 1px dashed var(--color-border-strong);
+  border-radius: var(--radius-field);
+  background: var(--color-surface);
+}
+
+.option:has(input:checked) {
+  border: 2px solid var(--color-text);
+}
+
+.option input {
+  width: var(--space-44);
+  height: var(--space-44);
+  min-width: var(--space-44);
+  min-height: var(--space-44);
+  margin: 0;
+  accent-color: var(--color-brand-blue-600);
+}
+
+.option label {
+  min-height: var(--space-44);
+  min-width: 0;
+  display: grid;
+  gap: var(--space-4);
+  padding: var(--space-8) 0;
+  cursor: pointer;
+  overflow-wrap: anywhere;
+}
+
+.optionTitle {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-8);
+  color: var(--color-text);
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-ui);
+}
+
+.selectedMark {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--space-24);
+  padding: 0 var(--space-8);
+  border: 1px solid var(--color-text);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-soft);
+  color: var(--color-text);
+  font-size: var(--font-size-2xs);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: var(--letter-spacing-label);
+  line-height: var(--line-height-ui);
+}
+
+.optionHelp {
+  margin: 0;
+  font-size: var(--font-size-sm);
+}
+
+.result {
+  margin: var(--space-24) 0 0;
+  padding: var(--space-20);
+  display: grid;
+  gap: var(--space-12);
+  min-width: 0;
+  border-radius: var(--radius-field);
+  overflow-wrap: anywhere;
+}
+
+.resultStart {
+  border: 2px dashed var(--color-border-strong);
+  background: var(--color-surface-subtle);
+}
+
+.resultReady {
+  border: 4px double var(--color-text);
+  background: var(--color-surface);
+}
+
+.resultHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-12);
+}
+
+.result h3,
+.actionSection h4,
+.risks h4 {
+  font-size: var(--font-size-lg);
+  line-height: var(--line-height-heading);
+}
+
+.resetButton {
+  padding: var(--space-8) var(--space-16);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-bold);
+  line-height: var(--line-height-ui);
+}
+
+.resetButton:hover {
+  background: var(--color-surface-soft);
+}
+
+.announcement,
+.resultNote {
+  margin: var(--space-8) 0 0;
+  font-size: var(--font-size-md);
+  color: var(--color-text);
+}
+
+.summaryList {
+  margin: var(--space-12) 0 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-12);
+}
+
+.summaryList div {
+  min-width: 0;
+  padding: var(--space-16);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-field);
+  background: var(--color-surface-subtle);
+  overflow-wrap: anywhere;
+}
+
+.summaryList dt {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+}
+
+.summaryList dd {
+  margin: var(--space-4) 0 0;
+  color: var(--color-text);
+  font-weight: var(--font-weight-semibold);
+  overflow-wrap: anywhere;
+}
+
+.levelLegend {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-12);
+  margin: var(--space-16) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.levelItem {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-8);
+  min-width: 0;
+  min-height: var(--space-44);
+  padding: var(--space-8) var(--space-12);
+  border-radius: var(--radius-field);
+  color: var(--color-text);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  overflow-wrap: anywhere;
+}
+
+.actionSection,
+.risks {
+  margin: var(--space-16) 0 0;
+  min-width: 0;
+  padding: var(--space-16);
+  border-radius: var(--radius-field);
+  overflow-wrap: anywhere;
+}
+
+.checkpoints,
+.riskList {
+  display: grid;
+  gap: var(--space-12);
+  margin: var(--space-16) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.checkpoint,
+.risk {
+  min-width: 0;
+  padding: var(--space-16);
+  border-radius: var(--radius-field);
+  overflow-wrap: anywhere;
+}
+
+.checkpoint {
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+}
+
+.actionEssential {
+  border: 2px solid var(--color-text);
+  background: var(--color-surface-subtle);
+}
+
+.actionConfirm {
+  border: 2px dashed var(--color-border-strong);
+  background: var(--color-surface);
+}
+
+.actionHuman {
+  border: 4px double var(--color-text);
+  background: var(--color-surface-soft);
+}
+
+.risks {
+  border: 2px dashed var(--color-warning);
+  background: var(--color-warning-surface);
+}
+
+.risk {
+  border: 2px dashed var(--color-warning);
+  background: var(--color-surface);
+}
+
+.checkpointHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-8);
+  margin: 0;
+  color: var(--color-text);
+}
+
+.attentionIcon {
+  width: var(--space-44);
+  height: var(--space-44);
+  min-width: var(--space-44);
+  min-height: var(--space-44);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--color-border-strong);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-bold);
+}
+
+.actionEssential .attentionIcon {
+  border-style: solid;
+  border-width: 2px;
+}
+
+.actionConfirm .attentionIcon {
+  border-style: dashed;
+}
+
+.actionHuman .attentionIcon,
+.risk .attentionIcon {
+  border-style: double;
+  border-width: 4px;
+}
+
+.attentionLabel {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--space-24);
+  padding: 0 var(--space-8);
+  border: 1px solid var(--color-text);
+  border-radius: var(--radius-pill);
+  font-size: var(--font-size-2xs);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: var(--letter-spacing-label);
+  line-height: var(--line-height-ui);
+}
+
+.actionConfirm .attentionLabel {
+  border-style: dashed;
+}
+
+.actionHuman .attentionLabel,
+.risk .attentionLabel {
+  border-style: double;
+  border-width: 4px;
+}
+
+.checkpointTitle {
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-ui);
+}
+
+.checkpointDetail {
+  margin: var(--space-8) 0 0;
+  font-size: var(--font-size-md);
+  color: var(--color-text);
+}
+
+.next {
+  margin-top: var(--space-36);
+  padding-top: var(--space-24);
+  border-top: 1px solid var(--color-on-dark-muted);
+}
+
+.next h2 {
+  margin: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--color-text);
+  font-size: var(--font-size-2xl);
+  line-height: var(--line-height-heading);
+}
+
+.next p {
+  margin: var(--space-8) 0 var(--space-16);
+  font-size: var(--font-size-md);
+}
+
+.nextLinks {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
+  gap: var(--space-8) var(--space-16);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.nextLinks li {
+  min-width: 0;
+}
+
+@media (max-width: 768px) {
+  .summaryList,
+  .levelLegend,
+  .option,
+  .nextLinks {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .resultHead {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
+
+@media (max-width: 320px) {
+  .main {
+    padding-inline: var(--space-12);
+  }
+
+  .article {
+    padding: var(--space-20) var(--space-12);
+    border-radius: var(--radius-card);
+  }
+
+  .article h1 {
+    font-size: var(--font-size-2xl);
+    line-height: var(--line-height-heading);
+  }
+
+  .lead,
+  .plannerLead,
+  .fieldHint,
+  .resultNote,
+  .announcement,
+  .optionHelp,
+  .checkpointDetail,
+  .next p {
+    font-size: var(--font-size-md);
+  }
+
+  .notice,
+  .result,
+  .group,
+  .option,
+  .checkpoint,
+  .actionSection,
+  .risks,
+  .risk {
+    padding: var(--space-16) var(--space-12);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .main * {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
+
+@media (forced-colors: active) {
+  .article,
+  .notice,
+  .result,
+  .group,
+  .option,
+  .resetButton,
+  .attentionIcon,
+  .selectedMark,
+  .attentionLabel,
+  .summaryList div,
+  .option input,
+  .checkpoint,
+  .risks,
+  .risk {
+    border: 1px solid CanvasText;
+  }
+
+  .resultReady,
+  .actionHuman {
+    border: 4px double CanvasText;
+  }
+
+  .actionEssential,
+  .option:has(input:checked) {
+    border: 2px solid CanvasText;
+  }
+
+  .actionConfirm,
+  .risks,
+  .risk {
+    border: 2px dashed CanvasText;
+  }
+
+  .backLink,
+  .nextLinks a {
+    color: LinkText;
+  }
+
+  .resetButton,
+  .attentionIcon,
+  .selectedMark,
+  .attentionLabel,
+  .option,
+  .summaryList div,
+  .checkpoint,
+  .risk,
+  .risks {
+    background: Canvas;
+    color: CanvasText;
+  }
+}
+
+@media print {
+  .main {
+    min-height: 0;
+    padding: 0;
+    background: Canvas;
+  }
+
+  .article {
+    width: 100%;
+    box-shadow: none;
+    border-radius: 0;
+  }
+
+  .backLink,
+  .next,
+  .group,
+  .result,
+  .actionSection,
+  .checkpoint,
+  .risk {
+    break-inside: avoid;
+  }
+}
