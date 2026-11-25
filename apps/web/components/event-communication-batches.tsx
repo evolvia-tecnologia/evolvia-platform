@@ -6,13 +6,13 @@ import { communicationDraftId } from '../lib/event-communication-draft';
 import styles from './event-communication.module.css';
 
 type Batch = { id: string; draftId: string; draftRevision: number; recipientCount: number;
-  status: string; createdAt: string; acceptedCount?: number; receivedCount: number; unknownCount?: number };
+  status: string; createdAt: string; acceptedCount?: number; receivedCount: number; unknownCount?: number; failedCount?: number; cancelledCount?: number };
 type Listing = { batches: Batch[]; sendingAvailable: boolean };
 type Props = { eventId: string; draft: { id: string; revision: number; subject: string } | null;
   filters: { categoryIds: string[]; payment: string; filterMode: string } | null; history?: boolean };
 const statusLabels: Record<string, string> = {
   PREPARED: 'Preparado', SENDING: 'Em processamento', ACCEPTED: 'Aceito pelo transporte',
-  RECEIVED: 'Recebido', UNKNOWN: 'A conciliar', FAILED: 'Falhou', CANCELLED: 'Cancelado',
+  RECEIVED: 'Recebido', UNKNOWN: 'A conciliar', PARTIAL: 'Resultados distintos', FAILED: 'Falhou', CANCELLED: 'Cancelado',
 };
 
 export default function EventCommunicationBatches({ eventId, draft, filters, history = false }: Props) {
@@ -94,6 +94,8 @@ export default function EventCommunicationBatches({ eventId, draft, filters, his
       <strong>{statusLabels[batch.status] ?? 'A conferir'} · {batch.recipientCount} destinatários</strong>
       <span>{new Date(batch.createdAt).toLocaleString('pt-BR')} · Revisão {batch.draftRevision}</span>
       <span>Recebidos: {batch.receivedCount}{batch.acceptedCount !== undefined && ` · Aceitos pelo transporte: ${batch.acceptedCount}`}
+        {Boolean(batch.failedCount) && ` · Falhas: ${batch.failedCount}`}
+        {Boolean(batch.cancelledCount) && ` · Cancelados: ${batch.cancelledCount}`}
         {Boolean(batch.unknownCount) && ` · A conciliar: ${batch.unknownCount}`}</span>
       {batch.status === 'PREPARED' && <div className={styles.actions}>
         {listing.sendingAvailable && <button type="button" disabled={busy} onClick={() => void command('start', batch)}>Autorizar envio</button>}
