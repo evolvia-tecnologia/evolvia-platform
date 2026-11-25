@@ -51,7 +51,7 @@ function glyphAdvanceEm(char: string, fontFamily: LabelFontFamily, bold: boolean
 
 /** Largura efetiva de um trecho contínuo (mm), somando glifos + letter-spacing. */
 export function measureRunWidthMm(text: string, fontSizeMm: number, opts: MeasureOpts = {}): number {
-  if (!text || fontSizeMm <= 0) return 0;
+  if (typeof text !== 'string' || !text || fontSizeMm <= 0) return 0;
   const fontFamily = opts.fontFamily ?? 'sans';
   const bold = Boolean(opts.bold);
   const value = opts.uppercase ? text.toLocaleUpperCase('pt-BR') : text;
@@ -67,6 +67,7 @@ export function measureRunWidthMm(text: string, fontSizeMm: number, opts: Measur
  * overflow-wrap:anywhere parte por glifo.
  */
 export function wrapTextToWidth(text: string, maxWidthMm: number, fontSizeMm: number, opts: MeasureOpts = {}): string[] {
+  if (typeof text !== 'string') return [];
   const raw = text.replace(/\s+/gu, ' ').trim();
   if (!raw) return [];
   if (maxWidthMm <= 0 || fontSizeMm <= 0) return [raw];

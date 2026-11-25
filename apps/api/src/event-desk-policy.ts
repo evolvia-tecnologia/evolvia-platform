@@ -309,7 +309,7 @@ function labelValue(data: Record<string, unknown>, code: string): string {
   // The shared renderer scales text and warns about unreadable paper sizes.
   if (typeof value === 'string' && value.trim()) return value.trim();
   if (code === 'institution') {
-    const company = [data.company, data.company_name, data.organization]
+    const company = [data['company'], data['company_name'], data['organization']]
       .find((candidate): candidate is string => typeof candidate === 'string' && Boolean(candidate.trim()));
     if (company) return company.trim();
   }
