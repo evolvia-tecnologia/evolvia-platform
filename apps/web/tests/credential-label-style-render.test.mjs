@@ -197,3 +197,17 @@ test('QR de categoria ocupa coluna própria com a mesma largura medida na prévi
     assert.equal(sheet.props['data-barcode'], false);
   }
 });
+
+test('ordem relativa de QR e barras segue a categoria nos dois modos', () => {
+  for (const kinds of [['barcode', 'qr'], ['qr', 'barcode']]) {
+    const label = { ...base, widthMm: 90, heightMm: 40, barcode: 'EVB1.preview', qr: 'EVQ1.preview',
+      orderedContent: kinds.map(kind => ({ code: kind, kind, value: '' })) };
+    for (const preview of [true, false]) {
+      const row = nodes(CredentialLabel({ label, preview })).find(n => n.props?.className === 'codesRow');
+      assert.ok(row);
+      assert.equal(row.props['data-barcode-first'], kinds[0] === 'barcode');
+      assert.deepEqual(row.props.children.filter(Boolean).map(n => n.props.className),
+        kinds.map(k => k === 'barcode' ? 'barcode' : 'codes'));
+    }
+  }
+});

@@ -72,9 +72,13 @@ export default function CredentialLabel({ label, preview = false }: { label: Cre
     <div className={styles.barcode}><CredentialBarcode value={label.barcode} /></div>
   ) : null;
 
+  const primeiroCodigo = ordered?.find(item => item.kind === 'qr' || item.kind === 'barcode');
+  const barrasPrimeiro = bothCodes && primeiroCodigo?.kind === 'barcode';
   const bottomRow = bottomCodes ? (
-    <div className={styles.codesRow} data-codes={codesMode}>
-      {bothCodes ? <>{qrNode}{barcodeNode}</> : barcodeNode}
+    <div className={styles.codesRow} data-codes={codesMode} data-barcode-first={barrasPrimeiro}>
+      {bothCodes && !barrasPrimeiro && qrNode}
+      {barcodeNode}
+      {barrasPrimeiro && qrNode}
     </div>
   ) : null;
 
