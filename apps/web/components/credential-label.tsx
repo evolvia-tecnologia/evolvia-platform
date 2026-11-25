@@ -28,7 +28,7 @@ export default function CredentialLabel({ label, preview = false }: { label: Cre
     width: `${label.widthMm}mm`,
     height: `${label.heightMm}mm`,
     '--label-scale': scale,
-    '--label-qr-size': `${qrSize}mm`,
+    '--label-qr-size': `${sideQr && ordered ? orderedQrSize : qrSize}mm`,
     '--ordered-qr-size': `${orderedQrSize || qrSize}mm`,
     '--label-barcode-height': `${barcodeHeight}mm`,
     '--label-barcode-width': `${barcodeWidthMm}mm`,
@@ -98,9 +98,8 @@ export default function CredentialLabel({ label, preview = false }: { label: Cre
           ...lines.map((line, index) => <p key={`${index}-${line}`} className={styles.line}>{line}</p>),
           label.category && <p key="category" className={styles.category}>{label.category}</p>,
         ]}
-      {ordered && sideQr ? qrNode : null}
     </div>
-    {!ordered && sideQr ? qrNode : null}
+    {sideQr ? qrNode : null}
     {bottomRow}
   </section>;
 
