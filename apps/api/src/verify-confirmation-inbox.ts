@@ -23,7 +23,7 @@ export async function verifyConfirmationInbox(prisma: PrismaClient, reservationI
   const scope = { organizationId: org, eventId: row.eventId, entityId: reservationId, entityType: 'EventRegistrationReservation' };
   const accepted = await prisma.auditLog.findFirst({ where: { ...scope, action: 'registration.confirmation_email_accepted' }, select: { id: true } });
   if (!accepted) throw new Error('Aceite do transporte pendente.');
-  const properties = ['id','mailboxIds','from','to','subject','textBody','bodyValues'];
+  const properties = ['id','mailboxIds','keywords','from','to','subject','textBody','bodyValues'];
   const response = await transport(endpoint, { method: 'POST', redirect: 'error', cache: 'no-store', signal: AbortSignal.timeout(5000),
     headers: { Authorization: 'Bearer ' + env.EVOLVIA_TEST_MAIL_TOKEN, 'Content-Type': 'application/json' },
     body: JSON.stringify({ using: ['urn:ietf:params:jmap:core','urn:ietf:params:jmap:mail'],
@@ -35,6 +35,8 @@ export async function verifyConfirmationInbox(prisma: PrismaClient, reservationI
   const link = credentialUrl(publicBaseUrl, row.event.slug, row.protocol);
   if (result?.[0] !== 'Email/get' || result?.[2] !== 'verify' || data?.accountId !== accountId ||
       data.list?.length !== 1 || mail?.id !== messageId || mail.mailboxIds?.[mailboxId] !== true ||
+      !mail.keywords || typeof mail.keywords !== 'object' || Array.isArray(mail.keywords) ||
+      Object.keys(mail.keywords).some(key => key.toLowerCase() === '$draft') ||
       mail.from?.length !== 1 || mail.from[0].email !== sender || mail.to?.length !== 1 || mail.to[0].email !== recipient ||
       mail.subject !== 'Sua inscrição foi confirmada' || !link || !Array.isArray(mail.textBody) || !mail.textBody.some((part: { partId?: string } | null) => {
         if (typeof part?.partId !== 'string') return false;

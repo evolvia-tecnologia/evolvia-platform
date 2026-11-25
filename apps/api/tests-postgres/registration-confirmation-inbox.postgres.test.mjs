@@ -30,7 +30,7 @@ test('a leitura da caixa de teste é isolada, verifica a mensagem e persiste uma
     EVOLVIA_TEST_MAIL_JMAP_URL: 'https://inbox.example.invalid/api', EVOLVIA_EMAIL_FROM: from,
     EVOLVIA_EMAIL_DELIVERY_ENDPOINT: 'https://gateway.example.invalid/send', EVOLVIA_EMAIL_DELIVERY_TOKEN: 'fixture',
     EVOLVIA_PUBLIC_BASE_URL: 'https://evolvia.example.invalid' };
-  const mail = { id: 'message', mailboxIds: { inbox: true }, from: [{ email: from }], to: [{ email: to }],
+  const mail = { id: 'message', keywords: {}, mailboxIds: { inbox: true }, from: [{ email: from }], to: [{ email: to }],
     subject: 'Sua inscrição foi confirmada', textBody: [{ partId: '1' }], bodyValues: { '1': { value: [
       'Protocolo: ' + protocol, 'Acompanhe a inscrição: ' + credentialUrl(env.EVOLVIA_PUBLIC_BASE_URL, slug, protocol),
     ].join('\n') } } };
@@ -40,6 +40,7 @@ test('a leitura da caixa de teste é isolada, verifica a mensagem e persiste uma
     assert.equal(url.href, env.EVOLVIA_TEST_MAIL_JMAP_URL);
     assert.equal(init.redirect, 'error');
     assert.equal(JSON.parse(init.body).methodCalls[0][0], 'Email/get');
+    assert.ok(JSON.parse(init.body).methodCalls[0][1].properties.includes('keywords'));
     return Response.json({ methodResponses: [['Email/get', { accountId: 'test', list: [mail] }, 'verify']] });
   };
   const verify = (settings = env) => verifyConfirmationInbox(prisma, row.id, 'message', settings, transport);
@@ -54,6 +55,11 @@ test('a leitura da caixa de teste é isolada, verifica a mensagem e persiste uma
   mail.mailboxIds = { drafts: true };
   await assert.rejects(verify(), /não comprova/);
   mail.mailboxIds = { inbox: true };
+  for (const keywords of [{ $draft: true }, undefined, null, []]) {
+    mail.keywords = keywords;
+    await assert.rejects(verify(), /não comprova/);
+  }
+  mail.keywords = { $seen: true };
   mail.to = [{ email: from }];
   await assert.rejects(verify(), /não comprova/);
   mail.to = [{ email: to }];
