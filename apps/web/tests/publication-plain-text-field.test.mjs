@@ -20,6 +20,9 @@ globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 for (const [id, maxLength, rows] of [
   ['shortDescription', 280, 3], ['accessibilitySummary', 4000, 5],
   ['seoTitle', 120, undefined], ['seoDescription', 320, 3],
+  ['guest-invitation-subject', undefined, undefined], ['guest-invitation-body', undefined, 7],
+  ['guest-mini-bio', undefined, 3], ['guest-accessibility-notes', undefined, 3],
+  ['guest-technical-notes', undefined, 3], ['media-alt', 300, undefined],
 ]) {
   test('texto simples mantém o valor e as referências acessíveis de ' + id, async t => {
     const props = { id, label: 'Descrição', value: 'A & B', maxLength, rows,
@@ -39,7 +42,7 @@ for (const [id, maxLength, rows] of [
       assert.equal(tree.root.findAllByProps({ id: ref }).length, 1);
     }
     assert.equal(control.props['aria-invalid'], true);
-    const literal = 'A & B **texto** <b>literal</b>';
+    const literal = 'Olá {NOME}, participe de {EVENTO} como {FUNCAO}. A & B **texto** <b>literal</b>';
     control.props.onChange({ target: { value: literal } });
     assert.equal(saved, literal);
     props.disabled = true;
@@ -49,6 +52,6 @@ for (const [id, maxLength, rows] of [
     assert.equal(control.props.value, literal);
     assert.equal(control.props['aria-invalid'], false);
     assert.equal(tree.root.findAllByType('b').length, 0);
-    assert.equal(tree.root.findByProps({ id: id + '-count' }).children.join(''), literal.length + ' de ' + maxLength + ' caracteres');
+    assert.equal(tree.root.findByProps({ id: id + '-count' }).children.join(''), maxLength === undefined ? literal.length + ' caracteres' : literal.length + ' de ' + maxLength + ' caracteres');
   });
 }
