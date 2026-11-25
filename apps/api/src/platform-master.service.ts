@@ -1,9 +1,11 @@
-import { BadRequestException, Injectable, NotFoundException, ServiceUnavailableException, UnauthorizedException } from '@nestjs/common';
+import { HttpException, BadRequestException, Injectable, NotFoundException, ServiceUnavailableException, UnauthorizedException } from '@nestjs/common';
 import { createHash, randomBytes } from 'node:crypto';
 import { PrismaService } from './prisma.service.ts';
 import { PlatformMasterRepository } from './platform-master.repository.ts';
 import type { ClienteTransacional } from './platform-master.repository.ts';
-import { PlatformWebAuthnService } from './platform-webauthn.ts';
+import type { AbrirInscricaoMasterDto, ConsumirInscricaoMasterDto } from './platform-master.dto.ts';
+import { PrismaPasswordRecoveryRateLimiter, PasswordRecoveryRateLimitExceededError } from './auth/password-recovery-rate-limiter';
+import { configuracaoWebAuthn, PlatformWebAuthnService } from './platform-webauthn.ts';
 import { abrirCerimonia, consumirDesafio } from './platform-ceremony-policy.ts';
 import { contadorAceito, validadeDaSessao } from './platform-session-policy.ts';
 import { MudancaRevertida, executarAuditado } from './platform-audit-transaction.ts';
@@ -137,13 +139,21 @@ export class PlatformMasterService {
 
     const agora = Date.now();
     const token = randomBytes(TAMANHO_DO_TOKEN).toString('base64url');
-    const sessionId = await this.repositorio.criarSessao({
-      identityId: identidade.id,
-      tokenHash: hash(token),
-      secondFactorAt: new Date(agora).toISOString(),
-      expiresAt: validadeDaSessao(agora),
+    const sessionId = await this.prisma.$transaction(async tx => {
+      await tx.$queryRaw`SELECT id FROM "PlatformMasterIdentity" WHERE id = ${identidade.id} FOR UPDATE`;
+      const atual = await tx.platformMasterIdentity.findFirst({ where: { id: identidade.id, userId, status: 'ACTIVE' } });
+      if (!atual) throw new UnauthorizedException();
+      const alterada = await tx.platformWebAuthnCredential.updateMany({
+        where: { identityId: identidade.id, credentialId: credencial.id, counter: credencial.counter },
+        data: { counter: verificada.novoContador, lastUsedAt: new Date() },
+      });
+      if (alterada.count !== 1) throw new UnauthorizedException();
+      const sessao = await tx.platformMasterSession.create({ data: {
+        identityId: identidade.id, tokenHash: hash(token), secondFactorAt: new Date(agora),
+        stepUpAt: new Date(agora), expiresAt: new Date(validadeDaSessao(agora)),
+      } });
+      return sessao.id;
     });
-    await this.repositorio.avancarContador(credencial.id, credencial.counter, verificada.novoContador);
     return { token, sessionId, expiraEm: validadeDaSessao(agora) };
   }
 
@@ -153,6 +163,75 @@ export class PlatformMasterService {
   }
 
   // --------------------------------------------------------------- registro
+
+  private async janelaDeInscricao(userId: string, pedido: AbrirInscricaoMasterDto, origem: string, etapa: string) {
+    const config = configuracaoWebAuthn();
+    const ambiente = process.env.EVOLVIA_AMBIENTE;
+    const homologacao = ambiente === 'homologacao' && config.origin === 'https://homologacao.evolviatecnologia.com'
+      && config.rpID === 'homologacao.evolviatecnologia.com' && process.env.EVOLVIA_PUBLIC_BASE_URL === config.origin;
+    const ci = ambiente === 'ci' && process.env.EVOLVIA_CI_MODE === '1' && config.origin === 'http://localhost:3000'
+      && config.rpID === 'localhost' && process.env.EVOLVIA_PUBLIC_BASE_URL === 'http://127.0.0.1:3000';
+    if (!homologacao && !ci) throw new NotFoundException();
+    const identidade = await this.exigirIdentidade(userId);
+    if (identidade.status !== 'ACTIVE') throw new NotFoundException();
+    try {
+      await new PrismaPasswordRecoveryRateLimiter(this.prisma).assertAllowed({
+        identityKey: hash('master-enrollment-' + etapa + ':' + identidade.id),
+        originKey: hash('master-enrollment-' + etapa + ':' + origem),
+      });
+    } catch (e) {
+      if (e instanceof PasswordRecoveryRateLimitExceededError) throw new HttpException('Tente novamente mais tarde.', 429);
+      throw e;
+    }
+    const secretDigest = hash([pedido.segredo, pedido.finalidade, identidade.id].join(':'));
+    const janela = await this.prisma.platformMasterEnrollmentWindow.findFirst({
+      where: { identityId: identidade.id, secretDigest, purpose: pedido.finalidade, revokedAt: null, consumedAt: null,
+        expiresAt: { gt: new Date() } },
+      select: { id: true, identityId: true, correlationId: true, challengeHash: true },
+    });
+    if (!janela) throw new NotFoundException();
+    return janela;
+  }
+
+  async abrirInscricao(userId: string, email: string, pedido: AbrirInscricaoMasterDto, origem: string) {
+    const janela = await this.janelaDeInscricao(userId, pedido, origem, 'abrir');
+    const opcoes = await this.webauthn.opcoesDeRegistro(email, []);
+    const resultado = await this.prisma.platformMasterEnrollmentWindow.updateMany({
+      where: { id: janela.id, identity: { userId, status: 'ACTIVE' }, revokedAt: null, consumedAt: null,
+        expiresAt: { gt: new Date() } }, data: { challengeHash: hash(opcoes.challenge) },
+    });
+    if (!resultado.count) throw new NotFoundException();
+    return opcoes;
+  }
+
+  async consumirInscricao(userId: string, pedido: ConsumirInscricaoMasterDto, origem: string) {
+    const janela = await this.janelaDeInscricao(userId, pedido, origem, 'concluir');
+    const challengeHash = hash(pedido.desafio);
+    if (janela.challengeHash !== challengeHash) throw new UnauthorizedException();
+    const verificado = await this.webauthn.verificarRegistro(pedido.resposta, pedido.desafio);
+    if (!verificado) throw new UnauthorizedException();
+    await this.prisma.$transaction(async tx => {
+      // Mesma ordem de locks do emissor no host: identidade antes da janela.
+      const identidade = await tx.$queryRaw<{ id: string }[]>`SELECT id FROM "PlatformMasterIdentity"
+        WHERE id = ${janela.identityId} AND "userId" = ${userId} AND status = 'ACTIVE' FOR UPDATE`;
+      if (!identidade.length || await tx.platformWebAuthnCredential.count({ where: { identityId: janela.identityId } })) {
+        throw new UnauthorizedException();
+      }
+      const consumida = await tx.$executeRaw`UPDATE "PlatformMasterEnrollmentWindow"
+        SET "consumedAt" = clock_timestamp(), "challengeHash" = NULL
+        WHERE id = ${janela.id} AND "identityId" = ${janela.identityId} AND "challengeHash" = ${challengeHash}
+          AND "consumedAt" IS NULL AND "revokedAt" IS NULL AND "expiresAt" > clock_timestamp()`;
+      if (consumida !== 1) throw new UnauthorizedException();
+      await tx.platformWebAuthnCredential.create({ data: this.repositorio.dadosDaCredencial({
+        identityId: janela.identityId, rotulo: 'Chave de segurança', ...verificado,
+      }) });
+      await tx.platformAuditLog.create({ data: { actorUserId: userId, targetUserId: userId,
+        action: 'consumir_inscricao_master', scopeKind: 'GLOBAL', result: 'ALLOWED',
+        reason: 'Registro de autenticador autorizado no host.', correlationId: janela.correlationId,
+        changes: { finalidade: pedido.finalidade } } });
+    });
+    return { registrado: true };
+  }
 
   /** Abre a cerimônia de registro, vinculada à sessão Master em curso. */
   async desafioDeRegistro(userId: string, contexto: ContextoMaster, nomeDeUsuario: string) {
@@ -208,6 +287,14 @@ export class PlatformMasterService {
         changes: { credentialId: verificado.credentialId, backedUp: verificado.backedUp },
       },
       async (tx) => {
+        await tx.cliente.$queryRaw`SELECT id FROM "PlatformMasterIdentity" WHERE id = ${identidade.id} FOR UPDATE`;
+        const sessao = await tx.cliente.platformMasterSession.findFirst({ where: {
+          id: contexto.sessionId, identityId: identidade.id, tokenHash: contexto.tokenHash,
+          revokedAt: null, expiresAt: { gt: new Date() },
+        } });
+        if (!sessao || !await tx.cliente.platformMasterIdentity.count({ where: { id: identidade.id, status: 'ACTIVE' } })) {
+          throw new UnauthorizedException();
+        }
         await tx.cliente.platformWebAuthnCredential.create({
           // Pelo construtor do repositório, que passa pelo codec. Converter
           // aqui à mão criaria um segundo caminho para a mesma coluna, sem as
