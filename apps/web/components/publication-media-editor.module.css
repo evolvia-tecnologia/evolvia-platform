@@ -19,6 +19,9 @@
 
 .heading h2 {
   margin:var(--space-4) 0 var(--space-8);
+  font-size:var(--font-size-xl);
+  line-height:var(--line-height-compact);
+  font-weight:var(--font-weight-medium);
 }
 
 .heading span,
@@ -49,6 +52,12 @@
 .mediaCard h3,
 .mediaCard p {
   margin:0;
+}
+
+.mediaCard h3 {
+  font-size:var(--font-size-lg);
+  line-height:var(--line-height-compact);
+  font-weight:var(--font-weight-medium);
 }
 
 .mediaCard p {

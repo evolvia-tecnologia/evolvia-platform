@@ -67,8 +67,8 @@
 
 .ticketWhen {
   color: var(--color-text-strong);
-  font-size: var(--font-size-lg);
-  font-weight: var(--font-weight-bold);
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-semibold);
   line-height: var(--line-height-heading);
 }
 
@@ -118,7 +118,21 @@
 }
 
 .largeText {
-  font-size:var(--font-size-lg);
+  font-size:var(--font-size-md);
+}
+
+.largeText .hero h1 {
+  font-size:var(--font-size-display-md);
+}
+
+.largeText .lead {
+  font-size:var(--font-size-xl);
+}
+
+.largeText .section h2,
+.largeText .highlight h2,
+.largeText .contact h2 {
+  font-size:var(--font-size-2xl);
 }
 
 .highContrast {
@@ -188,8 +202,9 @@
 .hero h1 {
   max-width: 28ch;
   margin:0;
-  font-size:var(--font-size-display-lg);
-  line-height:var(--line-height-tight);
+  font-size:var(--font-size-display-sm);
+  line-height:var(--line-height-heading);
+  font-weight:var(--font-weight-semibold);
   overflow-wrap: anywhere;
 }
 
@@ -197,8 +212,8 @@
   max-width: 68ch;
   margin:var(--space-20) 0 0;
   color: var(--color-text-muted);
-  font-size:var(--font-size-title-responsive);
-  line-height:var(--line-height-relaxed);
+  font-size:var(--font-size-lg);
+  line-height:var(--line-height-body);
 }
 
 .facts {
@@ -250,7 +265,9 @@
 .highlight h2,
 .contact h2 {
   margin:0 0 var(--space-12);
-  font-size:var(--font-size-title-responsive);
+  font-size:var(--font-size-xl);
+  line-height:var(--line-height-compact);
+  font-weight:var(--font-weight-medium);
 }
 
 .prose {
@@ -484,7 +501,9 @@
 
 .evaIntro h2 {
   margin:var(--space-4) 0 var(--space-12);
-  font-size:var(--font-size-title-responsive);
+  font-size:var(--font-size-xl);
+  line-height:var(--line-height-compact);
+  font-weight:var(--font-weight-medium);
   text-wrap: balance;
 }
 

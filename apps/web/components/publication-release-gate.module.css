@@ -16,7 +16,15 @@
   gap:var(--space-16);
 }
 
-.heading h2, .checklist h3, .dialog h2 { margin:0; }
+.heading h2, .checklist h3, .dialog h2 {
+  margin:0;
+  font-size:var(--font-size-xl);
+  line-height:var(--line-height-compact);
+  font-weight:var(--font-weight-medium);
+}
+.checklist h3 {
+  font-size:var(--font-size-lg);
+}
 .heading p, .checklist p, .dialog p { margin:var(--space-8) 0 0; line-height:var(--line-height-body); }
 
 .eyebrow {

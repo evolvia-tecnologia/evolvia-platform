@@ -59,14 +59,16 @@
 
 .header h1 {
   margin:var(--space-4) 0 var(--space-8);
-  font-size:var(--font-size-display-md);
-  line-height:var(--line-height-tight);
+  font-size:var(--font-size-title-responsive);
+  line-height:var(--line-height-compact);
+  font-weight:var(--font-weight-semibold);
 }
 
 .header p {
   max-width: 760px;
   margin:0;
-  line-height:var(--line-height-relaxed);
+  font-size:var(--font-size-md);
+  line-height:var(--line-height-body);
 }
 
 .backLink {
@@ -108,7 +110,9 @@
 .headerStatus strong {
   display: block;
   margin:var(--space-4) 0;
-  font-size:var(--font-size-3xl);
+  font-size:var(--font-size-2xl);
+  line-height:var(--line-height-compact);
+  font-weight:var(--font-weight-semibold);
 }
 
 .notice,
@@ -153,6 +157,9 @@
 .card h2,
 .evaCard h2 {
   margin:var(--space-4) 0 0;
+  font-size:var(--font-size-xl);
+  line-height:var(--line-height-compact);
+  font-weight:var(--font-weight-medium);
 }
 
 .contextGrid {
@@ -530,7 +537,8 @@
   border-radius:var(--radius-sm);
   padding:var(--space-12) var(--space-16);
   font: inherit;
-  font-weight:var(--font-weight-bold);
+  font-size:var(--font-size-md);
+  font-weight:var(--font-weight-medium);
   cursor: pointer;
   text-decoration: none;
 }
@@ -629,12 +637,18 @@
 }
 
 /* Embedded screens use the common event frame, matching the Cursor layout. */
-:global([data-shell="panel"]) .page { min-height: 0; min-width: 0; max-width: none; width: 100%; margin: 0; padding: 0; background: transparent; font-family: var(--font-family-sans); font-weight: var(--font-weight-regular); line-height: var(--line-height-body); }
+:global([data-shell="panel"]) .page,
+:global([data-shell="panel"]) .embedded { min-height: 0; min-width: 0; max-width: none; width: 100%; margin: 0; padding: 0; background: transparent; font-family: var(--font-family-sans); font-weight: var(--font-weight-regular); line-height: var(--line-height-body); }
 :global([data-shell="panel"]) .workspace { width: 100%; max-width: none; min-width: 0; margin: 0; padding: 0; }
 :global([data-shell="panel"]) .topbar { display: none; }
 
-.page { font-family: var(--font-family-sans); font-weight: var(--font-weight-regular); line-height: var(--line-height-body); }
-.page h1 { font-size: var(--font-size-title-responsive); line-height: var(--line-height-compact); font-weight: var(--font-weight-semibold); overflow-wrap: anywhere; }
-.page h2 { font-size: var(--font-size-xl); line-height: var(--line-height-compact); font-weight: var(--font-weight-semibold); overflow-wrap: anywhere; }
-.page h3 { font-size: var(--font-size-lg); line-height: var(--line-height-compact); font-weight: var(--font-weight-medium); overflow-wrap: anywhere; }
-.page :is(input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=color]),select,textarea) { font-family: inherit; font-size: var(--font-size-md); font-weight: var(--font-weight-regular); min-width: 0; max-width: 100%; }
+.page,
+.embedded { font-family: var(--font-family-sans); font-weight: var(--font-weight-regular); line-height: var(--line-height-body); }
+.page h1,
+.embedded h1 { font-size: var(--font-size-title-responsive); line-height: var(--line-height-compact); font-weight: var(--font-weight-semibold); overflow-wrap: anywhere; }
+.page h2,
+.embedded h2 { font-size: var(--font-size-xl); line-height: var(--line-height-compact); font-weight: var(--font-weight-medium); overflow-wrap: anywhere; }
+.page h3,
+.embedded h3 { font-size: var(--font-size-lg); line-height: var(--line-height-compact); font-weight: var(--font-weight-medium); overflow-wrap: anywhere; }
+.page :is(input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=color]),select,textarea),
+.embedded :is(input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=color]),select,textarea) { font-family: inherit; font-size: var(--font-size-md); font-weight: var(--font-weight-regular); min-width: 0; max-width: 100%; }

@@ -227,6 +227,24 @@ test('tipografia transversal usa somente a escala canônica', () => {
   }
 });
 
+test('divulgação do evento usa a mesma escala do painel, sem título de vitrine', async () => {
+  const [editor, publicPage] = await Promise.all([
+    readFile(new URL('../components/publication-editor.module.css', import.meta.url), 'utf8'),
+    readFile(new URL('../app/evento/[slug]/page.module.css', import.meta.url), 'utf8'),
+  ]);
+  assert.match(editor, /\.header h1 \{[\s\S]*font-size:var\(--font-size-title-responsive\)/u);
+  assert.match(editor, /\.headerStatus strong \{[\s\S]*font-size:var\(--font-size-2xl\)/u);
+  assert.match(editor, /\.embedded h1 \{ font-size: var\(--font-size-title-responsive\)/u);
+  assert.doesNotMatch(editor, /--font-size-display-md|--font-size-display-lg|--font-size-3xl|--font-size-4xl/u);
+  assert.match(publicPage, /\.hero h1 \{[\s\S]*font-size:var\(--font-size-display-sm\)/u);
+  assert.match(publicPage, /\.lead \{[\s\S]*font-size:var\(--font-size-lg\)/u);
+  assert.match(publicPage, /\.section h2,[\s\S]*font-size:var\(--font-size-xl\)/u);
+  assert.match(publicPage, /\.largeText \.lead \{[\s\S]*font-size:var\(--font-size-xl\)/u);
+  assert.match(publicPage, /\.largeText \.section h2,[\s\S]*font-size:var\(--font-size-2xl\)/u);
+  assert.doesNotMatch(publicPage, /\.hero h1 \{[\s\S]*--font-size-display-lg/u);
+  assert.doesNotMatch(editor, /\.page,\s*\n\.embedded \{[^}]*color:/u);
+});
+
 test('CSS transversal usa somente cores da fonte canônica', () => {
   for (const [path, source] of transversalStyles) {
     assert.doesNotMatch(source, /#[0-9a-f]{3,8}\b/iu, path);
