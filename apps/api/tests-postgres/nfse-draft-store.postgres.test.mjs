@@ -166,7 +166,7 @@ test('cancelamento do checkout após a leitura impede persistir prévia e audito
 });
 
 test('preparação sandbox persiste um único vínculo por recibo sob concorrência', async t => {
-  const { db, token, outsider, org, receipt, url, setup, send } = await fiscalFixture(t);
+  const { db, token, outsider, org, owner, receipt, url, setup, send } = await fiscalFixture(t);
   const endpoint = url.replace(/nfse-draft$/, 'nfse-sandbox/preparation');
   const prepare = auth => fetch(endpoint, { method: 'PUT', headers: { authorization: 'Bearer ' + auth } });
   const config = { EVOLVIA_NFSE_SANDBOX_PROVIDER: 'enotas', EVOLVIA_NFSE_SANDBOX_ORGANIZATION_ID: org.id,
@@ -178,6 +178,8 @@ test('preparação sandbox persiste um único vínculo por recibo sob concorrên
   }
   assert.equal((await prepare(token)).status, 404);
   const draft = await (await send(token, setup)).json();
+  const read = auth => fetch(endpoint, { headers: { authorization: 'Bearer ' + auth } });
+  assert.equal((await read(token)).status, 404);
   assert.equal((await prepare(outsider.token)).status, 404);
   process.env.EVOLVIA_NFSE_SANDBOX_MUNICIPALITY = '0000000';
   assert.equal((await prepare(token)).status, 503);
@@ -196,6 +198,14 @@ test('preparação sandbox persiste um único vínculo por recibo sob concorrên
   }
   process.env.EVOLVIA_NFSE_SANDBOX_PROVIDER = 'notazz';
   assert.equal((await prepare(token)).status, 409);
+  const persisted = await read(token);
+  assert.equal(persisted.status, 200);
+  assert.deepEqual(await persisted.json(), records[0]);
+  assert.equal((await read(outsider.token)).status, 404);
+  await db.organizationMembership.updateMany({
+    where: { userId: owner.id, organizationId: org.id }, data: { role: 'ADMIN' },
+  });
+  assert.equal((await read(token)).status, 404);
   const logs = await db.auditLog.findMany({ where: { entityId: receipt.id, action: 'nfse.sandbox_prepared' } });
   assert.equal(logs.length, 1);
   assert.equal(logs[0].metadata, null);

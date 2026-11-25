@@ -8,6 +8,26 @@ type PreparationRow = FiscalSetup & {
   sandboxProvider: string | null; sandboxPreparedAt: Date | null;
 };
 
+type SavedPreparation = { provider: string; preparedAt: Date; idempotencyKey: string };
+
+function preparationView(saved: SavedPreparation) {
+  return { environment: 'SANDBOX', status: 'PREPARED', ...saved, issueAuthorized: false } as const;
+}
+
+export async function readFiscalSandboxPreparation(db: Pick<PrismaClient, '$queryRaw'>, userId: string, eventId: string, receiptId: string) {
+  const [saved] = await db.$queryRaw<SavedPreparation[]>`
+    SELECT d."sandboxProvider" AS provider, d."sandboxPreparedAt" AS "preparedAt", d."idempotencyKey"
+    FROM "FiscalReceiptDraft" d
+    JOIN "EventRegistrationPaymentReceipt" r ON r.id = d."receiptId" AND r."organizationId" = d."issuerId"
+    JOIN "Event" e ON e.id = r."eventId" AND e."organizationId" = r."organizationId"
+    JOIN "OrganizationMembership" m ON m."organizationId" = e."organizationId"
+    WHERE r.id = ${receiptId} AND e.id = ${eventId} AND m."userId" = ${userId}
+      AND m.status = 'ACTIVE' AND m.role = 'OWNER'
+      AND d."sandboxProvider" IS NOT NULL AND d."sandboxPreparedAt" IS NOT NULL`;
+  if (!saved) throw new NotFoundException('Preparação fiscal indisponível.');
+  return preparationView(saved);
+}
+
 // Persist the sandbox binding, never a municipal protocol or an issuance result.
 export function prepareFiscalSandbox(db: Pick<PrismaClient, '$transaction'>, userId: string, eventId: string, receiptId: string) {
   return db.$transaction(async tx => {
@@ -50,7 +70,6 @@ export function prepareFiscalSandbox(db: Pick<PrismaClient, '$transaction'>, use
       await tx.auditLog.create({ data: { organizationId: row.organizationId, eventId, actorUserId: userId,
         entityId: receiptId, entityType: 'FiscalReceiptDraft', action: 'nfse.sandbox_prepared' } });
     }
-    return { environment: 'SANDBOX', status: 'PREPARED', provider, preparedAt,
-      idempotencyKey: row.idempotencyKey, issueAuthorized: false };
+    return preparationView({ provider, preparedAt, idempotencyKey: row.idempotencyKey });
   });
 }
