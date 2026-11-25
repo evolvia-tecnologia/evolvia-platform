@@ -1,0 +1,751 @@
+diff --git a/apps/api/prisma/migrations/20261121120000_sandbox_refund_operation/migration.sql b/apps/api/prisma/migrations/20261121120000_sandbox_refund_operation/migration.sql
+new file mode 100644
+index 00000000..1b10d547
+--- /dev/null
++++ b/apps/api/prisma/migrations/20261121120000_sandbox_refund_operation/migration.sql
+@@ -0,0 +1,11 @@
++CREATE TABLE "SandboxRefundOperation" (
++  "requestId" TEXT PRIMARY KEY REFERENCES "RegistrationRefundRequest"("id") ON DELETE RESTRICT,
++  "organizationId" TEXT NOT NULL,
++  "eventId" TEXT NOT NULL,
++  "paymentId" TEXT NOT NULL,
++  "amountCents" INTEGER NOT NULL CHECK ("amountCents" > 0),
++  "attempts" INTEGER NOT NULL DEFAULT 1 CHECK ("attempts" = 1),
++  "status" TEXT NOT NULL DEFAULT 'PROCESSING' CHECK ("status" IN ('PROCESSING','FAILED','RECONCILED')),
++  "createdAt" TIMESTAMPTZ NOT NULL DEFAULT now(),
++  "reconciledAt" TIMESTAMPTZ
++);
+diff --git a/apps/api/prisma/migrations/20261121130000_sandbox_refund_reconciliation/migration.sql b/apps/api/prisma/migrations/20261121130000_sandbox_refund_reconciliation/migration.sql
+new file mode 100644
+index 00000000..ef6bb850
+--- /dev/null
++++ b/apps/api/prisma/migrations/20261121130000_sandbox_refund_reconciliation/migration.sql
+@@ -0,0 +1,4 @@
++-- Recovery can observe a provider operation without reserving a local POST.
++ALTER TABLE "SandboxRefundOperation"
++  DROP CONSTRAINT "SandboxRefundOperation_attempts_check",
++  ADD CONSTRAINT "SandboxRefundOperation_attempts_check" CHECK ("attempts" IN (0, 1));
+diff --git a/apps/api/prisma/migrations/20261122010000_sandbox_refund_recovery/migration.sql b/apps/api/prisma/migrations/20261122010000_sandbox_refund_recovery/migration.sql
+new file mode 100644
+index 00000000..0e55432a
+--- /dev/null
++++ b/apps/api/prisma/migrations/20261122010000_sandbox_refund_recovery/migration.sql
+@@ -0,0 +1,2 @@
++ALTER TABLE "SandboxRefundOperation" ADD COLUMN "nextCheckAt" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP;
++CREATE INDEX "SandboxRefundOperation_recovery_idx" ON "SandboxRefundOperation" ("organizationId", status, "nextCheckAt", "paymentId");
+diff --git a/apps/api/prisma/migrations/20261123200000_sandbox_refund_bounded_retry/migration.sql b/apps/api/prisma/migrations/20261123200000_sandbox_refund_bounded_retry/migration.sql
+new file mode 100644
+index 00000000..81ce5380
+--- /dev/null
++++ b/apps/api/prisma/migrations/20261123200000_sandbox_refund_bounded_retry/migration.sql
+@@ -0,0 +1,6 @@
++-- The first provider POST is durable. Only a definitive rejection can
++-- permit one more explicitly authorized attempt; timeout stays non-repeatable.
++-- Zero means a refund was discovered in Asaas without a local POST.
++ALTER TABLE "SandboxRefundOperation"
++  DROP CONSTRAINT "SandboxRefundOperation_attempts_check",
++  ADD CONSTRAINT "SandboxRefundOperation_attempts_check" CHECK ("attempts" IN (0, 1, 2));
+diff --git a/apps/api/prisma/schema.prisma b/apps/api/prisma/schema.prisma
+index 6d13e133..2369dc26 100644
+--- a/apps/api/prisma/schema.prisma
++++ b/apps/api/prisma/schema.prisma
+@@ -1030,6 +1030,7 @@ model MockRefundReceipt {
+ }
+ 
+ model RegistrationRefundRequest {
++  sandboxOperation SandboxRefundOperation?
+   mockReceipt             MockRefundReceipt?
+   sandboxPaymentId        String? @db.VarChar(200)
+   preparedAmountCents     Int?
+@@ -2569,3 +2570,19 @@ model EventCommunicationDraft {
+   @@unique([id, eventId, organizationId])
+   @@index([organizationId, eventId, updatedAt])
+ }
++
++model SandboxRefundOperation {
++  requestId      String                    @id
++  request        RegistrationRefundRequest @relation(fields: [requestId], references: [id], onDelete: Restrict, onUpdate: NoAction)
++  organizationId String
++  eventId        String
++  paymentId      String
++  amountCents    Int
++  attempts       Int                       @default(1)
++  status         String                    @default("PROCESSING")
++  createdAt      DateTime                  @default(now()) @db.Timestamptz(6)
++  reconciledAt   DateTime?                 @db.Timestamptz(6)
++  nextCheckAt    DateTime                  @default(now()) @db.Timestamptz(6)
++
++  @@index([organizationId, status, nextCheckAt, paymentId], map: "SandboxRefundOperation_recovery_idx")
++}
+diff --git a/apps/api/src/asaas-sandbox-refund.ts b/apps/api/src/asaas-sandbox-refund.ts
+new file mode 100644
+index 00000000..5dc0cf73
+--- /dev/null
++++ b/apps/api/src/asaas-sandbox-refund.ts
+@@ -0,0 +1,56 @@
++import { ConflictException, ServiceUnavailableException } from '@nestjs/common';
++
++export type SandboxRefund = {
++  requestId: string; paymentId: string; checkoutId: string; amountCents: number; checkoutCents: number;
++};
++
++function hasAmount(value: unknown, expectedCents: number): boolean {
++  if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) return false;
++  const cents = Math.round(value * 100);
++  return Number.isSafeInteger(cents) && cents === expectedCents && cents / 100 === value;
++}
++
++async function callAsaas(paymentId: string, token: string, body?: object) {
++  if (!/^pay_[a-zA-Z0-9_-]{1,196}$/.test(paymentId)) throw new ConflictException('Referência de cobrança inválida.');
++  const url = new URL('/v3/payments/' + paymentId + (body ? '/refund' : ''), 'https://api-sandbox.asaas.com');
++  return fetch(url, {
++    method: body ? 'POST' : 'GET', redirect: 'error', cache: 'no-store', signal: AbortSignal.timeout(5000),
++    headers: { access_token: token, 'User-Agent': 'Evolvia', 'Content-Type': 'application/json' },
++    body: body ? JSON.stringify(body) : undefined,
++  });
++}
++
++export async function readSandboxPayment(paymentId: string, token: string) {
++  try {
++    const response = await callAsaas(paymentId, token);
++    if (!response.ok) { await response.body?.cancel(); throw new Error(); }
++    return await response.json() as { id?: unknown; checkoutSession?: unknown; billingType?: unknown; value?: unknown;
++      split?: unknown; refunds?: unknown; status?: unknown } | null;
++  } catch { throw new ServiceUnavailableException('Consulta ao sandbox indisponível.'); }
++}
++
++export function inspectSandboxPayment(op: SandboxRefund, payment: Awaited<ReturnType<typeof readSandboxPayment>>) {
++  if (payment?.id !== op.paymentId || payment.checkoutSession !== op.checkoutId ||
++      payment.billingType !== 'PIX' || !hasAmount(payment.value, op.checkoutCents) ||
++      (payment.split != null && !(Array.isArray(payment.split) && payment.split.length === 0))) {
++    throw new ConflictException('A cobrança não corresponde a um Pix sem split deste checkout.');
++  }
++  const refunds: unknown = payment.refunds ?? [];
++  if (!Array.isArray(refunds)) throw new ConflictException('Histórico de estornos inválido.');
++  const matches = refunds.filter(item => item?.description === 'Evolvia/' + op.requestId);
++  if (matches.length > 1 || (matches.length && !hasAmount(matches[0].value, op.amountCents))) {
++    throw new ConflictException('Histórico ambíguo para este pedido.');
++  }
++  const state = matches[0]?.status;
++  return { eligible: payment.status === 'RECEIVED', matched: matches.length === 1,
++    status: state === 'DONE' ? 'RECONCILED' : state === 'CANCELLED' ? 'FAILED' : 'PROCESSING' };
++}
++
++// An ambiguous POST can have reached Asaas. Only the first durable claimant sends it.
++export async function submitSandboxRefund(op: SandboxRefund, token: string) {
++  try {
++    const response = await callAsaas(op.paymentId, token, { value: op.amountCents / 100, description: 'Evolvia/' + op.requestId });
++    await response.body?.cancel();
++    return response.status === 400 || response.status === 401 || response.status === 403 ? 'FAILED' : 'PROCESSING';
++  } catch { return 'PROCESSING'; }
++}
+diff --git a/apps/api/src/registration-refund.controller.ts b/apps/api/src/registration-refund.controller.ts
+index c05c6e06..11c190ef 100644
+--- a/apps/api/src/registration-refund.controller.ts
++++ b/apps/api/src/registration-refund.controller.ts
+@@ -1,12 +1,19 @@
+-import { Body, Controller, Get, Headers, Param, Post, Query, Req, UseGuards } from '@nestjs/common';
++import { Body, Controller, Get, Headers, HttpCode, Param, Post, Query, Req, UseGuards } from '@nestjs/common';
+ import { AuthGuard, AuthenticatedRequest } from './auth.guard';
+ import { RegistrationRefundService } from './registration-refund.service';
+ 
+-@Controller('public/events/:slug/refund-policy')
++@Controller('public')
+ export class RegistrationRefundPublicController {
+   constructor(private readonly refunds: RegistrationRefundService) {}
+ 
+-  @Get()
++  @Post('integrations/asaas/sandbox/refunds/webhook')
++  @HttpCode(200)
++  async sandboxWebhook(@Headers('asaas-access-token') token: string | undefined, @Body() body: unknown) {
++    await this.refunds.reconcileSandboxWebhook(token, body);
++    return { received: true };
++  }
++
++  @Get('events/:slug/refund-policy')
+   policy(@Param('slug') slug: string) {
+     return this.refunds.publicPolicy(slug);
+   }
+@@ -85,6 +92,11 @@ export class RegistrationRefundOrganizerController {
+     return this.refunds.resolveSandboxPayment(request.user!.id, eventId, requestId);
+   }
+ 
++  @Post('requests/:requestId/sandbox-processing')
++  processSandbox(@Req() request: AuthenticatedRequest, @Param('eventId') eventId: string, @Param('requestId') requestId: string) {
++    return this.refunds.processSandboxRefund(request.user!.id, eventId, requestId);
++  }
++
+   @Post('requests/:requestId/mock-refund')
+   simulate(@Req() request: AuthenticatedRequest, @Param('eventId') eventId: string, @Param('requestId') requestId: string) {
+     return this.refunds.mockRefund(request.user!.id, eventId, requestId, 'ISSUE');
+diff --git a/apps/api/src/registration-refund.service.ts b/apps/api/src/registration-refund.service.ts
+index 19edb2e6..8b69d79c 100644
+--- a/apps/api/src/registration-refund.service.ts
++++ b/apps/api/src/registration-refund.service.ts
+@@ -1,5 +1,7 @@
++import { createHash, timingSafeEqual } from 'node:crypto';
++import { inspectSandboxPayment, readSandboxPayment, submitSandboxRefund } from './asaas-sandbox-refund';
+ import { lookupSandboxRefundPayment } from './asaas-refund-payment-lookup';
+-import { BadRequestException, ConflictException, Injectable, NotFoundException, UnauthorizedException, ServiceUnavailableException } from '@nestjs/common';
++import { BadRequestException, ConflictException, Injectable, Logger, NotFoundException, UnauthorizedException, ServiceUnavailableException } from '@nestjs/common';
+ import { EventStatus, MembershipRole, Prisma, RegistrationCheckoutStatus, RegistrationRefundRequestStatus, RegistrationReservationStatus } from '@prisma/client';
+ import { AuthorizationService } from './authorization.service';
+ import { participantHash, normalizeParticipantToken } from './participant-area-policy';
+@@ -39,6 +41,48 @@ function policyError(error: unknown): never {
+ export class RegistrationRefundService {
+   constructor(private readonly prisma: PrismaService, private readonly authorization: AuthorizationService) {}
+ 
++  private recoveryTimer?: NodeJS.Timeout;
++  private readonly logger = new Logger(RegistrationRefundService.name);
++
++  onModuleInit() {
++    if (!this.sandboxRecoveryAccount()) return;
++    this.recoveryTimer = setInterval(() => {
++      void this.recoverSandboxRefund().catch(() => this.logger.warn('Falha na consulta de conciliação Pix sandbox.'));
++    }, 30_000);
++    this.recoveryTimer.unref();
++  }
++
++  onModuleDestroy() {
++    clearInterval(this.recoveryTimer);
++  }
++
++  private sandboxRecoveryAccount() {
++    const org = process.env.ASAAS_REFUND_SANDBOX_ORGANIZATION_ID;
++    const token = process.env.ASAAS_REFUND_SANDBOX_TOKEN?.trim();
++    return org && token && org === process.env.ASAAS_REFUND_SANDBOX_EXECUTION_ORGANIZATION_ID ? { org, token } : null;
++  }
++
++  async recoverSandboxRefund() {
++    const account = this.sandboxRecoveryAccount();
++    if (!account) return;
++    const { org, token } = account;
++    // Reserve the next read across instances, committing before contacting Asaas.
++    const paymentId = await this.prisma.$transaction(async tx => {
++      const [lock] = await tx.$queryRaw<{ acquired: boolean }[]>`
++        SELECT pg_try_advisory_xact_lock(hashtextextended(${'sandbox-refund-recovery/' + org}, 0)) AS acquired`;
++      if (!lock.acquired) return;
++      const [due] = await tx.$queryRaw<{ paymentId: string }[]>`
++        SELECT "paymentId" FROM "SandboxRefundOperation"
++        WHERE "organizationId" = ${org} AND status = 'PROCESSING' AND "nextCheckAt" <= now()
++        ORDER BY "nextCheckAt", "paymentId" LIMIT 1`;
++      if (!due) return;
++      await tx.$executeRaw`UPDATE "SandboxRefundOperation" SET "nextCheckAt" = now() + interval '5 minutes'
++        WHERE "organizationId" = ${org} AND "paymentId" = ${due.paymentId} AND status = 'PROCESSING'`;
++      return due.paymentId;
++    });
++    if (paymentId) await this.reconcileSandboxPayment(org, paymentId, token);
++  }
++
+   async publicPolicy(slugValue: string, now = new Date()) {
+     const event = await this.publishedEvent(slugValue);
+     return this.livePolicy(event, now);
+@@ -530,8 +574,132 @@ export class RegistrationRefundService {
+     });
+   }
+ 
+-  // Both commands operate exclusively on a local simulated receipt. The payment and
+-  // registration remain unchanged; an organization must explicitly opt into simulation.
++  async processSandboxRefund(userId: string, eventId: string, requestId: string) {
++    const fields = { providerCheckoutId: true, provider: true, amountCents: true, status: true, paidAt: true } as const;
++    const where = { id: requestId, eventId, reservation: { event: { organization: {
++      memberships: { some: { userId, role: MembershipRole.OWNER, status: 'ACTIVE' as const } },
++    } } } };
++    const select = { organizationId: true, status: true, preparedAmountCents: true, sandboxPaymentId: true,
++      preparedCheckout: { select: fields }, preparedOrderCheckout: { select: fields } } as const;
++    const initial = await this.prisma.registrationRefundRequest.findFirst({
++      where, select: { ...select, sandboxOperation: { select: { status: true, attempts: true } } },
++    });
++    if (!initial) throw new NotFoundException('Pedido não encontrado.');
++    const { sandboxOperation, ...request } = initial;
++    // A duplicate already in flight before rejection is not an explicit retry.
++    const retryRequested = sandboxOperation?.status === 'FAILED' && sandboxOperation.attempts === 1;
++    const { organizationId } = request;
++    const token = process.env.ASAAS_REFUND_SANDBOX_TOKEN?.trim();
++    if (!token || process.env.ASAAS_REFUND_SANDBOX_ORGANIZATION_ID !== organizationId ||
++        process.env.ASAAS_REFUND_SANDBOX_EXECUTION_ORGANIZATION_ID !== organizationId) {
++      throw new ServiceUnavailableException('Processamento de homologação desabilitado.');
++    }
++    const checkout = request.preparedCheckout ?? request.preparedOrderCheckout;
++    if (request.status !== 'APPROVED' || !request.sandboxPaymentId || !request.preparedAmountCents ||
++        !checkout?.providerCheckoutId || !checkout.paidAt || checkout.provider !== 'ASAAS' || checkout.status !== 'PAID' ||
++        (request.preparedCheckout && request.preparedOrderCheckout)) {
++      throw new ConflictException('A execução exige uma cobrança paga e um pedido aprovado e preparado.');
++    }
++    const op = { requestId, paymentId: request.sandboxPaymentId, checkoutId: checkout.providerCheckoutId,
++      amountCents: request.preparedAmountCents, checkoutCents: checkout.amountCents };
++    const observed = inspectSandboxPayment(op, await readSandboxPayment(op.paymentId, token));
++    const claim = await this.prisma.$transaction(async tx => {
++      const owner = await tx.$queryRaw<{ id: string }[]>`
++        SELECT id FROM "OrganizationMembership" WHERE "userId" = ${userId} AND "organizationId" = ${organizationId}
++        AND role = 'OWNER' AND status = 'ACTIVE' FOR SHARE`;
++      if (!owner.length) throw new NotFoundException('Pedido não encontrado.');
++      // Lock the refund request, not just the operation insert: concurrent owners
++      // must serialize while claims and prepared payment references are rechecked.
++      // Never turn a conflicted claim into another provider POST after a timeout.
++      const locked = await tx.$queryRaw<Array<{ id: string }>>`SELECT id FROM "RegistrationRefundRequest"
++        WHERE id = ${requestId} AND "eventId" = ${eventId} AND "organizationId" = ${organizationId} FOR UPDATE`;
++      if (!locked.length) throw new NotFoundException('Pedido não encontrado.');
++      const current = await tx.registrationRefundRequest.findFirst({ where, select });
++      if (!current || JSON.stringify(current) !== JSON.stringify(request)) throw new ConflictException('O pedido mudou.');
++      // A first, definitively rejected HTTP 400/401/403 can be retried ONCE
++      // by an authorized OWNER who explicitly calls the processing endpoint.
++      // Ambiguous transport errors remain PROCESSING: never retry a possible
++      // successful provider POST merely because a later GET sees no refund.
++      // Match the immutable tenant/payment/amount and cap total provider POSTs at 2.
++      const inserted = await tx.$executeRaw`
++        INSERT INTO "SandboxRefundOperation" ("requestId","organizationId","eventId","paymentId","amountCents","attempts")
++        VALUES (${requestId},${organizationId},${eventId},${op.paymentId},${op.amountCents},${observed.matched ? 0 : 1})
++        ON CONFLICT ("requestId") DO UPDATE SET
++          status = 'PROCESSING',
++          attempts = "SandboxRefundOperation".attempts + 1,
++          "nextCheckAt" = now()
++        WHERE "SandboxRefundOperation".status = 'FAILED'
++          AND "SandboxRefundOperation".attempts = 1
++          AND "SandboxRefundOperation"."organizationId" = ${organizationId}
++          AND "SandboxRefundOperation"."eventId" = ${eventId}
++          AND "SandboxRefundOperation"."paymentId" = ${op.paymentId}
++          AND "SandboxRefundOperation"."amountCents" = ${op.amountCents}
++          AND ${retryRequested && !observed.matched && observed.eligible}`;
++      if (inserted && !observed.matched && !observed.eligible) throw new ConflictException('Cobrança indisponível para nova operação.');
++      return inserted === 1 && !observed.matched;
++    });
++    const status = claim ? await submitSandboxRefund(op, token) : observed.status;
++    const saved = await this.saveSandboxStatus(organizationId, eventId, requestId, op.paymentId, op.amountCents, status);
++    return { requestId, environment: 'SANDBOX', processingStatus: saved.status, amountCents: op.amountCents,
++      sandboxRefundConfirmed: saved.status === 'RECONCILED', moneyReturned: false };
++  }
++
++  private async saveSandboxStatus(organizationId: string, eventId: string, requestId: string,
++    paymentId: string, amountCents: number, status: string) {
++    const [saved] = await this.prisma.$queryRaw<{ status: string }[]>`
++      UPDATE "SandboxRefundOperation" SET
++        status = CASE WHEN status = 'RECONCILED' OR ${status} = 'RECONCILED' THEN 'RECONCILED'
++                      WHEN status = 'FAILED' THEN status ELSE ${status} END,
++        "reconciledAt" = CASE WHEN ${status} = 'RECONCILED' THEN COALESCE("reconciledAt", now()) ELSE "reconciledAt" END
++      WHERE "requestId" = ${requestId} AND "organizationId" = ${organizationId} AND "eventId" = ${eventId}
++        AND "amountCents" = ${amountCents} AND "paymentId" = ${paymentId} RETURNING status`;
++    if (!saved) throw new ConflictException('Operação divergente do pedido preparado.');
++    return saved;
++  }
++
++  async reconcileSandboxWebhook(header: string | undefined, input: unknown) {
++    const secret = process.env.ASAAS_REFUND_SANDBOX_WEBHOOK_TOKEN;
++    const org = process.env.ASAAS_REFUND_SANDBOX_ORGANIZATION_ID;
++    const token = process.env.ASAAS_REFUND_SANDBOX_TOKEN;
++    if (!secret?.trim() || !org || !token?.trim() || org !== process.env.ASAAS_REFUND_SANDBOX_EXECUTION_ORGANIZATION_ID) {
++      throw new ServiceUnavailableException('Conciliação sandbox desabilitada.');
++    }
++    const digest = (value: string) => createHash('sha256').update(value).digest();
++    if (typeof header !== 'string' || !timingSafeEqual(digest(header), digest(secret))) throw new UnauthorizedException();
++    const payload = input as { event?: unknown; payment?: { id?: unknown } } | null;
++    if (typeof payload?.event !== 'string') throw new BadRequestException('Evento inválido.');
++    if (!['PAYMENT_REFUNDED', 'PAYMENT_PARTIALLY_REFUNDED', 'PAYMENT_REFUND_IN_PROGRESS', 'PAYMENT_REFUND_DENIED'].includes(payload.event)) return;
++    const paymentId = payload.payment?.id;
++    if (typeof paymentId !== 'string' || !/^pay_[a-zA-Z0-9_-]{1,196}$/.test(paymentId)) {
++      throw new BadRequestException('Referência de cobrança inválida.');
++    }
++    await this.reconcileSandboxPayment(org, paymentId, token);
++  }
++
++  private async reconcileSandboxPayment(org: string, paymentId: string, token: string) {
++    const rows = await this.prisma.$queryRaw<Array<{ requestId: string; eventId: string; amountCents: number;
++      checkoutId: string; checkoutCents: number }>>`
++      SELECT op."requestId", op."eventId", op."amountCents",
++        COALESCE(c."providerCheckoutId", g."providerCheckoutId") AS "checkoutId",
++        COALESCE(c."amountCents", g."amountCents") AS "checkoutCents"
++      FROM "SandboxRefundOperation" op JOIN "RegistrationRefundRequest" r ON r.id = op."requestId"
++        AND r."organizationId" = op."organizationId" AND r."eventId" = op."eventId"
++        AND r."sandboxPaymentId" = op."paymentId" AND r."preparedAmountCents" = op."amountCents"
++      LEFT JOIN "EventRegistrationCheckout" c ON c.id = r."preparedCheckoutId"
++        AND c."organizationId" = op."organizationId" AND c."eventId" = op."eventId"
++      LEFT JOIN "EventRegistrationOrderCheckout" g ON g.id = r."preparedOrderCheckoutId"
++        AND g."organizationId" = op."organizationId" AND g."eventId" = op."eventId"
++      WHERE op."organizationId" = ${org} AND op."paymentId" = ${paymentId} AND op.status <> 'RECONCILED'
++        AND ((c.id IS NULL) <> (g.id IS NULL))`;
++    if (!rows.length) return;
++    const payment = await readSandboxPayment(paymentId, token);
++    for (const row of rows) {
++      const observed = inspectSandboxPayment({ ...row, paymentId }, payment);
++      if (observed.matched) await this.saveSandboxStatus(org, row.eventId, row.requestId, paymentId, row.amountCents, observed.status);
++    }
++  }
++
++  // Simulation requires an explicit opt-in and writes only a local receipt.
+   async mockRefund(userId: string, eventId: string, requestId: string, command: 'ISSUE' | 'RECONCILE', now = new Date()) {
+     const org = simulationOrganization();
+     if (!org) throw new NotFoundException('Simulação indisponível.');
+diff --git a/apps/api/tests-postgres/registration-order-atomic.postgres.test.mjs b/apps/api/tests-postgres/registration-order-atomic.postgres.test.mjs
+index 94d0c944..762bddc1 100644
+--- a/apps/api/tests-postgres/registration-order-atomic.postgres.test.mjs
++++ b/apps/api/tests-postgres/registration-order-atomic.postgres.test.mjs
+@@ -84,7 +84,11 @@ test('G2.10 PostgreSQL Serializable: two concurrent 2-entry orders never oversel
+     const success = outcomes.filter((item) => item.status === 'fulfilled');
+     assert.equal(success.length, 1, 'exactly one atomic order wins');
+     const failed = outcomes.find((item) => item.status === 'rejected');
+-    assert.equal(failed.reason.getStatus?.(), 409);
++    // A raw Prisma/transaction exception was previously reported only as
++    // "undefined !== 409"; identify the error class/code without PII.
++    const cause = failed.reason;
++    const diagnosis = [cause?.constructor?.name ?? 'unknown', typeof cause?.code === 'string' ? cause.code : 'no-code'].join('/');
++    assert.equal(cause?.getStatus?.(), 409, 'unexpected concurrent loser exception: ' + diagnosis);
+     const rows = await prisma.eventRegistrationReservation.findMany({
+       where: { eventId: ctx.event.id, organizationId: ctx.organization.id },
+     });
+diff --git a/apps/api/tests-postgres/registration-refund.postgres.test.mjs b/apps/api/tests-postgres/registration-refund.postgres.test.mjs
+index 98ac699c..6c475a91 100644
+--- a/apps/api/tests-postgres/registration-refund.postgres.test.mjs
++++ b/apps/api/tests-postgres/registration-refund.postgres.test.mjs
+@@ -663,3 +663,352 @@ test('cancelar uma inscrição paga preserva a preparação do reembolso aprovad
+   const saved = await prisma.eventRegistrationReservation.findUniqueOrThrow({ where: { id: row.id } });
+   assert.equal(saved.status, 'CANCELLED');
+ });
++
++async function verifyRefundRecovery(t, amountCents, refundEvent) {
++  const event = await insertEvent(organizationId);
++  const { lot, category } = await catalog(event);
++  const row = await reservation(event, lot, category, { status: 'CONFIRMED', priceCents: 1200, identityHash: digest(), emailHash: digest() });
++  const checkoutRow = await checkout(row, 'PAID');
++  const checkoutId = 'checkout_' + digest();
++  const paymentId = 'pay_' + digest();
++  await prisma.eventRegistrationCheckout.update({ where: { id: checkoutRow.id }, data: { providerCheckoutId: checkoutId } });
++  const req = await prisma.registrationRefundRequest.create({ data: {
++    organizationId, eventId: event.id, reservationId: row.id, reason, status: 'APPROVED',
++  } });
++  await refunds.prepare(people.owner.id, event.id, req.id, { amountCents });
++  await prisma.registrationRefundRequest.update({ where: { id: req.id }, data: { sandboxPaymentId: paymentId } });
++  const config = { ASAAS_REFUND_SANDBOX_ORGANIZATION_ID: organizationId,
++    ASAAS_REFUND_SANDBOX_EXECUTION_ORGANIZATION_ID: organizationId, ASAAS_REFUND_SANDBOX_WEBHOOK_TOKEN: 'webhook-fixture', ASAAS_REFUND_SANDBOX_TOKEN: 'fixture' };
++  for (const [key, value] of Object.entries(config)) {
++    const prior = process.env[key];
++    process.env[key] = value;
++    t.after(() => { if (prior === undefined) delete process.env[key]; else process.env[key] = prior; });
++  }
++  let posts = 0;
++  let history = [];
++  t.mock.method(globalThis, 'fetch', async (url, init) => {
++    assert.equal(url.origin, 'https://api-sandbox.asaas.com');
++    if (init.method === 'GET') {
++      assert.equal(url.pathname, '/v3/payments/' + paymentId);
++      return Response.json({ id: paymentId, checkoutSession: checkoutId, billingType: 'PIX', value: 12,
++        status: 'RECEIVED', refunds: history });
++    }
++    assert.equal(url.pathname, '/v3/payments/' + paymentId + '/refund');
++    posts++;
++    const body = JSON.parse(init.body);
++    assert.deepEqual(body, { value: amountCents / 100, description: 'Evolvia/' + req.id });
++    history = [{ ...body, status: 'PENDING' }];
++    throw new Error('timeout após recebimento');
++  });
++  const run = service => service.processSandboxRefund(people.owner.id, event.id, req.id);
++  await rejects(refunds.processSandboxRefund(people.outsider.id, event.id, req.id), 404);
++  const results = await Promise.all([run(refunds), run(refunds)]);
++  assert.ok(results.every(result => result.processingStatus === 'PROCESSING'));
++  assert.equal(posts, 1);
++  const restarted = new RegistrationRefundService(prisma, new AuthorizationService(prisma));
++  const notification = { event: refundEvent, payment: { id: paymentId, status: 'REFUNDED' } };
++  const notify = (header = 'webhook-fixture') => restarted.reconcileSandboxWebhook(header, notification);
++  const { NestFactory } = await import('@nestjs/core');
++  const { Module } = await import('@nestjs/common');
++  const { RegistrationRefundPublicController } = await import('../dist/registration-refund.controller.js');
++  const { request: httpRequest } = await import('node:http');
++  class WebhookTestModule {}
++  Module({ controllers: [RegistrationRefundPublicController], providers: [
++    { provide: RegistrationRefundService, useValue: restarted },
++  ] })(WebhookTestModule);
++  const app = await NestFactory.create(WebhookTestModule, { logger: false });
++  await app.listen(0, '127.0.0.1');
++  t.after(() => app.close());
++  const webhookUrl = new URL('/public/integrations/asaas/sandbox/refunds/webhook', await app.getUrl());
++  const postWebhook = header => new Promise((resolve, reject) => {
++    const call = httpRequest(webhookUrl, { method: 'POST', headers: {
++      'content-type': 'application/json', 'asaas-access-token': header,
++    } }, response => {
++      response.resume();
++      response.on('end', () => resolve(response.statusCode));
++    });
++    call.on('error', reject);
++    call.end(JSON.stringify(notification));
++  });
++  assert.equal(await postWebhook('invalid'), 401);
++  await notify();
++  const localStatus = async () => (await prisma.$queryRaw`SELECT status FROM "SandboxRefundOperation" WHERE "requestId" = ${req.id}`)[0].status;
++  assert.equal(await localStatus(), 'PROCESSING');
++  history[0].status = 'DONE';
++  process.env.ASAAS_REFUND_SANDBOX_ORGANIZATION_ID = 'org-other';
++  process.env.ASAAS_REFUND_SANDBOX_EXECUTION_ORGANIZATION_ID = 'org-other';
++  await notify();
++  assert.equal(await localStatus(), 'PROCESSING');
++  process.env.ASAAS_REFUND_SANDBOX_ORGANIZATION_ID = organizationId;
++  process.env.ASAAS_REFUND_SANDBOX_EXECUTION_ORGANIZATION_ID = organizationId;
++  assert.deepEqual(await Promise.all([postWebhook('webhook-fixture'), postWebhook('webhook-fixture')]), [200, 200]);
++  assert.equal(await localStatus(), 'RECONCILED');
++  notification.event = 'PAYMENT_REFUND_IN_PROGRESS';
++  history[0].status = 'PENDING';
++  assert.equal(await postWebhook('webhook-fixture'), 200);
++  assert.equal(await localStatus(), 'RECONCILED');
++  for (let i = 0; i < 2; i++) {
++    const result = await run(restarted);
++    assert.equal(result.processingStatus, 'RECONCILED');
++    assert.equal(result.sandboxRefundConfirmed, true);
++    assert.equal(result.moneyReturned, false);
++  }
++  assert.equal(posts, 1);
++  const [record] = await prisma.$queryRaw`SELECT * FROM "SandboxRefundOperation" WHERE "requestId" = ${req.id}`;
++  assert.equal(record.amountCents, amountCents);
++  assert.equal(record.attempts, 1);
++  assert.ok(record.reconciledAt);
++  history[0].status = 'DONE';
++  // Rebuild the local projection using the persisted provider history.
++  await prisma.$executeRaw`DELETE FROM "SandboxRefundOperation" WHERE "requestId" = ${req.id}`;
++  for (const invalid of [(amountCents + 0.1) / 100, (amountCents / 100).toFixed(2), (amountCents + 1) / 100, null]) {
++    history[0].value = invalid;
++    await rejects(run(restarted), 409);
++  }
++  history[0].value = amountCents / 100;
++  const recovered = await Promise.all([run(restarted), run(refunds)]);
++  assert.ok(recovered.every(result => result.sandboxRefundConfirmed));
++  assert.equal(posts, 1);
++  const [restored] = await prisma.$queryRaw`SELECT * FROM "SandboxRefundOperation" WHERE "requestId" = ${req.id}`;
++  assert.equal(restored.attempts, 0);
++  assert.ok(restored.reconciledAt);
++}
++
++test('sandbox Pix preserva uma tentativa após timeout, concorrência e reinício', t =>
++  verifyRefundRecovery(t, 750, 'PAYMENT_PARTIALLY_REFUNDED'));
++
++test('estorno integral de Pix concilia uma vez e resiste a webhook atrasado', t =>
++  verifyRefundRecovery(t, 1200, 'PAYMENT_REFUNDED'));
++
++test('uma notificação de Pix concilia dois participantes a partir da mesma consulta', async t => {
++  const event = await insertEvent(organizationId);
++  const { lot, category } = await catalog(event);
++  const scope = { organizationId, eventId: event.id };
++  const order = await prisma.eventRegistrationOrder.create({ data: {
++    ...scope, idempotencyKeyHash: digest(), payloadHash: digest(), subtotalCents: 2000,
++  } });
++  const group = await prisma.eventRegistrationOrderCheckout.create({ data: {
++    ...scope, orderId:order.id, idempotencyKeyHash:digest(), requestHash:digest(),
++    providerCheckoutId: 'checkout_' + digest(), status:'PAID', paidAt:new Date(), expiresAt:new Date(), amountCents:1500,
++  } });
++  const requests = [];
++  for (const position of [0, 1]) {
++    const row = await reservation(event, lot, category, { status:'CONFIRMED', priceCents:1000, identityHash:digest(), emailHash:digest() });
++    await prisma.eventRegistrationOrderEntry.create({ data: {
++      ...scope, orderId:order.id, position, categoryId:category.id, lotId:lot.id,
++      identityHash:row.identityHash, emailHash:row.emailHash, reservationId:row.id, basePriceCents:1000, finalPriceCents:1000,
++    } });
++    requests.push(await prisma.registrationRefundRequest.create({ data: { ...scope, reservationId:row.id, reason, status:'APPROVED' } }));
++  }
++  const paymentId = 'pay_' + digest();
++  const config = { ASAAS_REFUND_SANDBOX_ORGANIZATION_ID: organizationId,
++    ASAAS_REFUND_SANDBOX_EXECUTION_ORGANIZATION_ID: organizationId,
++    ASAAS_REFUND_SANDBOX_WEBHOOK_TOKEN: 'fixture-hook', ASAAS_REFUND_SANDBOX_TOKEN: 'fixture-api' };
++  for (const [key, value] of Object.entries(config)) {
++    const prior = process.env[key];
++    process.env[key] = value;
++    t.after(() => { if (prior === undefined) delete process.env[key]; else process.env[key] = prior; });
++  }
++  for (const req of requests) {
++    await refunds.prepare(people.owner.id, event.id, req.id, { amountCents: 750 });
++    await prisma.registrationRefundRequest.update({ where: { id: req.id }, data: { sandboxPaymentId: paymentId } });
++    await prisma.$executeRaw`INSERT INTO "SandboxRefundOperation" ("requestId","organizationId","eventId","paymentId","amountCents")
++      VALUES (${req.id},${organizationId},${event.id},${paymentId},750)`;
++  }
++  let reads = 0;
++  let denied = false;
++  t.mock.method(globalThis, 'fetch', async (url, init) => {
++    assert.equal(init.method, 'GET');
++    assert.equal(url.pathname, '/v3/payments/' + paymentId);
++    reads++;
++    return Response.json({ id: paymentId, billingType: 'PIX', checkoutSession: group.providerCheckoutId, value: 15,
++      refunds: requests.map((req, i) => ({ description: 'Evolvia/' + req.id, value: 7.5, status: i ? (denied ? 'CANCELLED' : 'PENDING') : 'DONE' })) });
++  });
++  await refunds.reconcileSandboxWebhook('fixture-hook', { event: 'PAYMENT_PARTIALLY_REFUNDED', payment: { id: paymentId } });
++  assert.equal(reads, 1);
++  const rows = await prisma.$queryRaw`SELECT "requestId", status FROM "SandboxRefundOperation" WHERE "paymentId" = ${paymentId}`;
++  assert.deepEqual(Object.fromEntries(rows.map(row => [row.requestId, row.status])), {
++    [requests[0].id]: 'RECONCILED', [requests[1].id]: 'PROCESSING',
++  });
++  // O Asaas envia PAYMENT_REFUND_DENIED ao cancelar estorno Pix. O evento
++  // autenticado deve consultar o histórico, sem confiar no status do payload.
++  denied = true;
++  const denial = { event: 'PAYMENT_REFUND_DENIED', payment: { id: paymentId, status: 'REFUNDED' } };
++  await refunds.reconcileSandboxWebhook('fixture-hook', denial);
++  assert.equal(reads, 2, 'negação precisa consultar o Asaas antes de atualizar estados');
++  const deniedRows = await prisma.$queryRaw`SELECT "requestId", status FROM "SandboxRefundOperation" WHERE "paymentId" = ${paymentId}`;
++  assert.deepEqual(Object.fromEntries(deniedRows.map(row => [row.requestId, row.status])), {
++    [requests[0].id]: 'RECONCILED', [requests[1].id]: 'FAILED',
++  });
++  await refunds.reconcileSandboxWebhook('fixture-hook', denial);
++  assert.equal(reads, 3);
++  const replay = await prisma.$queryRaw`SELECT "requestId", status FROM "SandboxRefundOperation" WHERE "paymentId" = ${paymentId}`;
++  assert.deepEqual(Object.fromEntries(replay.map(row => [row.requestId, row.status])), {
++    [requests[0].id]: 'RECONCILED', [requests[1].id]: 'FAILED',
++  });
++});
++
++test('sem callback, duas conexões retomam uma confirmação tardia sem reenviar o Pix', async t => {
++  const { id: organizationId } = await prisma.organization.create({ data: {
++    name: 'Recuperação', slug: 'recuperacao-' + digest(), createdById: people.owner.id,
++  } });
++  await prisma.organizationMembership.create({ data: { organizationId, userId: people.owner.id, role: 'OWNER' } });
++  const event = await insertEvent(organizationId);
++  const { lot, category } = await catalog(event);
++  const row = await reservation(event, lot, category, { status: 'CONFIRMED', priceCents: 1200, identityHash: digest(), emailHash: digest() });
++  const checkoutRow = await checkout(row, 'PAID');
++  const checkoutId = 'checkout_' + digest();
++  const paymentId = 'pay_' + digest();
++  await prisma.eventRegistrationCheckout.update({ where: { id: checkoutRow.id }, data: { providerCheckoutId: checkoutId } });
++  const req = await prisma.registrationRefundRequest.create({ data: {
++    organizationId, eventId: event.id, reservationId: row.id, reason, status: 'APPROVED',
++  } });
++  await refunds.prepare(people.owner.id, event.id, req.id, { amountCents: 750 });
++  await prisma.registrationRefundRequest.update({ where: { id: req.id }, data: { sandboxPaymentId: paymentId } });
++  const config = { ASAAS_REFUND_SANDBOX_ORGANIZATION_ID: organizationId,
++    ASAAS_REFUND_SANDBOX_EXECUTION_ORGANIZATION_ID: organizationId, ASAAS_REFUND_SANDBOX_WEBHOOK_TOKEN: 'webhook-fixture', ASAAS_REFUND_SANDBOX_TOKEN: 'fixture' };
++  for (const [key, value] of Object.entries(config)) {
++    const prior = process.env[key];
++    process.env[key] = value;
++    t.after(() => { if (prior === undefined) delete process.env[key]; else process.env[key] = prior; });
++  }
++  const independent = new PrismaClient();
++  t.after(() => independent.$disconnect());
++  const replacement = new RegistrationRefundService(independent, new AuthorizationService(independent));
++  let posts = 0;
++  let reads = 0;
++  let confirmed = false;
++  t.mock.method(globalThis, 'fetch', async (_url, init) => {
++    if (init.method === 'POST') {
++      posts++;
++      throw new Error('timeout depois do aceite');
++    }
++    reads++;
++    return Response.json({ id: paymentId, checkoutSession: checkoutId, billingType: 'PIX', value: 12,
++      status: 'RECEIVED', refunds: confirmed ? [{ description: 'Evolvia/' + req.id, value: 7.5, status: 'DONE' }] : [] });
++  });
++  assert.equal((await refunds.processSandboxRefund(people.owner.id, event.id, req.id)).processingStatus, 'PROCESSING');
++  confirmed = true;
++  await Promise.all([refunds.recoverSandboxRefund(), replacement.recoverSandboxRefund()]);
++  await replacement.recoverSandboxRefund();
++  assert.equal(posts, 1);
++  assert.equal(reads, 2);
++  const [stored] = await independent.$queryRaw`SELECT status, attempts FROM "SandboxRefundOperation" WHERE "requestId" = ${req.id}`;
++  assert.deepEqual(stored, { status: 'RECONCILED', attempts: 1 });
++});
++
++test('sandbox Pix permite uma única reiteração explícita após HTTP 400 definitivo, sem duplicar POST concorrente', async t => {
++  const event = await insertEvent(organizationId);
++  const { lot, category } = await catalog(event);
++  const row = await reservation(event, lot, category, {
++    status: 'CONFIRMED', priceCents: 1200, identityHash: digest(), emailHash: digest(),
++  });
++  const checkoutRow = await checkout(row, 'PAID');
++  const checkoutId = 'checkout_' + digest();
++  const paymentId = 'pay_' + digest();
++  await prisma.eventRegistrationCheckout.update({ where: { id: checkoutRow.id }, data: { providerCheckoutId: checkoutId } });
++  const req = await prisma.registrationRefundRequest.create({ data: {
++    organizationId, eventId: event.id, reservationId: row.id, reason, status: 'APPROVED',
++  } });
++  await refunds.prepare(people.owner.id, event.id, req.id, { amountCents: 750 });
++  await prisma.registrationRefundRequest.update({ where: { id: req.id }, data: { sandboxPaymentId: paymentId } });
++  const config = { ASAAS_REFUND_SANDBOX_ORGANIZATION_ID: organizationId,
++    ASAAS_REFUND_SANDBOX_EXECUTION_ORGANIZATION_ID: organizationId, ASAAS_REFUND_SANDBOX_TOKEN: 'fixture' };
++  for (const [key, value] of Object.entries(config)) {
++    const previous = process.env[key];
++    process.env[key] = value;
++    t.after(() => { if (previous === undefined) delete process.env[key]; else process.env[key] = previous; });
++  }
++  let posts = 0;
++  let history = [];
++  let reads = 0;
++  const firstReading = Promise.withResolvers();
++  const bothReading = Promise.withResolvers();
++  const releaseSecond = Promise.withResolvers();
++  t.mock.method(globalThis, 'fetch', async (url, init) => {
++    assert.equal(url.origin, 'https://api-sandbox.asaas.com');
++    if (init.method === 'GET') {
++      const sequence = ++reads;
++      if (sequence === 1) {
++        firstReading.resolve();
++        await bothReading.promise;
++      }
++      if (sequence === 2) {
++        bothReading.resolve();
++        await releaseSecond.promise;
++      }
++      assert.equal(url.pathname, '/v3/payments/' + paymentId);
++      return Response.json({ id: paymentId, checkoutSession: checkoutId,
++        billingType: 'PIX', value: 12, status: 'RECEIVED', refunds: history });
++    }
++    assert.equal(url.pathname, '/v3/payments/' + paymentId + '/refund');
++    posts++;
++    assert.deepEqual(JSON.parse(init.body), { value: 7.5, description: 'Evolvia/' + req.id });
++    if (posts === 1) return new Response('saldo insuficiente - não expor', { status: 400 });
++    return new Response(null, { status: 503 });
++  });
++  const execute = () => refunds.processSandboxRefund(people.owner.id, event.id, req.id);
++  const initial = execute();
++  await firstReading.promise;
++  const duplicate = execute();
++  const first = await initial;
++  releaseSecond.resolve();
++  assert.equal((await duplicate).processingStatus, 'FAILED');
++  assert.equal(posts, 1);
++  assert.equal(first.processingStatus, 'FAILED');
++  assert.equal(first.moneyReturned, false);
++  const failed = await prisma.sandboxRefundOperation.findUniqueOrThrow({ where: { requestId: req.id } });
++  assert.equal(failed.attempts, 1);
++  // Two owners call simultaneously: only one may claim the second and final POST.
++  const second = await Promise.all([execute(), execute()]);
++  assert.ok(second.every(r => r.processingStatus === 'PROCESSING' && r.moneyReturned === false));
++  assert.equal(posts, 2);
++  assert.equal((await prisma.sandboxRefundOperation.findUniqueOrThrow({ where: { requestId: req.id } })).attempts, 2);
++  await execute();
++  assert.equal(posts, 2);
++  history = [{ description: 'Evolvia/' + req.id, value: 7.5, status: 'DONE' }];
++  const reconciled = await execute();
++  assert.equal(reconciled.processingStatus, 'RECONCILED');
++  assert.equal(reconciled.moneyReturned, false);
++  assert.equal(posts, 2);
++});
++
++test('sandbox Pix bloqueia terceira tentativa mesmo com dois erros 400 definitivos', async t => {
++  const event = await insertEvent(organizationId);
++  const { lot, category } = await catalog(event);
++  const row = await reservation(event, lot, category, {
++    status: 'CONFIRMED', priceCents: 1200, identityHash: digest(), emailHash: digest(),
++  });
++  const checkoutRow = await checkout(row, 'PAID');
++  const checkoutId = 'checkout_' + digest();
++  const paymentId = 'pay_' + digest();
++  await prisma.eventRegistrationCheckout.update({ where: { id: checkoutRow.id }, data: { providerCheckoutId: checkoutId } });
++  const req = await prisma.registrationRefundRequest.create({ data: {
++    organizationId, eventId: event.id, reservationId: row.id, reason, status: 'APPROVED',
++  } });
++  await refunds.prepare(people.owner.id, event.id, req.id, { amountCents: 750 });
++  await prisma.registrationRefundRequest.update({ where: { id: req.id }, data: { sandboxPaymentId: paymentId } });
++  const config = { ASAAS_REFUND_SANDBOX_ORGANIZATION_ID: organizationId,
++    ASAAS_REFUND_SANDBOX_EXECUTION_ORGANIZATION_ID: organizationId, ASAAS_REFUND_SANDBOX_TOKEN: 'fixture' };
++  for (const [key, value] of Object.entries(config)) {
++    const previous = process.env[key]; process.env[key] = value;
++    t.after(() => { if (previous === undefined) delete process.env[key]; else process.env[key] = previous; });
++  }
++  let posts = 0;
++  t.mock.method(globalThis, 'fetch', async (url, init) => {
++    if (init.method === 'GET') {
++      return Response.json({ id: paymentId, checkoutSession: checkoutId,
++        billingType: 'PIX', value: 12, status: 'RECEIVED', refunds: [] });
++    }
++    posts++;
++    return new Response('sem saldo de teste', { status: 400 });
++  });
++  const execute = () => refunds.processSandboxRefund(people.owner.id, event.id, req.id);
++  assert.equal((await execute()).processingStatus, 'FAILED');
++  assert.equal((await execute()).processingStatus, 'FAILED');
++  assert.equal((await execute()).processingStatus, 'FAILED');
++  assert.equal(posts, 2);
++  const op = await prisma.sandboxRefundOperation.findUniqueOrThrow({ where: { requestId: req.id } });
++  assert.equal(op.status, 'FAILED');
++  assert.equal(op.attempts, 2);
++});

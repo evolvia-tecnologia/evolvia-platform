@@ -1,0 +1,916 @@
+diff --git a/apps/api/prisma/migrations/20261120001000_fiscal_receipt_draft/migration.sql b/apps/api/prisma/migrations/20261120001000_fiscal_receipt_draft/migration.sql
+new file mode 100644
+index 00000000..635cc0df
+--- /dev/null
++++ b/apps/api/prisma/migrations/20261120001000_fiscal_receipt_draft/migration.sql
+@@ -0,0 +1,9 @@
++CREATE TABLE "FiscalReceiptDraft" (
++    "receiptId" TEXT PRIMARY KEY REFERENCES "EventRegistrationPaymentReceipt"("id") ON DELETE RESTRICT ON UPDATE CASCADE,
++    "idempotencyKey" CHAR(64) NOT NULL,
++    "municipalityIbgeCode" VARCHAR(7) NOT NULL,
++    "serviceCode" VARCHAR(20) NOT NULL,
++    "issuerId" VARCHAR(128) NOT NULL,
++    "recipientId" VARCHAR(128) NOT NULL,
++    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
++);
+diff --git a/apps/api/prisma/migrations/20261124140000_fiscal_sandbox_preparation/migration.sql b/apps/api/prisma/migrations/20261124140000_fiscal_sandbox_preparation/migration.sql
+new file mode 100644
+index 00000000..42b44686
+--- /dev/null
++++ b/apps/api/prisma/migrations/20261124140000_fiscal_sandbox_preparation/migration.sql
+@@ -0,0 +1,6 @@
++ALTER TABLE "FiscalReceiptDraft"
++  ADD COLUMN "sandboxProvider" VARCHAR(20),
++  ADD COLUMN "sandboxPreparedAt" TIMESTAMP(3),
++  ADD CONSTRAINT "FiscalReceiptDraft_sandbox_preparation_check"
++    CHECK (("sandboxProvider" IS NULL AND "sandboxPreparedAt" IS NULL)
++      OR ("sandboxProvider" IS NOT NULL AND "sandboxProvider" IN ('enotas', 'notazz') AND "sandboxPreparedAt" IS NOT NULL));
+diff --git a/apps/api/prisma/schema.prisma b/apps/api/prisma/schema.prisma
+index 3d020ffe..c8f5ae6f 100644
+--- a/apps/api/prisma/schema.prisma
++++ b/apps/api/prisma/schema.prisma
+@@ -1173,6 +1173,7 @@ model EventRegistrationCategoryProof {
+ }
+ 
+ model EventRegistrationPaymentReceipt {
++  fiscalDraft FiscalReceiptDraft?
+   id             String                       @id @default(cuid())
+   organizationId String
+   eventId        String
+@@ -2540,3 +2541,16 @@ model EventCommunicationDraft {
+   @@unique([id, eventId, organizationId])
+   @@index([organizationId, eventId, updatedAt])
+ }
++
++model FiscalReceiptDraft {
++  sandboxProvider      String? @db.VarChar(20)
++  sandboxPreparedAt    DateTime?
++  receiptId            String @id
++  receipt              EventRegistrationPaymentReceipt @relation(fields: [receiptId], references: [id], onDelete: Restrict)
++  idempotencyKey       String @db.Char(64)
++  municipalityIbgeCode String @db.VarChar(7)
++  serviceCode          String @db.VarChar(20)
++  issuerId             String @db.VarChar(128)
++  recipientId          String @db.VarChar(128)
++  createdAt            DateTime @default(now())
++}
+diff --git a/apps/api/src/event-financial-responsibility.controller.ts b/apps/api/src/event-financial-responsibility.controller.ts
+index c538bf2d..babf543f 100644
+--- a/apps/api/src/event-financial-responsibility.controller.ts
++++ b/apps/api/src/event-financial-responsibility.controller.ts
+@@ -1,4 +1,6 @@
+ import { Body, Controller, Get, Param, Put, Req, UseGuards } from '@nestjs/common';
++import { prepareFiscalAdapterPreview } from './nfse-adapter-preview';
++import type { FiscalSetup } from './nfse-draft-policy';
+ import { AuthGuard, AuthenticatedRequest } from './auth.guard';
+ import { SaveEventFinancialResponsibilityDto } from './event-financial-responsibility.dto';
+ import { EventFinancialResponsibilityService } from './event-financial-responsibility.service';
+@@ -8,6 +10,34 @@ import { EventFinancialResponsibilityService } from './event-financial-responsib
+ export class EventFinancialResponsibilityController {
+   constructor(private readonly responsibility: EventFinancialResponsibilityService) {}
+ 
++  @Get('receipts/:receiptId/nfse-draft')
++  fiscalDraft(@Req() request: AuthenticatedRequest, @Param('eventId') eventId: string, @Param('receiptId') receiptId: string) {
++    return this.responsibility.fiscalDraft(request.user!.id, eventId, receiptId);
++  }
++
++  @Get('receipts/:receiptId/nfse-draft/adapters/:provider')
++  async fiscalAdapterPreview(@Req() request: AuthenticatedRequest, @Param('eventId') eventId: string,
++    @Param('receiptId') receiptId: string, @Param('provider') provider: string) {
++    const draft = await this.responsibility.fiscalDraft(request.user!.id, eventId, receiptId);
++    return prepareFiscalAdapterPreview(provider, draft);
++  }
++
++  @Get('receipts/:receiptId/nfse-sandbox/preparation')
++  sandboxPreparation(@Req() request: AuthenticatedRequest, @Param('eventId') eventId: string, @Param('receiptId') receiptId: string) {
++    return this.responsibility.sandboxPreparation(request.user!.id, eventId, receiptId);
++  }
++
++  @Put('receipts/:receiptId/nfse-sandbox/preparation')
++  prepareSandbox(@Req() request: AuthenticatedRequest, @Param('eventId') eventId: string, @Param('receiptId') receiptId: string) {
++    return this.responsibility.prepareSandbox(request.user!.id, eventId, receiptId);
++  }
++
++  @Put('receipts/:receiptId/nfse-draft')
++  prepareFiscalDraft(@Req() request: AuthenticatedRequest, @Param('eventId') eventId: string,
++    @Param('receiptId') receiptId: string, @Body() setup: FiscalSetup) {
++    return this.responsibility.fiscalDraft(request.user!.id, eventId, receiptId, { setup });
++  }
++
+   @Get()
+   get(@Req() request: AuthenticatedRequest, @Param('eventId') eventId: string) {
+     return this.responsibility.get(request.user!.id, eventId);
+diff --git a/apps/api/src/event-financial-responsibility.service.ts b/apps/api/src/event-financial-responsibility.service.ts
+index 444855b3..62b739af 100644
+--- a/apps/api/src/event-financial-responsibility.service.ts
++++ b/apps/api/src/event-financial-responsibility.service.ts
+@@ -1,3 +1,6 @@
++import { readOrPrepareFiscalDraft } from './nfse-draft-store';
++import { prepareFiscalSandbox, readFiscalSandboxPreparation } from './nfse-sandbox-preparation';
++import type { FiscalSetup } from './nfse-draft-policy';
+ import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+ import { MembershipRole, Prisma } from '@prisma/client';
+ import { AuthorizationService } from './authorization.service';
+@@ -27,6 +30,18 @@ export class EventFinancialResponsibilityService {
+     private readonly authorization: AuthorizationService,
+   ) {}
+ 
++  fiscalDraft(userId: string, eventId: string, receiptId: string, command?: { setup: FiscalSetup }) {
++    return readOrPrepareFiscalDraft(this.prisma, userId, eventId, receiptId, command);
++  }
++
++  sandboxPreparation(userId: string, eventId: string, receiptId: string) {
++    return readFiscalSandboxPreparation(this.prisma, userId, eventId, receiptId);
++  }
++
++  prepareSandbox(userId: string, eventId: string, receiptId: string) {
++    return prepareFiscalSandbox(this.prisma, userId, eventId, receiptId);
++  }
++
+   private async eventFor(userId: string, eventId: string) {
+     const event = await this.prisma.event.findUnique({
+       where: { id: eventId },
+diff --git a/apps/api/src/nfse-adapter-preview.ts b/apps/api/src/nfse-adapter-preview.ts
+new file mode 100644
+index 00000000..37573a63
+--- /dev/null
++++ b/apps/api/src/nfse-adapter-preview.ts
+@@ -0,0 +1,17 @@
++import { NotFoundException } from '@nestjs/common';
++import type { FiscalInvoiceDraft } from './nfse-draft-policy';
++
++/** Versioned internal input for a fiscal connector. Provider wire formats require separate homologation. */
++export function prepareFiscalAdapterPreview(provider: string, draft: FiscalInvoiceDraft) {
++  if (provider !== 'enotas' && provider !== 'notazz') {
++    throw new NotFoundException('Conector fiscal indisponível.');
++  }
++  return {
++    version: 1, provider, operation: 'PREVIEW', issueAuthorized: false,
++    idempotencyKey: draft.idempotencyKey,
++    source: { organizationId: draft.organizationId, eventId: draft.eventId, receiptId: draft.receiptId },
++    service: { municipalityIbgeCode: draft.municipalityIbgeCode, code: draft.serviceCode,
++      amountCents: draft.amountCents, currency: draft.currency },
++    parties: { issuerId: draft.issuerId, recipientId: draft.recipientId },
++  } as const;
++}
+diff --git a/apps/api/src/nfse-draft-policy.ts b/apps/api/src/nfse-draft-policy.ts
+new file mode 100644
+index 00000000..aacdb5b4
+--- /dev/null
++++ b/apps/api/src/nfse-draft-policy.ts
+@@ -0,0 +1,144 @@
++import { createHash } from 'node:crypto';
++
++/**
++ * Gate G2.14 - deterministic fiscal request contract.
++ *
++ * This module does NOT issue invoices or talk to fiscal providers. Municipal
++ * adapters, issuer authorization, taxpayer verification and legal validation
++ * must exist before enabling emission in any environment.
++ */
++export class FiscalInvoicePolicyError extends Error {
++  constructor(message: string) {
++    super(message);
++    this.name = 'FiscalInvoicePolicyError';
++  }
++}
++
++export type FiscalInvoiceSource = {
++  organizationId: string;
++  eventId: string;
++  reservationId: string;
++  receiptId: string;
++  paymentStatus: 'CONFIRMED' | 'PENDING' | 'REFUNDED' | 'CANCELLED';
++  amountCents: number;
++  currency: 'BRL';
++  municipalityIbgeCode: string;
++  issuerId: string;
++  recipientId: string;
++  serviceCode: string;
++};
++
++export type FiscalInvoiceDraft = {
++  idempotencyKey: string;
++  organizationId: string;
++  eventId: string;
++  reservationId: string;
++  receiptId: string;
++  amountCents: number;
++  currency: 'BRL';
++  municipalityIbgeCode: string;
++  issuerId: string;
++  recipientId: string;
++  serviceCode: string;
++  status: 'AWAITING_MUNICIPAL_ADAPTER';
++  issueAuthorized: false;
++};
++
++const ID = /^[A-Za-z0-9_-]{1,128}$/u;
++const IBGE = /^\d{7}$/u;
++// IBGE municipality codes begin with a valid Brazilian state code. This is
++// structural validation only; municipal adapter must validate the full code.
++const IBGE_UF = new Set(['11','12','13','14','15','16','17','21','22','23','24','25','26','27','28','29','31','32','33','35','41','42','43','50','51','52','53']);
++const SERVICE = /^[A-Za-z0-9.\-]{1,20}$/u;
++const MAX_CENTS = 999_999_999_999;
++
++export type FiscalSetup = Pick<FiscalInvoiceSource, 'issuerId' | 'recipientId' | 'serviceCode' | 'municipalityIbgeCode'>;
++
++export function validateFiscalSetup(input: FiscalSetup): void {
++  if (!input || typeof input !== 'object' || Array.isArray(input) ||
++      [input.issuerId, input.recipientId].some(id => typeof id !== 'string' || !ID.test(id))) {
++    throw new FiscalInvoicePolicyError('Referências fiscais inválidas.');
++  }
++  if (typeof input.municipalityIbgeCode !== 'string'
++    || !IBGE.test(input.municipalityIbgeCode)
++    || !IBGE_UF.has(input.municipalityIbgeCode.slice(0, 2))
++    || input.municipalityIbgeCode.slice(2) === '00000'
++    || typeof input.serviceCode !== 'string'
++    || !SERVICE.test(input.serviceCode)) {
++    throw new FiscalInvoicePolicyError('Município ou código de serviço inválido.');
++  }
++}
++
++export function prepareFiscalInvoiceDraft(input: FiscalInvoiceSource): FiscalInvoiceDraft {
++  if (!input || typeof input !== 'object' || Array.isArray(input)) {
++    throw new FiscalInvoicePolicyError('Referências fiscais inválidas.');
++  }
++  const ids = [input.organizationId, input.eventId, input.reservationId,
++    input.receiptId];
++  if (ids.some((id) => typeof id !== 'string' || !ID.test(id))) {
++    throw new FiscalInvoicePolicyError('Referências fiscais inválidas.');
++  }
++  if (input.paymentStatus !== 'CONFIRMED') {
++    throw new FiscalInvoicePolicyError('A nota exige pagamento confirmado e não estornado.');
++  }
++  if (input.currency !== 'BRL' || !Number.isSafeInteger(input.amountCents)
++    || input.amountCents <= 0 || input.amountCents > MAX_CENTS) {
++    throw new FiscalInvoicePolicyError('Valor fiscal inválido.');
++  }
++  validateFiscalSetup(input);
++  const keySource = [
++    'nfse-draft-v1', input.organizationId, input.eventId, input.reservationId,
++    input.receiptId, input.issuerId, input.recipientId, input.municipalityIbgeCode,
++    input.serviceCode, String(input.amountCents),
++  ].join(':');
++  return {
++    idempotencyKey: createHash('sha256').update(keySource).digest('hex'),
++    organizationId: input.organizationId,
++    eventId: input.eventId,
++    reservationId: input.reservationId,
++    receiptId: input.receiptId,
++    amountCents: input.amountCents,
++    currency: input.currency,
++    municipalityIbgeCode: input.municipalityIbgeCode,
++    issuerId: input.issuerId,
++    recipientId: input.recipientId,
++    serviceCode: input.serviceCode,
++    status: 'AWAITING_MUNICIPAL_ADAPTER',
++    issueAuthorized: false,
++  };
++}
++
++export function requireMunicipalFiscalAuthorization(
++  draft: FiscalInvoiceDraft,
++): never {
++  // Fail closed: no adapter / municipal homologation / explicit opt-in exists yet.
++  // This prevents a payment receipt being mislabeled an issued tax document.
++  void draft;
++  throw new FiscalInvoicePolicyError(
++    'NFS-e não emitida: adaptador municipal e homologação fiscal ainda indisponíveis.',
++  );
++}
++
++/**
++ * Reconcile repeated paid receipts in a fiscal draft batch. A retry of an
++ * identical receipt is safe, but changed fiscal details require investigation.
++ * This function never sends an invoice to a municipal provider.
++ */
++export function prepareFiscalInvoiceDraftBatch(
++  sources: readonly FiscalInvoiceSource[],
++): FiscalInvoiceDraft[] {
++  if (!Array.isArray(sources) || sources.length === 0 || sources.length > 100) {
++    throw new FiscalInvoicePolicyError('Lote de rascunhos fiscais inválido.');
++  }
++  const byReceipt = new Map<string, FiscalInvoiceDraft>();
++  for (const source of sources) {
++    const draft = prepareFiscalInvoiceDraft(source);
++    const scope = [draft.organizationId, draft.receiptId].join(':');
++    const existing = byReceipt.get(scope);
++    if (existing && existing.idempotencyKey !== draft.idempotencyKey) {
++      throw new FiscalInvoicePolicyError('Recibo com dados fiscais conflitantes.');
++    }
++    if (!existing) byReceipt.set(scope, draft);
++  }
++  return [...byReceipt.values()];
++}
+diff --git a/apps/api/src/nfse-draft-store.ts b/apps/api/src/nfse-draft-store.ts
+new file mode 100644
+index 00000000..a167cde8
+--- /dev/null
++++ b/apps/api/src/nfse-draft-store.ts
+@@ -0,0 +1,73 @@
++import { setTimeout as delay } from 'node:timers/promises';
++import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
++import { Prisma, type PrismaClient } from '@prisma/client';
++import { FiscalInvoicePolicyError, validateFiscalSetup, type FiscalSetup } from './nfse-draft-policy';
++import { previewFiscalReceipt } from './nfse-receipt-draft';
++
++export async function readOrPrepareFiscalDraft(
++  db: Pick<PrismaClient, '$transaction'>, userId: string, eventId: string, receiptId: string,
++  command?: { setup: FiscalSetup },
++) {
++  for (let attempt = 1; ; attempt++) {
++    try {
++      return await db.$transaction(async tx => {
++        const event = await tx.event.findFirst({
++          where: { id: eventId, organization: { memberships: { some: { userId, status: 'ACTIVE', role: 'OWNER' } } } },
++          select: { organizationId: true },
++        });
++        if (!event?.organizationId) throw new NotFoundException('Recibo indisponível.');
++        const organizationId = event.organizationId;
++        const stored = await tx.fiscalReceiptDraft.findFirst({
++          where: { receiptId, receipt: { eventId, organizationId } },
++        });
++        if (!command && !stored) throw new NotFoundException('Prévia fiscal indisponível.');
++        const setup = command ? command.setup : stored!;
++        try {
++          validateFiscalSetup(setup);
++        } catch (error) {
++          if (error instanceof FiscalInvoicePolicyError) throw new BadRequestException(error.message);
++          throw error;
++        }
++        if (setup.issuerId !== organizationId) {
++          throw new BadRequestException('O emissor precisa corresponder à organização do recibo.');
++        }
++        const draft = await previewFiscalReceipt(tx, { userId, organizationId, eventId, receiptId }, setup);
++        if (stored && stored.idempotencyKey !== draft.idempotencyKey) {
++          throw new ConflictException('Os dados fiscais divergem da prévia registrada.');
++        }
++        if (!stored) {
++          // Hold the eligibility rows through commit. Concurrent changes invalidate
++          // this serializable snapshot and must pass the checks on a fresh read.
++          const authorized = await tx.$queryRaw<Array<{ id: string }>>`
++            SELECT m.id FROM "EventRegistrationPaymentReceipt" r
++            JOIN "OrganizationMembership" m ON m."organizationId" = r."organizationId"
++            JOIN "EventRegistrationCheckout" c ON c.id = r."checkoutId"
++            JOIN "EventRegistrationReservation" s ON s.id = r."reservationId"
++            WHERE r.id = ${receiptId} AND r."eventId" = ${eventId} AND r."organizationId" = ${organizationId}
++              AND m."userId" = ${userId} AND m.status = 'ACTIVE' AND m.role = 'OWNER'
++              AND c.status = 'PAID' AND c."paidAt" IS NOT NULL AND s.status = 'CONFIRMED'
++            FOR SHARE OF r, m, c, s
++          `;
++          if (!authorized.length) throw new NotFoundException('Recibo indisponível.');
++          await tx.fiscalReceiptDraft.create({ data: {
++            receiptId, idempotencyKey: draft.idempotencyKey, issuerId: draft.issuerId,
++            recipientId: draft.recipientId, municipalityIbgeCode: draft.municipalityIbgeCode, serviceCode: draft.serviceCode,
++          } });
++          await tx.auditLog.create({ data: {
++            organizationId, eventId, actorUserId: userId, action: 'nfse.draft_prepared',
++            entityType: 'FiscalReceiptDraft', entityId: receiptId,
++          } });
++        }
++        return draft;
++      }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
++    } catch (error) {
++      if (error instanceof FiscalInvoicePolicyError) throw new NotFoundException('Recibo indisponível.');
++      if (!(error instanceof Prisma.PrismaClientKnownRequestError)) throw error;
++      const serializationFailure = error.code === 'P2010' && error.meta?.code === '40001';
++      if (!serializationFailure && !['P2034','P2002'].includes(error.code)) throw error;
++      if (attempt >= 4) throw new ConflictException('Prévia em atualização. Repita a consulta.');
++      const windowMs = 10 * 2 ** (attempt - 1);
++      await delay(windowMs + Math.floor(Math.random() * windowMs));
++    }
++  }
++}
+diff --git a/apps/api/src/nfse-receipt-draft.ts b/apps/api/src/nfse-receipt-draft.ts
+new file mode 100644
+index 00000000..58fe6077
+--- /dev/null
++++ b/apps/api/src/nfse-receipt-draft.ts
+@@ -0,0 +1,35 @@
++import type { Prisma } from '@prisma/client';
++import { FiscalInvoicePolicyError, prepareFiscalInvoiceDraft, validateFiscalSetup, type FiscalSetup } from './nfse-draft-policy';
++
++/** Server-only preview for a paid individual receipt. Fiscal setup comes from the caller's verified configuration. */
++export async function previewFiscalReceipt(
++  db: Pick<Prisma.TransactionClient, 'eventRegistrationPaymentReceipt'>,
++  scope: { userId: string; organizationId: string; eventId: string; receiptId: string },
++  setup: FiscalSetup,
++) {
++  if (!scope || [scope.userId, scope.organizationId, scope.eventId, scope.receiptId].some(
++    value => typeof value !== 'string' || !value.trim(),
++  )) throw new FiscalInvoicePolicyError('Recibo indisponível para preparação fiscal.');
++  validateFiscalSetup(setup);
++  const receipt = await db.eventRegistrationPaymentReceipt.findFirst({
++    where: {
++      id: scope.receiptId, organizationId: scope.organizationId, eventId: scope.eventId,
++      reservation: { status: 'CONFIRMED', event: { organization: { memberships: { some: {
++        userId: scope.userId, status: 'ACTIVE', role: 'OWNER',
++      } } } } },
++      checkout: { status: 'PAID', paidAt: { not: null } },
++    },
++    select: {
++      id: true, organizationId: true, eventId: true, reservationId: true, amountCents: true,
++      checkout: { select: { amountCents: true, reservationId: true } },
++    },
++  });
++  if (!receipt || receipt.checkout.reservationId !== receipt.reservationId ||
++      receipt.checkout.amountCents !== receipt.amountCents) {
++    throw new FiscalInvoicePolicyError('Recibo indisponível para preparação fiscal.');
++  }
++  return prepareFiscalInvoiceDraft({
++    ...setup, receiptId: receipt.id, eventId: receipt.eventId, organizationId: receipt.organizationId,
++    reservationId: receipt.reservationId, amountCents: receipt.amountCents, currency: 'BRL', paymentStatus: 'CONFIRMED',
++  });
++}
+diff --git a/apps/api/src/nfse-sandbox-preparation.ts b/apps/api/src/nfse-sandbox-preparation.ts
+new file mode 100644
+index 00000000..189cab8b
+--- /dev/null
++++ b/apps/api/src/nfse-sandbox-preparation.ts
+@@ -0,0 +1,75 @@
++import { ConflictException, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
++import type { PrismaClient } from '@prisma/client';
++
++import { FiscalInvoicePolicyError, prepareFiscalInvoiceDraft, type FiscalSetup } from './nfse-draft-policy';
++
++type PreparationRow = FiscalSetup & {
++  organizationId: string; reservationId: string; amountCents: number; idempotencyKey: string;
++  sandboxProvider: string | null; sandboxPreparedAt: Date | null;
++};
++
++type SavedPreparation = { provider: string; preparedAt: Date; idempotencyKey: string };
++
++function preparationView(saved: SavedPreparation) {
++  return { environment: 'SANDBOX', status: 'PREPARED', ...saved, issueAuthorized: false } as const;
++}
++
++export async function readFiscalSandboxPreparation(db: Pick<PrismaClient, '$queryRaw'>, userId: string, eventId: string, receiptId: string) {
++  const [saved] = await db.$queryRaw<SavedPreparation[]>`
++    SELECT d."sandboxProvider" AS provider, d."sandboxPreparedAt" AS "preparedAt", d."idempotencyKey"
++    FROM "FiscalReceiptDraft" d
++    JOIN "EventRegistrationPaymentReceipt" r ON r.id = d."receiptId" AND r."organizationId" = d."issuerId"
++    JOIN "Event" e ON e.id = r."eventId" AND e."organizationId" = r."organizationId"
++    JOIN "OrganizationMembership" m ON m."organizationId" = e."organizationId"
++    WHERE r.id = ${receiptId} AND e.id = ${eventId} AND m."userId" = ${userId}
++      AND m.status = 'ACTIVE' AND m.role = 'OWNER'
++      AND d."sandboxProvider" IS NOT NULL AND d."sandboxPreparedAt" IS NOT NULL`;
++  if (!saved) throw new NotFoundException('Preparação fiscal indisponível.');
++  return preparationView(saved);
++}
++
++// Persist the sandbox binding, never a municipal protocol or an issuance result.
++export function prepareFiscalSandbox(db: Pick<PrismaClient, '$transaction'>, userId: string, eventId: string, receiptId: string) {
++  return db.$transaction(async tx => {
++    const [row] = await tx.$queryRaw<PreparationRow[]>`
++      SELECT r."organizationId", r."reservationId", r."amountCents", d."issuerId", d."recipientId", d."serviceCode",
++        d."municipalityIbgeCode", d."idempotencyKey", d."sandboxProvider", d."sandboxPreparedAt"
++      FROM "FiscalReceiptDraft" d
++      JOIN "EventRegistrationPaymentReceipt" r ON r.id = d."receiptId" AND r."organizationId" = d."issuerId"
++      JOIN "Event" e ON e.id = r."eventId" AND e."organizationId" = r."organizationId"
++      JOIN "OrganizationMembership" m ON m."organizationId" = r."organizationId"
++      JOIN "EventRegistrationCheckout" c ON c.id = r."checkoutId" AND c."reservationId" = r."reservationId"
++      JOIN "EventRegistrationReservation" s ON s.id = r."reservationId"
++      WHERE r.id = ${receiptId} AND r."eventId" = ${eventId} AND m."userId" = ${userId}
++        AND m.status = 'ACTIVE' AND m.role = 'OWNER' AND c.status = 'PAID' AND c."paidAt" IS NOT NULL
++        AND c."organizationId" = r."organizationId" AND c."eventId" = r."eventId"
++        AND s."organizationId" = r."organizationId" AND s."eventId" = r."eventId"
++        AND c."amountCents" = r."amountCents" AND s.status = 'CONFIRMED'
++      FOR UPDATE OF d FOR SHARE OF r, e, m, c, s`;
++    if (!row) throw new NotFoundException('Prévia fiscal indisponível.');
++    const provider = process.env.EVOLVIA_NFSE_SANDBOX_PROVIDER;
++    if ((provider !== 'enotas' && provider !== 'notazz') ||
++        process.env.EVOLVIA_NFSE_SANDBOX_ORGANIZATION_ID !== row.organizationId ||
++        process.env.EVOLVIA_NFSE_SANDBOX_MUNICIPALITY !== row.municipalityIbgeCode) {
++      throw new ServiceUnavailableException('Preparação fiscal de homologação desabilitada.');
++    }
++    try {
++      const current = prepareFiscalInvoiceDraft({ ...row, receiptId, eventId, currency: 'BRL', paymentStatus: 'CONFIRMED' });
++      if (current.idempotencyKey !== row.idempotencyKey) throw new ConflictException('Os dados do recibo divergiram da prévia fiscal.');
++    } catch (error) {
++      if (error instanceof FiscalInvoicePolicyError) throw new ConflictException('O recibo perdeu a elegibilidade fiscal.');
++      throw error;
++    }
++    if (row.sandboxProvider && row.sandboxProvider !== provider) {
++      throw new ConflictException('O recibo já foi preparado com outro provedor.');
++    }
++    const preparedAt = row.sandboxPreparedAt ?? new Date();
++    if (!row.sandboxProvider) {
++      await tx.$executeRaw`UPDATE "FiscalReceiptDraft" SET "sandboxProvider" = ${provider},
++        "sandboxPreparedAt" = ${preparedAt} WHERE "receiptId" = ${receiptId}`;
++      await tx.auditLog.create({ data: { organizationId: row.organizationId, eventId, actorUserId: userId,
++        entityId: receiptId, entityType: 'FiscalReceiptDraft', action: 'nfse.sandbox_prepared' } });
++    }
++    return preparationView({ provider, preparedAt, idempotencyKey: row.idempotencyKey });
++  });
++}
+diff --git a/apps/api/tests-postgres/nfse-draft-store.postgres.test.mjs b/apps/api/tests-postgres/nfse-draft-store.postgres.test.mjs
+new file mode 100644
+index 00000000..f1ee9d62
+--- /dev/null
++++ b/apps/api/tests-postgres/nfse-draft-store.postgres.test.mjs
+@@ -0,0 +1,238 @@
++import 'reflect-metadata';
++import assert from 'node:assert/strict';
++import test from 'node:test';
++import { randomUUID } from 'node:crypto';
++import { Module } from '@nestjs/common';
++import { NestFactory } from '@nestjs/core';
++import { JwtModule, JwtService } from '@nestjs/jwt';
++import { PrismaClient } from '@prisma/client';
++import { AuthGuard } from '../dist/auth.guard.js';
++import { AuthorizationService } from '../dist/authorization.service.js';
++import { PrismaService } from '../dist/prisma.service.js';
++import { EventFinancialResponsibilityController } from '../dist/event-financial-responsibility.controller.js';
++import { EventFinancialResponsibilityService } from '../dist/event-financial-responsibility.service.js';
++
++async function fiscalFixture(t) {
++  const db = new PrismaClient();
++  t.after(() => db.$disconnect());
++  class FiscalTestModule {}
++  Module({
++    imports: [JwtModule.register({ secret: randomUUID() })],
++    controllers: [EventFinancialResponsibilityController],
++    providers: [AuthGuard, AuthorizationService, EventFinancialResponsibilityService, { provide: PrismaService, useValue: db }],
++  })(FiscalTestModule);
++  const app = await NestFactory.create(FiscalTestModule, { logger: false });
++  t.after(() => app.close());
++  const server = await app.listen(0, '127.0.0.1');
++  async function createOwner() {
++    const slug = randomUUID();
++    const owner = await db.user.create({ data: { name: 'Teste fiscal', email: slug + '@example.invalid', passwordHash: 'fixture' } });
++    const org = await db.organization.create({ data: { name: 'Fiscal', slug, createdById: owner.id,
++      memberships: { create: { userId: owner.id, role: 'OWNER', status: 'ACTIVE' } } } });
++    return { owner, org, token: app.get(JwtService).sign({ sub: owner.id, email: owner.email }) };
++  }
++  const { owner, org, token } = await createOwner();
++  const outsider = await createOwner();
++  const event = await db.event.create({ data: { name: 'Teste fiscal', slug: randomUUID(), eventType: 'Outro',
++    format: 'IN_PERSON', registrationMode: 'PAID', status: 'CANCELLED', ownerId: owner.id, organizationId: org.id } });
++  const scope = { organizationId: org.id, eventId: event.id };
++  const catalog = await db.eventRegistrationCatalog.create({ data: scope });
++  const category = await db.eventRegistrationCategory.create({ data: { ...scope, catalogId: catalog.id, code: 'G', name: 'Geral' } });
++  const lot = await db.eventRegistrationLot.create({ data: { ...scope, categoryId: category.id, code: 'L', name: 'Lote',
++    startsAt: new Date('2026-01-01'), endsAt: new Date('2026-12-01'), priceCents: 750 } });
++  const paidAt = new Date('2026-10-01');
++  const reservation = await db.eventRegistrationReservation.create({ data: { ...scope, categoryId: category.id, lotId: lot.id,
++    protocol: randomUUID().slice(0,16), idempotencyKeyHash: randomUUID(), payloadHash: randomUUID(), identityHash: randomUUID(), emailHash: randomUUID(),
++    registrationData: {}, basePriceCents: 750, finalPriceCents: 750, status: 'CONFIRMED', confirmedAt: paidAt } });
++  const checkout = await db.eventRegistrationCheckout.create({ data: { ...scope, reservationId: reservation.id,
++    idempotencyKeyHash: randomUUID(), requestHash: randomUUID(), amountCents: 750, expiresAt: paidAt, paidAt, status: 'PAID' } });
++  const receipt = await db.eventRegistrationPaymentReceipt.create({ data: { ...scope, reservationId: reservation.id, checkoutId: checkout.id,
++    number: randomUUID().slice(0,20), sellerSnapshot: {}, amountCents: 750, paidAt } });
++  const url = 'http://127.0.0.1:' + server.address().port + '/events/' + event.id + '/financial-responsibility/receipts/' + receipt.id + '/nfse-draft';
++  const setup = { issuerId: org.id, recipientId: 'recipient', serviceCode: '12.01', municipalityIbgeCode: '3550308' };
++  const send = (auth, body) => fetch(url, { method: body === undefined ? 'GET' : 'PUT',
++    headers: { 'content-type': 'application/json', ...(auth && { authorization: 'Bearer ' + auth }) }, body: JSON.stringify(body) });
++  return { db, org, owner, token, outsider, checkout, receipt, url, setup, send };
++}
++
++test('prévia fiscal HTTP persiste uma vez e revalida organização, recibo e pagamento', async t => {
++  const { db, token, outsider, checkout, receipt, url, setup, send } = await fiscalFixture(t);
++  assert.equal((await send(null)).status, 401);
++  assert.equal((await send(outsider.token, setup)).status, 404);
++  assert.equal((await send(token)).status, 404);
++  assert.equal((await send(token, {})).status, 400);
++  assert.equal((await send(token, { ...setup, issuerId: outsider.org.id })).status, 400);
++  const sibling = await db.event.create({ data: { organizationId: receipt.organizationId, ownerId: (await db.organization.findUniqueOrThrow({ where: { id: receipt.organizationId } })).createdById,
++    name: 'Outro evento', slug: randomUUID(), eventType: 'Outro', registrationMode: 'PAID', format: 'IN_PERSON' } });
++  const otherEventUrl = url.replace('/events/' + receipt.eventId + '/', '/events/' + sibling.id + '/');
++  assert.equal((await fetch(otherEventUrl, { method: 'PUT', headers: { authorization: 'Bearer ' + token, 'content-type': 'application/json' }, body: JSON.stringify(setup) })).status, 404);
++  const requests = await Promise.all(Array.from({ length: 6 }, () => send(token, { ...setup, amountCents: 1, issueAuthorized: true })));
++  for (const response of requests) {
++    assert.equal(response.status, 200);
++    const draft = await response.json();
++    assert.equal(draft.amountCents, 750);
++    assert.equal(draft.issueAuthorized, false);
++    assert.equal(draft.status, 'AWAITING_MUNICIPAL_ADAPTER');
++  }
++  const audits = await db.auditLog.findMany({ where: { entityId: receipt.id, action: 'nfse.draft_prepared' } });
++  assert.equal(audits.length, 1);
++  assert.equal(audits[0].metadata, null);
++  assert.equal(audits[0].organizationId, receipt.organizationId);
++  assert.equal(await db.fiscalReceiptDraft.count({ where: { receiptId: receipt.id } }), 1);
++  assert.equal((await send(token, { ...setup, recipientId: 'other' })).status, 409);
++  assert.equal((await (await send(token)).json()).recipientId, setup.recipientId);
++  assert.equal((await send(outsider.token)).status, 404);
++  const headers = { authorization: 'Bearer ' + token };
++  for (const provider of ['enotas', 'notazz']) {
++    const adapterUrl = url + '/adapters/' + provider;
++    assert.equal((await fetch(adapterUrl, { headers: { authorization: 'Bearer ' + outsider.token } })).status, 404);
++    const response = await fetch(adapterUrl, { headers });
++    assert.equal(response.status, 200);
++    const preview = await response.json();
++    assert.equal(preview.provider, provider);
++    assert.equal(preview.operation, 'PREVIEW');
++    assert.equal(preview.issueAuthorized, false);
++    assert.equal(preview.service.amountCents, 750);
++    assert.equal(preview.source.receiptId, receipt.id);
++    assert.equal(preview.idempotencyKey, (await (await send(token)).json()).idempotencyKey);
++  }
++  assert.equal((await fetch(url + '/adapters/unknown', { headers })).status, 404);
++  await db.eventRegistrationCheckout.update({ where: { id: checkout.id }, data: { status: 'CANCELED' } });
++  assert.equal((await send(token)).status, 404);
++});
++
++test('dois tomadores concorrentes e revogação do OWNER preservam a primeira prévia', async t => {
++  const { db, org, owner, token, receipt, url, setup, send } = await fiscalFixture(t);
++  const proposals = [setup, { ...setup, recipientId: 'segundo-tomador' }];
++  const responses = await Promise.all(proposals.map(body => send(token, body)));
++  assert.deepEqual(responses.map(response => response.status).sort(), [200, 409]);
++  const winner = responses.findIndex(response => response.status === 200);
++  const draft = await responses[winner].json();
++  assert.equal(draft.recipientId, proposals[winner].recipientId);
++  assert.deepEqual(await (await send(token, proposals[winner])).json(), draft);
++  const membership = await db.organizationMembership.findFirstOrThrow({ where: { userId: owner.id, organizationId: org.id } });
++  await db.organizationMembership.update({ where: { id: membership.id }, data: { role: 'ADMIN' } });
++  assert.equal((await send(token)).status, 404);
++  assert.equal((await send(token, proposals[winner])).status, 404);
++  for (const provider of ['enotas', 'notazz']) {
++    assert.equal((await fetch(url + '/adapters/' + provider, { headers: { authorization: 'Bearer ' + token } })).status, 404);
++  }
++  const stored = await db.fiscalReceiptDraft.findUniqueOrThrow({ where: { receiptId: receipt.id } });
++  assert.equal(stored.recipientId, proposals[winner].recipientId);
++  assert.equal(stored.idempotencyKey, draft.idempotencyKey);
++});
++
++test('revogação confirmada depois da leitura impede gravar rascunho e auditoria', async t => {
++  const { db, org, owner, receipt, setup } = await fiscalFixture(t);
++  const { readOrPrepareFiscalDraft } = await import('../dist/nfse-draft-store.js');
++  let revoked = false;
++  const instrumented = db.$extends({ query: { eventRegistrationPaymentReceipt: {
++    async findFirst({ args, query }) {
++      const result = await query(args);
++      if (result && !revoked) {
++        const change = await db.organizationMembership.updateMany({ where: { userId: owner.id, organizationId: org.id }, data: { role: 'ADMIN' } });
++        assert.equal(change.count, 1);
++        revoked = true;
++      }
++      return result;
++    },
++  } } });
++  await assert.rejects(readOrPrepareFiscalDraft(instrumented, owner.id, receipt.eventId, receipt.id, { setup }),
++    error => error.getStatus?.() === 404);
++  assert.equal(revoked, true);
++  assert.equal(await db.fiscalReceiptDraft.count({ where: { receiptId: receipt.id } }), 0);
++  assert.equal(await db.auditLog.count({ where: { entityId: receipt.id, action: 'nfse.draft_prepared' } }), 0);
++});
++
++test('cancelamento do checkout após a leitura impede persistir prévia e auditoria', async t => {
++  const { db, owner, checkout, receipt, setup } = await fiscalFixture(t);
++  const { readOrPrepareFiscalDraft } = await import('../dist/nfse-draft-store.js');
++  let cancelled = false;
++  const instrumented = db.$extends({ query: { eventRegistrationPaymentReceipt: {
++    async findFirst({ args, query }) {
++      const result = await query(args);
++      if (result && !cancelled) {
++        await db.eventRegistrationCheckout.update({ where: { id: checkout.id }, data: { status: 'CANCELED' } });
++        cancelled = true;
++      }
++      return result;
++    },
++  } } });
++  await assert.rejects(readOrPrepareFiscalDraft(instrumented, owner.id, receipt.eventId, receipt.id, { setup }),
++    error => error.getStatus?.() === 404);
++  assert.equal(cancelled, true);
++  assert.equal(await db.fiscalReceiptDraft.count({ where: { receiptId: receipt.id } }), 0);
++  assert.equal(await db.auditLog.count({ where: { entityId: receipt.id, action: 'nfse.draft_prepared' } }), 0);
++});
++
++test('preparação sandbox persiste um único vínculo por recibo sob concorrência', async t => {
++  const { db, token, outsider, org, owner, receipt, url, setup, send } = await fiscalFixture(t);
++  const endpoint = url.replace(/nfse-draft$/, 'nfse-sandbox/preparation');
++  const prepare = auth => fetch(endpoint, { method: 'PUT', headers: { authorization: 'Bearer ' + auth } });
++  const config = { EVOLVIA_NFSE_SANDBOX_PROVIDER: 'enotas', EVOLVIA_NFSE_SANDBOX_ORGANIZATION_ID: org.id,
++    EVOLVIA_NFSE_SANDBOX_MUNICIPALITY: setup.municipalityIbgeCode };
++  for (const [key, value] of Object.entries(config)) {
++    const original = process.env[key];
++    process.env[key] = value;
++    t.after(() => { if (original === undefined) delete process.env[key]; else process.env[key] = original; });
++  }
++  assert.equal((await prepare(token)).status, 404);
++  const draft = await (await send(token, setup)).json();
++  const read = auth => fetch(endpoint, { headers: { authorization: 'Bearer ' + auth } });
++  assert.equal((await read(token)).status, 404);
++  assert.equal((await prepare(outsider.token)).status, 404);
++  process.env.EVOLVIA_NFSE_SANDBOX_MUNICIPALITY = '0000000';
++  assert.equal((await prepare(token)).status, 503);
++  process.env.EVOLVIA_NFSE_SANDBOX_MUNICIPALITY = setup.municipalityIbgeCode;
++  const responses = await Promise.all(Array.from({ length: 5 }, () => prepare(token)));
++  const records = [];
++  for (const response of responses) {
++    assert.equal(response.status, 200);
++    records.push(await response.json());
++  }
++  for (const record of records) {
++    assert.deepEqual(record, records[0]);
++    assert.equal(record.idempotencyKey, draft.idempotencyKey);
++    assert.equal(record.issueAuthorized, false);
++    assert.equal(record.status, 'PREPARED');
++  }
++  process.env.EVOLVIA_NFSE_SANDBOX_PROVIDER = 'notazz';
++  assert.equal((await prepare(token)).status, 409);
++  const persisted = await read(token);
++  assert.equal(persisted.status, 200);
++  assert.deepEqual(await persisted.json(), records[0]);
++  assert.equal((await read(outsider.token)).status, 404);
++  await db.organizationMembership.updateMany({
++    where: { userId: owner.id, organizationId: org.id }, data: { role: 'ADMIN' },
++  });
++  assert.equal((await read(token)).status, 404);
++  const logs = await db.auditLog.findMany({ where: { entityId: receipt.id, action: 'nfse.sandbox_prepared' } });
++  assert.equal(logs.length, 1);
++  assert.equal(logs[0].metadata, null);
++});
++
++test('valor alterado no recibo e checkout invalida o rascunho antes de preparar no sandbox', async t => {
++  const { db, org, token, receipt, checkout, send, setup, url } = await fiscalFixture(t);
++  const config = {
++    EVOLVIA_NFSE_SANDBOX_PROVIDER: 'enotas',
++    EVOLVIA_NFSE_SANDBOX_ORGANIZATION_ID: org.id,
++    EVOLVIA_NFSE_SANDBOX_MUNICIPALITY: setup.municipalityIbgeCode,
++  };
++  for (const [key, value] of Object.entries(config)) {
++    const previous = process.env[key];
++    process.env[key] = value;
++    t.after(() => { if (previous === undefined) delete process.env[key]; else process.env[key] = previous; });
++  }
++  assert.equal((await send(token, setup)).status, 200);
++  await db.$transaction([
++    db.eventRegistrationCheckout.update({ where: { id: checkout.id }, data: { amountCents: 900 } }),
++    db.eventRegistrationPaymentReceipt.update({ where: { id: receipt.id }, data: { amountCents: 900 } }),
++  ]);
++  const response = await fetch(url.replace(/nfse-draft$/, 'nfse-sandbox/preparation'), {
++    method: 'PUT', headers: { authorization: 'Bearer ' + token },
++  });
++  assert.equal(response.status, 409);
++  const [stored] = await db.$queryRaw`SELECT "sandboxPreparedAt" FROM "FiscalReceiptDraft" WHERE "receiptId" = ${receipt.id}`;
++  assert.equal(stored.sandboxPreparedAt, null);
++  assert.equal(await db.auditLog.count({ where: { entityId: receipt.id, action: 'nfse.sandbox_prepared' } }), 0);
++});
+diff --git a/apps/api/tests/nfse-draft-policy.test.mjs b/apps/api/tests/nfse-draft-policy.test.mjs
+new file mode 100644
+index 00000000..95ab2711
+--- /dev/null
++++ b/apps/api/tests/nfse-draft-policy.test.mjs
+@@ -0,0 +1,119 @@
++import assert from 'node:assert/strict';
++import test from 'node:test';
++import {
++  FiscalInvoicePolicyError, prepareFiscalInvoiceDraft, prepareFiscalInvoiceDraftBatch,
++  requireMunicipalFiscalAuthorization,
++} from '../dist/nfse-draft-policy.js';
++
++const fixture = {
++  organizationId: 'organization_0001',
++  eventId: 'event_0001',
++  reservationId: 'reservation_0001',
++  receiptId: 'receipt_0001',
++  paymentStatus: 'CONFIRMED',
++  amountCents: 12050,
++  currency: 'BRL',
++  municipalityIbgeCode: '3550308',
++  issuerId: 'issuer_0001',
++  recipientId: 'recipient_0001',
++  serviceCode: '12.01',
++};
++
++test('prepara rascunho fiscal idempotente, sem alegar emissão', () => {
++  const first = prepareFiscalInvoiceDraft(fixture);
++  const replay = prepareFiscalInvoiceDraft({ ...fixture });
++  assert.deepEqual(first, replay);
++  assert.match(first.idempotencyKey, /^[0-9a-f]{64}$/u);
++  assert.equal(first.status, 'AWAITING_MUNICIPAL_ADAPTER');
++  assert.equal(first.issueAuthorized, false);
++  assert.equal(first.amountCents, 12050);
++  assert.equal(first.currency, 'BRL');
++  assert.doesNotMatch(JSON.stringify(first), /access_token|authorization|cpf|password/iu);
++});
++
++test('chave é distinta por organização, evento, recibo, tomador e município', () => {
++  const original = prepareFiscalInvoiceDraft(fixture).idempotencyKey;
++  for (const change of [
++    { organizationId: 'organization_0002' }, { eventId: 'event_0002' },
++    { receiptId: 'receipt_0002' }, { recipientId: 'recipient_0002' },
++    { municipalityIbgeCode: '3509502' }, { amountCents: 12051 },
++  ]) {
++    assert.notEqual(prepareFiscalInvoiceDraft({ ...fixture, ...change }).idempotencyKey, original);
++  }
++});
++
++test('nenhuma NFS-e pode ser emitida com pagamento pendente, cancelado ou estornado', () => {
++  for (const paymentStatus of ['PENDING', 'REFUNDED', 'CANCELLED']) {
++    assert.throws(
++      () => prepareFiscalInvoiceDraft({ ...fixture, paymentStatus }),
++      FiscalInvoicePolicyError,
++    );
++  }
++});
++
++test('impede município, valor, serviço e referências inválidos', () => {
++  const variants = [
++    { municipalityIbgeCode: '355030' },
++    { municipalityIbgeCode: 'A550308' },
++    { municipalityIbgeCode: '0000000' },
++    { municipalityIbgeCode: '9950308' },
++    { municipalityIbgeCode: '3450308' },
++    { municipalityIbgeCode: '3500000' },
++    { municipalityIbgeCode: '5300000' },
++    { amountCents: 0 }, { amountCents: -1 },
++    { amountCents: 1.5 }, { amountCents: Number.POSITIVE_INFINITY },
++    { currency: 'USD' }, { serviceCode: '12.01;DROP TABLE' },
++    { serviceCode: undefined }, { serviceCode: null }, { serviceCode: 123 },
++    { serviceCode: false }, { serviceCode: {} },
++    { municipalityIbgeCode: undefined }, { municipalityIbgeCode: null },
++    { municipalityIbgeCode: 3550308 }, { municipalityIbgeCode: {} },
++    { issuerId: '' }, { recipientId: '' },
++  ];
++  for (const change of variants) {
++    assert.throws(() => prepareFiscalInvoiceDraft({ ...fixture, ...change }), FiscalInvoicePolicyError);
++  }
++});
++
++test('rejeita payload ausente ou não objeto com erro fiscal controlado', () => {
++  for (const payload of [undefined, null, false, '', 0, [], ['invalid']]) {
++    assert.throws(() => prepareFiscalInvoiceDraft(payload), FiscalInvoicePolicyError);
++  }
++});
++
++test('aceita identificadores legados curtos sem enfraquecer isolamento e idempotência', () => {
++  const short = { ...fixture, organizationId: 'o', eventId: 'e', reservationId: 'r',
++    receiptId: 'p', issuerId: 'i', recipientId: 't' };
++  const draft = prepareFiscalInvoiceDraft(short);
++  assert.equal(draft.organizationId, 'o');
++  assert.equal(draft.issueAuthorized, false);
++  assert.notEqual(draft.idempotencyKey, prepareFiscalInvoiceDraft(fixture).idempotencyKey);
++  for (const change of [{ organizationId: 'o!' }, { eventId: ' ' },
++    { reservationId: 'x'.repeat(129) }]) {
++    assert.throws(() => prepareFiscalInvoiceDraft({ ...short, ...change }), FiscalInvoicePolicyError);
++  }
++});
++
++test('sem adaptador municipal autorizado a emissão é proibida', () => {
++  const draft = prepareFiscalInvoiceDraft(fixture);
++  assert.throws(() => requireMunicipalFiscalAuthorization(draft), /não emitida/u);
++});
++
++test('lote fiscal deduplica retry do mesmo recibo sem emissão', () => {
++  const drafts = prepareFiscalInvoiceDraftBatch([fixture, { ...fixture }]);
++  assert.equal(drafts.length, 1);
++  assert.equal(drafts[0].issueAuthorized, false);
++});
++
++test('lote fiscal recusa conflito no mesmo recibo e isola organizações', () => {
++  assert.throws(
++    () => prepareFiscalInvoiceDraftBatch([fixture, { ...fixture, amountCents: 12051 }]),
++    /conflitantes/u,
++  );
++  const drafts = prepareFiscalInvoiceDraftBatch([
++    fixture, { ...fixture, organizationId: 'organization_0002' },
++  ]);
++  assert.equal(drafts.length, 2);
++  for (const batch of [[], Array.from({ length: 101 }, () => fixture)]) {
++    assert.throws(() => prepareFiscalInvoiceDraftBatch(batch), FiscalInvoicePolicyError);
++  }
++});
+diff --git a/apps/api/tests/nfse-receipt-draft.test.mjs b/apps/api/tests/nfse-receipt-draft.test.mjs
+new file mode 100644
+index 00000000..418de4d9
+--- /dev/null
++++ b/apps/api/tests/nfse-receipt-draft.test.mjs
+@@ -0,0 +1,35 @@
++import assert from 'node:assert/strict';
++import test from 'node:test';
++import { previewFiscalReceipt } from '../dist/nfse-receipt-draft.js';
++
++const scope = { userId:'u', organizationId:'o', eventId:'e', receiptId:'receipt' };
++const setup = { issuerId:'i', recipientId:'r', serviceCode:'12.01', municipalityIbgeCode:'3550308' };
++const receipt = { id:'receipt', organizationId:'o', eventId:'e', reservationId:'reservation',
++  amountCents:750, checkout:{ amountCents:750, reservationId:'reservation' } };
++const reader = row => ({eventRegistrationPaymentReceipt:{findFirst:async () => row}});
++
++test('a prévia usa o valor persistido, é idempotente e permanece bloqueada para emissão', async () => {
++  const preview = await previewFiscalReceipt(reader(receipt),scope,{...setup,amountCents:10});
++  assert.equal(preview.amountCents,750);
++  assert.equal(preview.issueAuthorized,false);
++  assert.deepEqual(preview,await previewFiscalReceipt(reader(receipt),scope,setup));
++});
++
++test('escopo incompleto é recusado antes da consulta, e divergência impede preparação', async () => {
++  for (const key of Object.keys(scope)) {
++    await assert.rejects(previewFiscalReceipt({}, {...scope,[key]:undefined}, setup), /Recibo indisponível/);
++  }
++  for (const value of [null,{...receipt,amountCents:751},{...receipt,reservationId:'outra'}]) {
++    await assert.rejects(previewFiscalReceipt(reader(value),scope,setup), /Recibo indisponível/);
++  }
++});
++
++test('configuração fiscal inválida falha antes da leitura do recibo', async () => {
++  let queries = 0;
++  const db = { eventRegistrationPaymentReceipt: { findFirst: async () => { queries++; return receipt; } } };
++  for (const invalid of [null, undefined, [], { ...setup, issuerId: '' }, { ...setup, recipientId: 123 },
++    { ...setup, municipalityIbgeCode: '0000000' }, { ...setup, serviceCode: {} }]) {
++    await assert.rejects(previewFiscalReceipt(db, scope, invalid), { name: 'FiscalInvoicePolicyError' });
++  }
++  assert.equal(queries, 0);
++});
