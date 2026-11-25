@@ -200,3 +200,29 @@ test('preparação sandbox persiste um único vínculo por recibo sob concorrên
   assert.equal(logs.length, 1);
   assert.equal(logs[0].metadata, null);
 });
+
+test('valor alterado no recibo e checkout invalida o rascunho antes de preparar no sandbox', async t => {
+  const { db, org, token, receipt, checkout, send, setup, url } = await fiscalFixture(t);
+  const config = {
+    EVOLVIA_NFSE_SANDBOX_PROVIDER: 'enotas',
+    EVOLVIA_NFSE_SANDBOX_ORGANIZATION_ID: org.id,
+    EVOLVIA_NFSE_SANDBOX_MUNICIPALITY: setup.municipalityIbgeCode,
+  };
+  for (const [key, value] of Object.entries(config)) {
+    const previous = process.env[key];
+    process.env[key] = value;
+    t.after(() => { if (previous === undefined) delete process.env[key]; else process.env[key] = previous; });
+  }
+  assert.equal((await send(token, setup)).status, 200);
+  await db.$transaction([
+    db.eventRegistrationCheckout.update({ where: { id: checkout.id }, data: { amountCents: 900 } }),
+    db.eventRegistrationPaymentReceipt.update({ where: { id: receipt.id }, data: { amountCents: 900 } }),
+  ]);
+  const response = await fetch(url.replace(/nfse-draft$/, 'nfse-sandbox/preparation'), {
+    method: 'PUT', headers: { authorization: 'Bearer ' + token },
+  });
+  assert.equal(response.status, 409);
+  const [stored] = await db.$queryRaw`SELECT "sandboxPreparedAt" FROM "FiscalReceiptDraft" WHERE "receiptId" = ${receipt.id}`;
+  assert.equal(stored.sandboxPreparedAt, null);
+  assert.equal(await db.auditLog.count({ where: { entityId: receipt.id, action: 'nfse.sandbox_prepared' } }), 0);
+});
