@@ -178,6 +178,8 @@ export default function AreaMasterPage() {
   const [ocupado, setOcupado] = useState(false);
   const [erro, setErro] = useState('');
   const [aviso, setAviso] = useState('');
+  const [segredo, setSegredo] = useState('');
+  const [finalidade, setFinalidade] = useState('BOOTSTRAP');
   const [visao, setVisao] = useState<VisaoGeral | null>(null);
   const [trilha, setTrilha] = useState<Relatorio | null>(null);
   const [catalogo, setCatalogo] = useState<Catalogo | null>(null);
@@ -309,6 +311,29 @@ export default function AreaMasterPage() {
     }
   }
 
+  async function registrarPorAutorizacao() {
+    setOcupado(true);
+    setErro('');
+    setAviso('');
+    const pedido = { segredo, finalidade };
+    setSegredo('');
+    try {
+      const abertura = await api<OpcoesDeRegistroJson>('/platform/master/enrollment/challenge', {
+        method: 'POST', body: JSON.stringify(pedido),
+      });
+      const credencial = await navigator.credentials.create({
+        publicKey: opcoesDeRegistro(abertura) as PublicKeyCredentialCreationOptions,
+      }) as PublicKeyCredential | null;
+      if (!credencial) throw new Error('A chave de segurança não respondeu.');
+      await api('/platform/master/enrollment/credential', { method: 'POST', body: JSON.stringify({
+        ...pedido, desafio: abertura.challenge, resposta: respostaDeRegistro(credencial),
+      }) });
+      setAviso('Chave registrada. Entre com a chave de segurança.');
+    } catch (reason) {
+      setErro(mensagemDoErro(reason));
+    } finally { setOcupado(false); }
+  }
+
   async function registrarChaveDeBackup() {
     setOcupado(true);
     setErro('');
@@ -392,6 +417,24 @@ export default function AreaMasterPage() {
           </p>
 
           {erro && <div className="error" role="alert">{erro}</div>}
+
+          {aviso && <p role="status">{aviso}</p>}
+          {suportado && ['homologacao.evolviatecnologia.com', 'localhost'].includes(window.location.hostname) &&
+            <details>
+              <summary>Cadastrar chave com autorização temporária</summary>
+              <form onSubmit={event => { event.preventDefault(); void registrarPorAutorizacao(); }}>
+                <label>Finalidade
+                  <select value={finalidade} onChange={event => setFinalidade(event.target.value)} disabled={ocupado}>
+                    <option value="BOOTSTRAP">Primeiro acesso</option><option value="RECOVERY">Recuperação</option>
+                  </select>
+                </label>
+                <label>Código recebido pelo canal seguro
+                  <input type="password" autoComplete="off" required minLength={43} maxLength={128}
+                    value={segredo} onChange={event => setSegredo(event.target.value)} disabled={ocupado} />
+                </label>
+                <button className="btn btn-secondary" disabled={ocupado}>Cadastrar chave</button>
+              </form>
+            </details>}
 
           {suportado
             ? <button className="btn btn-primary" onClick={entrar} disabled={ocupado}>

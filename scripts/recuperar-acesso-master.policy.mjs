@@ -310,7 +310,7 @@ BEGIN
   SELECT i."id", i."role"::text, i."status"::text
     INTO ident_id, ident_role, ident_status
     FROM "PlatformMasterIdentity" i
-   WHERE i."userId" = alvo_id;
+   WHERE i."userId" = alvo_id FOR UPDATE;
   IF ident_id IS NULL THEN
     RAISE EXCEPTION 'Este usuario nao tem identidade Master. Use o provisionamento do primeiro proprietario (#690); este script nao cria identidade.';
   END IF;
@@ -346,7 +346,7 @@ BEGIN
   -- execucoes deixariam dois segredos validos simultaneos.
   SELECT w."expiresAt" INTO janela_vence
     FROM "PlatformMasterEnrollmentWindow" w
-   WHERE w."identityId" = ident_id AND w."consumedAt" IS NULL AND w."expiresAt" > now()
+   WHERE w."identityId" = ident_id AND w."consumedAt" IS NULL AND w."revokedAt" IS NULL AND w."expiresAt" > now()
    ORDER BY w."expiresAt" DESC
    LIMIT 1;
   IF janela_vence IS NOT NULL THEN
