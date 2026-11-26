@@ -2027,13 +2027,13 @@
     }
   ],
   "lastConfirmedDeployment": {
-    "sourceSha": "8f6409b02178b795359ba96ad1e46f03514e3550",
-    "run": 44855700901,
-    "job": 136701219650,
-    "commitAtUtc": "2026-11-21T02:40:19Z",
-    "readinessAtUtc": "2026-11-21T02:40:21Z",
+    "sourceSha": "ab02d8d859f29061ff45ec0ebfc27f17aa0ffe3a",
+    "run": 45313903366,
+    "job": 138180865264,
+    "commitAtUtc": "2026-11-24T02:54:13Z",
+    "readinessAtUtc": "2026-11-24T02:54:14Z",
     "httpsStatus": 200,
-    "publicGatePassed": false,
-    "note": "API e PostgreSQL prontos. A verificação pública reprovou porque o cabeçalho Server expôs a versão do Nginx (#108). Aceite autenticado por perfil pendente."
+    "publicGatePassed": true,
+    "note": "O job registrou o commit publicado, HTTPS 200, API/PostgreSQL prontos e ocultação da versão do Nginx. Em 26/11 a rota pública de readiness respondeu com banco ok e versão 0.2.0-alpha.3. A resposta pública não identifica o commit em execução. Aceite autenticado por perfil pendente."
   }
 }
