@@ -30,5 +30,7 @@ COPY package.json package-lock.json ./
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/dist ./dist
 COPY prisma ./prisma
+COPY scripts/verify-sandbox-refund.mjs ./scripts/verify-sandbox-refund.mjs
+RUN node --input-type=module -e "import { verifySandboxRefund } from './scripts/verify-sandbox-refund.mjs'; if (typeof verifySandboxRefund !== 'function') process.exit(1)"
 EXPOSE 4000
 CMD ["node", "dist/main.js"]
