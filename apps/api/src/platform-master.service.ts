@@ -164,6 +164,87 @@ export class PlatformMasterService {
 
   // --------------------------------------------------------------- registro
 
+  /**
+   * Por que a janela não serviu — para a TRILHA, nunca para a resposta.
+   *
+   * O cliente recebe 404 em todos os casos, de propósito: distinguir "segredo
+   * errado" de "janela vencida" na resposta diria a quem sonda que o segredo
+   * estava certo, e isso é um oráculo. Quem investiga depois precisa justamente
+   * dessa distinção, e ela cabe na trilha, que se lê com privilégio.
+   *
+   * `segredo_ou_finalidade_divergente` junta os dois casos porque o digest é
+   * `sha256(segredo:finalidade:identityId)`: com a finalidade dentro do digest,
+   * segredo certo com finalidade errada e segredo errado produzem a mesma
+   * ausência de linha. Separá-los exigiria guardar o segredo de outra forma, o
+   * que o desenho recusa.
+   */
+  private async motivoDaJanelaRecusada(identityId: string, secretDigest: string) {
+    const pelaDigest = await this.prisma.platformMasterEnrollmentWindow.findFirst({
+      where: { identityId, secretDigest },
+      select: { consumedAt: true, revokedAt: true, expiresAt: true, correlationId: true },
+    });
+    if (!pelaDigest) {
+      const abertas = await this.prisma.platformMasterEnrollmentWindow.count({
+        where: { identityId, consumedAt: null, revokedAt: null, expiresAt: { gt: new Date() } },
+      });
+      return {
+        motivo: abertas > 0 ? 'segredo_ou_finalidade_divergente' : 'sem_janela_aberta',
+        correlationId: null as string | null,
+      };
+    }
+    if (pelaDigest.revokedAt) return { motivo: 'janela_revogada', correlationId: pelaDigest.correlationId };
+    if (pelaDigest.consumedAt) return { motivo: 'janela_ja_consumida', correlationId: pelaDigest.correlationId };
+    if (pelaDigest.expiresAt <= new Date()) return { motivo: 'janela_vencida', correlationId: pelaDigest.correlationId };
+    return { motivo: 'janela_indisponivel', correlationId: pelaDigest.correlationId };
+  }
+
+  /**
+   * Grava a recusa ou a falha da inscrição na trilha.
+   *
+   * Três escolhas, cada uma com consequência:
+   *
+   *   - **Fora da transação.** A recusa derruba a transação, e uma linha
+   *     gravada dentro dela voltaria atrás junto com o consumo. Negar sem
+   *     deixar rastro é como não ter negado — a mesma razão que levou
+   *     `PlatformMasterGuard` a gravar `DENIED` fora de transação.
+   *   - **Depois do limitador de tentativas.** Gravar antes transformaria a
+   *     própria trilha em alvo: quem tivesse identidade Master encheria a
+   *     tabela batendo na rota. Atrás do limitador, o número de linhas que uma
+   *     sondagem escreve é o número de tentativas que o limitador deixa passar.
+   *   - **Não derruba a recusa.** Se a gravação falhar, a pessoa continua
+   *     recusada. Trocar 404/401 por 500 porque a auditoria caiu abriria outra
+   *     porta, de outro tipo.
+   *
+   * O segredo NUNCA entra em `changes`. O que se registra é a finalidade, a
+   * etapa e o motivo — o que a auditoria precisa, não o material que
+   * autorizaria a inscrição.
+   */
+  private async registrarRecusaDeInscricao(dados: {
+    userId: string;
+    etapa: string;
+    finalidade: string;
+    motivo: string;
+    resultado: 'DENIED' | 'FAILED';
+    correlationId: string | null;
+  }): Promise<void> {
+    try {
+      await this.prisma.platformAuditLog.create({
+        data: {
+          actorUserId: dados.userId,
+          targetUserId: dados.userId,
+          action: `inscricao_master:${dados.etapa}`.slice(0, 60),
+          scopeKind: 'GLOBAL',
+          result: dados.resultado,
+          reason: `${dados.resultado === 'FAILED' ? 'Falha' : 'Recusa'} na inscrição: ${dados.motivo}.`.slice(0, 200),
+          correlationId: (dados.correlationId ?? `inscricao-${Date.now().toString(36)}`).slice(0, 64),
+          changes: { finalidade: dados.finalidade, etapa: dados.etapa, motivo: dados.motivo },
+        },
+      });
+    } catch {
+      // Registrada ou não, a recusa vale.
+    }
+  }
+
   private async janelaDeInscricao(userId: string, pedido: AbrirInscricaoMasterDto, origem: string, etapa: string) {
     const config = configuracaoWebAuthn();
     const ambiente = process.env.EVOLVIA_AMBIENTE;
@@ -189,7 +270,13 @@ export class PlatformMasterService {
         expiresAt: { gt: new Date() } },
       select: { id: true, identityId: true, correlationId: true, challengeHash: true },
     });
-    if (!janela) throw new NotFoundException();
+    if (!janela) {
+      const { motivo, correlationId } = await this.motivoDaJanelaRecusada(identidade.id, secretDigest);
+      await this.registrarRecusaDeInscricao({
+        userId, etapa, finalidade: pedido.finalidade, motivo, resultado: 'DENIED', correlationId,
+      });
+      throw new NotFoundException();
+    }
     return janela;
   }
 
@@ -200,36 +287,75 @@ export class PlatformMasterService {
       where: { id: janela.id, identity: { userId, status: 'ACTIVE' }, revokedAt: null, consumedAt: null,
         expiresAt: { gt: new Date() } }, data: { challengeHash: hash(opcoes.challenge) },
     });
-    if (!resultado.count) throw new NotFoundException();
+    if (!resultado.count) {
+      // Entre a leitura e este UPDATE a janela deixou de ser utilizável —
+      // revogada, vencida, consumida, ou a identidade saiu de ACTIVE.
+      await this.registrarRecusaDeInscricao({
+        userId, etapa: 'abrir', finalidade: pedido.finalidade, motivo: 'janela_indisponivel_na_abertura',
+        resultado: 'DENIED', correlationId: janela.correlationId,
+      });
+      throw new NotFoundException();
+    }
     return opcoes;
   }
 
   async consumirInscricao(userId: string, pedido: ConsumirInscricaoMasterDto, origem: string) {
     const janela = await this.janelaDeInscricao(userId, pedido, origem, 'concluir');
     const challengeHash = hash(pedido.desafio);
-    if (janela.challengeHash !== challengeHash) throw new UnauthorizedException();
+    if (janela.challengeHash !== challengeHash) {
+      await this.registrarRecusaDeInscricao({
+        userId, etapa: 'concluir', finalidade: pedido.finalidade, motivo: 'desafio_divergente',
+        resultado: 'DENIED', correlationId: janela.correlationId,
+      });
+      throw new UnauthorizedException();
+    }
     const verificado = await this.webauthn.verificarRegistro(pedido.resposta, pedido.desafio);
-    if (!verificado) throw new UnauthorizedException();
-    await this.prisma.$transaction(async tx => {
-      // Mesma ordem de locks do emissor no host: identidade antes da janela.
-      const identidade = await tx.$queryRaw<{ id: string }[]>`SELECT id FROM "PlatformMasterIdentity"
-        WHERE id = ${janela.identityId} AND "userId" = ${userId} AND status = 'ACTIVE' FOR UPDATE`;
-      if (!identidade.length || await tx.platformWebAuthnCredential.count({ where: { identityId: janela.identityId } })) {
-        throw new UnauthorizedException();
-      }
-      const consumida = await tx.$executeRaw`UPDATE "PlatformMasterEnrollmentWindow"
-        SET "consumedAt" = clock_timestamp(), "challengeHash" = NULL
-        WHERE id = ${janela.id} AND "identityId" = ${janela.identityId} AND "challengeHash" = ${challengeHash}
-          AND "consumedAt" IS NULL AND "revokedAt" IS NULL AND "expiresAt" > clock_timestamp()`;
-      if (consumida !== 1) throw new UnauthorizedException();
-      await tx.platformWebAuthnCredential.create({ data: this.repositorio.dadosDaCredencial({
-        identityId: janela.identityId, rotulo: 'Chave de segurança', ...verificado,
-      }) });
-      await tx.platformAuditLog.create({ data: { actorUserId: userId, targetUserId: userId,
-        action: 'consumir_inscricao_master', scopeKind: 'GLOBAL', result: 'ALLOWED',
-        reason: 'Registro de autenticador autorizado no host.', correlationId: janela.correlationId,
-        changes: { finalidade: pedido.finalidade } } });
-    });
+    if (!verificado) {
+      // `FAILED` e não `DENIED`: a autorização estava em ordem e a cerimônia
+      // criptográfica é que não se verificou. São investigações diferentes —
+      // uma aponta para quem sonda, a outra para o autenticador ou a origem.
+      await this.registrarRecusaDeInscricao({
+        userId, etapa: 'concluir', finalidade: pedido.finalidade, motivo: 'atestacao_nao_verificada',
+        resultado: 'FAILED', correlationId: janela.correlationId,
+      });
+      throw new UnauthorizedException();
+    }
+    try {
+      await this.prisma.$transaction(async tx => {
+        // Mesma ordem de locks do emissor no host: identidade antes da janela.
+        const identidade = await tx.$queryRaw<{ id: string }[]>`SELECT id FROM "PlatformMasterIdentity"
+          WHERE id = ${janela.identityId} AND "userId" = ${userId} AND status = 'ACTIVE' FOR UPDATE`;
+        if (!identidade.length || await tx.platformWebAuthnCredential.count({ where: { identityId: janela.identityId } })) {
+          throw new UnauthorizedException();
+        }
+        const consumida = await tx.$executeRaw`UPDATE "PlatformMasterEnrollmentWindow"
+          SET "consumedAt" = clock_timestamp(), "challengeHash" = NULL
+          WHERE id = ${janela.id} AND "identityId" = ${janela.identityId} AND "challengeHash" = ${challengeHash}
+            AND "consumedAt" IS NULL AND "revokedAt" IS NULL AND "expiresAt" > clock_timestamp()`;
+        if (consumida !== 1) throw new UnauthorizedException();
+        await tx.platformWebAuthnCredential.create({ data: this.repositorio.dadosDaCredencial({
+          identityId: janela.identityId, rotulo: 'Chave de segurança', ...verificado,
+        }) });
+        await tx.platformAuditLog.create({ data: { actorUserId: userId, targetUserId: userId,
+          action: 'consumir_inscricao_master', scopeKind: 'GLOBAL', result: 'ALLOWED',
+          reason: 'Registro de autenticador autorizado no host.', correlationId: janela.correlationId,
+          changes: { finalidade: pedido.finalidade } } });
+      });
+    } catch (erro) {
+      // `UnauthorizedException` aqui é recusa de política DENTRO da transação:
+      // a identidade saiu de ACTIVE, já havia credencial, ou a janela deixou de
+      // ser consumível entre a leitura e o UPDATE. Qualquer outro erro é falha
+      // de execução. Os dois casos não são a mesma linha na trilha, e tratá-los
+      // como um só obrigaria quem investiga a reabrir o código para saber qual
+      // aconteceu.
+      const recusada = erro instanceof UnauthorizedException;
+      await this.registrarRecusaDeInscricao({
+        userId, etapa: 'concluir', finalidade: pedido.finalidade,
+        motivo: recusada ? 'consumo_nao_autorizado' : 'falha_na_persistencia',
+        resultado: recusada ? 'DENIED' : 'FAILED', correlationId: janela.correlationId,
+      });
+      throw erro;
+    }
     return { registrado: true };
   }
 
