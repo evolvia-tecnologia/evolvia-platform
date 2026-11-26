@@ -25,6 +25,19 @@ RUN npm prune --omit=dev && npm cache clean --force
 FROM node:22.23-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
+
+# O commit que gerou ESTA imagem.
+#
+# Assado na imagem, de proposito, e nao passado como variavel de execucao: o que
+# a rota de saude precisa responder e "de qual codigo este binario veio", e
+# variavel de execucao responderia "o que este deploy alega". As duas divergem
+# exatamente no caso que interessa — imagem reaproveitada do cache enquanto o
+# repositorio avancou — e e nesse caso que uma resposta honesta importa.
+#
+# Fica no fim do estagio de execucao para nao invalidar as camadas caras acima:
+# trocar o SHA reconstroi so o que vem depois desta linha.
+ARG EVOLVIA_BUILD_SHA=""
+ENV EVOLVIA_BUILD_SHA=$EVOLVIA_BUILD_SHA
 RUN apk add --no-cache openssl
 COPY package.json package-lock.json ./
 COPY --from=builder /app/node_modules ./node_modules
