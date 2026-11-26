@@ -18,7 +18,10 @@ colateral de um comando que ninguém inspecionou.
 
 1. A conta que será proprietária **já existe** na plataforma e tem **e-mail
    verificado**. Crie pelo cadastro normal, não por SQL.
-2. A migration da Área Master está aplicada no banco de destino (vem da PR #675).
+2. As migrations da Área Master estão aplicadas no banco de destino: a da
+   identidade (PR #675) e a da janela de inscrição,
+   `20261125154000_platform_master_enrollment_window`. Sem a segunda, a janela
+   temporária não tem onde existir e o primeiro acesso não acontece.
 3. Você tem o `DATABASE_URL` do ambiente de destino.
 
 ## Passo 1 — gerar o SQL
@@ -181,3 +184,78 @@ O provisionamento da #690 cria a identidade do proprietário com e-mail verifica
 A API verifica o desafio, a origem, o RP e a verificação do usuário. A transação bloqueia a identidade e condiciona o consumo à validade da janela, à ausência de revogação e ao desafio vigente. Gravação da credencial, consumo e auditoria ocorrem na mesma transação. A recuperação invalida credenciais e sessões anteriores. A autorização temporária só é aceita na homologação canônica e pelo cenário descartável do CI. A publicação requer revisão independente, CI no SHA candidato e identificação do SHA implantado.
 
 Para habilitar a inscrição na homologação, o operador configura EVOLVIA_AMBIENTE=homologacao e EVOLVIA_PUBLIC_BASE_URL=https://homologacao.evolviatecnologia.com na API. PLATFORM_MASTER_RP_ID deve ser homologacao.evolviatecnologia.com e PLATFORM_MASTER_ORIGIN deve coincidir com a URL pública. O comando de emissão no host exige EVOLVIA_AMBIENTE=homologacao e a confirmação explícita do host PostgreSQL. Guarde a identificação da janela e a correlação da operação para auditoria.
+
+## Revogar uma janela aberta
+
+A janela dura no máximo 60 minutos, e às vezes isso é tempo demais: o segredo
+foi entregue à pessoa errada, a nota registrou o chamado errado, ou o canal de
+entrega vazou. Esperar o vencimento com um segredo válido em trânsito não é
+resposta, e `UPDATE` à mão em banco de homologação é exatamente o que estes
+scripts existem para evitar.
+
+```bash
+node scripts/revogar-inscricao-master.mjs \
+  --email titular@exemplo.org \
+  --identidade cmasteridentidade... \
+  --nota "Canal de entrega do segredo comprometido, chamado CH-7" \
+  --correlacao ch-7 \
+  --confirmar-host homologacao-db \
+  --confirmar-revogacao > revogacao.sql
+
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f revogacao.sql
+```
+
+Como os outros, ele **não escreve no banco**: imprime SQL para você ler antes de
+executar. O bloco é uma transação só — ou a revogação e a trilha acontecem
+juntas, ou nada acontece.
+
+O que ele faz: marca `revokedAt` nas janelas **abertas** daquela identidade,
+limpa o desafio gravado e registra a trilha com quantas janelas fechou. O que
+ele **não** faz: não apaga credencial, não encerra sessão, não altera a
+identidade. Para isso o comando é `recuperar-acesso-master.mjs --finalidade
+recuperacao`, e a diferença importa — recuperar **apaga** autenticadores, e
+ninguém deve chegar nesse efeito querendo cancelar um convite.
+
+Duas escolhas que surpreendem e são deliberadas:
+
+- **Identidade suspensa também pode ter janela revogada.** Abrir para identidade
+  suspensa devolveria acesso por via indireta e por isso é recusado; fechar uma
+  autorização pendente é sempre seguro. Exigir `ACTIVE` aqui deixaria sem recurso
+  justamente o caso em que a suspeita foi o motivo da suspensão.
+- **Se não havia nada aberto, o comando FALHA.** Zero linhas afetadas não sai
+  como sucesso: quem revoga precisa saber se havia o que revogar, porque ler
+  silêncio como "fechado" é como deixar de procurar um segredo que continua
+  valendo em outro lugar. Se o segredo já foi consumido, a credencial existe e o
+  caminho é a recuperação.
+
+Janela já consumida não é tocada. Marcar revogação nela diria que o registro do
+autenticador foi desfeito, e não foi.
+
+Depois de revogar, abrir outra é o caminho normal: a guarda de janela única
+passa a deixar, porque não há mais autorização em aberto.
+
+## Nota sobre a migration: o que é idempotente, e o que não é
+
+A distinção tem consequência operacional, então vale escrita precisa.
+
+`20261125154000_platform_master_enrollment_window` **não é um SQL
+re-executável**. São sete comandos `CREATE`/`ALTER` sem `IF NOT EXISTS`: rodar o
+arquivo duas vezes contra o mesmo banco falha no primeiro `CREATE TYPE`. Medido
+em PostgreSQL 16.15: a segunda execução para na primeira instrução, com
+`type "PlatformEnrollmentPurpose" already exists`.
+
+O que é idempotente é o **`prisma migrate deploy`**. Ele registra cada migration
+aplicada em `_prisma_migrations` e salta as que já estão lá, então uma segunda
+publicação do mesmo SHA não reaplica nada. O CI comprova esse comportamento, e
+não o outro — é o passo que grava `migrate-segunda-execucao.log` e exige
+`No pending migrations to apply`.
+
+Na prática: publicar duas vezes é seguro; executar o arquivo `.sql` à mão duas
+vezes não é. E não se corrige isso editando a migration depois de aplicada — o
+`migrate` guarda o checksum do arquivo, e alterá-lo passa a acusar divergência
+em todo ambiente onde ela já rodou.
+
+O SQL **do provisionamento** é outra coisa, e esse sim é re-executável para o
+mesmo proprietário ativo, como o Passo 3 explica. Os dois sentidos de
+"idempotente" conviviam neste procedimento sem serem distinguidos, e confundi-los
+é o que faz alguém reaplicar o arquivo errado.
