@@ -1,3 +1,11 @@
+## Homologação pública em 26/11/2026
+
+O HEAD verificado de develop foi `ab02d8d859f29061ff45ec0ebfc27f17aa0ffe3a`. Os oito jobs da execução 45313903366 passaram, inclusive migration idempotente, fluxo funcional, PostgreSQL, ARM64 e publicação. O job de deploy registrou esse SHA em 24/11 e confirmou HTTPS 200, API e banco prontos. [Publicação](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/45313903366/job/138180865264).
+
+Em 26/11, as rotas de saúde da API responderam HTTP 200 com versão 0.2.0-alpha.3 e o readiness confirmou PostgreSQL. No navegador, a navegação do início até Eventos carregou o catálogo, e o link para TESTE QA 30102026 — Corporativo Gratuito abriu a página de detalhe com o título esperado. O catálogo também exibiu a Feira de Tecnologia de teste. Os ensaios foram públicos, sem criação de inscrições. [Evento utilizado](https://homologacao.evolviatecnologia.com/tq3cg-50f36b8cda0d).
+
+O SHA servido pelas imagens ativas, Redis, Nginx local, certificado de origem e as quatro variáveis WebAuthn dependem da coleta no host. Os comandos de verificação, backup e critérios de rollback foram disponibilizados ao responsável. A restauração e os testes autenticados por perfil estão pendentes. [Procedimento na #571](https://github.com/evolvia-tecnologia/evolvia-platform/issues/571#issuecomment-7200660810).
+
 
 ## Reconciliação G5.8 I/T — 23/11/2026 (PR #708 integrada)
 

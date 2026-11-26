@@ -2,7 +2,7 @@
 
 O último deploy bem-sucedido da `develop` publicou `ab02d8d859f29061ff45ec0ebfc27f17aa0ffe3a` em 24/11 às 02h54 UTC. O job confirmou HTTPS 200, disponibilidade da API e do PostgreSQL e ocultação da versão do Nginx. [Log de publicação](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/45313903366/job/138180865264).
 
-Em 26/11, a API pública respondeu com status `ready`, banco `ok` e versão `0.2.0-alpha.3`. A identificação do SHA pelo serviço em execução, a configuração efetiva de WebAuthn e o aceite autenticado por perfil seguem pendentes. Os indicadores por critério permanecem no último fechamento EVO-018. Os registros datados abaixo preservam o histórico.
+Em 26/11, a API pública respondeu com status `ready`, banco `ok` e versão `0.2.0-alpha.3`. A identificação do SHA pelo serviço em execução, a configuração efetiva de WebAuthn e o aceite autenticado por perfil seguem pendentes. A regressão pública em navegador percorreu início, catálogo e página do evento corporativo fictício. O roteiro para confirmar as imagens ativas e as variáveis no host está na [#571](https://github.com/evolvia-tecnologia/evolvia-platform/issues/571#issuecomment-7200660810). Os indicadores por critério permanecem no último fechamento EVO-018. Os registros datados abaixo preservam o histórico.
 
 
 ## Reconciliação G5.8 I/T — 23/11/2026 (PR #708 integrada)
