@@ -25,6 +25,11 @@ RUN npm prune --omit=dev && npm cache clean --force
 FROM node:22.23-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
+RUN apk add --no-cache openssl
+COPY package.json package-lock.json ./
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/dist ./dist
+COPY prisma ./prisma
 
 # O commit que gerou ESTA imagem.
 #
@@ -38,10 +43,6 @@ ENV NODE_ENV=production
 # trocar o SHA reconstroi so o que vem depois desta linha.
 ARG EVOLVIA_BUILD_SHA=""
 ENV EVOLVIA_BUILD_SHA=$EVOLVIA_BUILD_SHA
-RUN apk add --no-cache openssl
-COPY package.json package-lock.json ./
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/dist ./dist
-COPY prisma ./prisma
+
 EXPOSE 4000
 CMD ["node", "dist/main.js"]
