@@ -33,11 +33,19 @@
  * para RECOVERY, e a janela de uma identidade nao serve para outra — mesmo que
  * o segredo vaze.
  *
- * SEM IMPORT RELATIVO, SEM PRISMA, SEM REDE
- * -----------------------------------------
- * Unico import e builtin, para o digest. O modulo roda e e testavel sozinho,
- * como `provisionar-proprietario-master.policy.mjs` — que e o padrao que o
- * fundador mandou reusar, e nao um padrao novo.
+ * SEM PRISMA E SEM REDE
+ * ---------------------
+ * Um builtin, para o digest, e uma constante da politica irma — que tambem nao
+ * toca banco nem rede. O modulo roda e e testavel sozinho, como
+ * `provisionar-proprietario-master.policy.mjs`, que e o padrao que o fundador
+ * mandou reusar.
+ *
+ * A constante importada e `PREFIXO_DE_ATOR_SISTEMICO`. Repetir a literal aqui
+ * foi o defeito corrigido em 26/11: este modulo gravava a trilha com
+ * `sistema-operacional`, que NAO casa o prefixo, e por isso `ehAtorSistemico`
+ * classificava a abertura de janela como acao HUMANA. O relatorio de auditoria
+ * separa pessoa de sistema por esse predicado — a linha aparecia como se
+ * alguem tivesse agido pela aplicacao, e nenhuma pessoa agiu.
  *
  * Nomes de tabela e coluna foram LIDOS de `apps/api/prisma/platform-master-identity.prisma`
  * (blob de8dc35a) e `platform-master.prisma` (blob d2658e05) em develop@ab02d8d8.
@@ -49,6 +57,13 @@
  */
 
 import { createHash, randomInt } from 'node:crypto';
+import { PREFIXO_DE_ATOR_SISTEMICO } from './provisionar-proprietario-master.policy.mjs';
+
+/**
+ * Ator desta operacao na trilha. Nao e pessoa: quem executa e o operador, pelo
+ * cliente dele, e o namespace `sistema:` e o que faz o relatorio saber disso.
+ */
+export const ATOR_DA_INSCRICAO = `${PREFIXO_DE_ATOR_SISTEMICO}inscricao-master`;
 
 /** As duas finalidades. Entram no digest, entao nao sao intercambiaveis. */
 export const FINALIDADES = Object.freeze(['BOOTSTRAP', 'RECOVERY']);
@@ -133,7 +148,14 @@ export function hostDoBanco(databaseUrl) {
   return host.length === 0 ? null : host;
 }
 
-function pareceProducao(...valores) {
+/**
+ * Marcador de producao em qualquer dos valores dados.
+ *
+ * Exportada porque `revogar-inscricao-master.policy.mjs` precisa da MESMA
+ * decisao. Uma terceira copia da regra de "o que e producao" seria a forma mais
+ * provavel de um dos scripts aceitar um banco que o outro recusa.
+ */
+export function pareceProducao(...valores) {
   for (const valor of valores) {
     if (typeof valor !== 'string') continue;
     const baixo = valor.toLowerCase();
@@ -266,7 +288,7 @@ function texto(valor) {
  * e desfeita, vale aqui como vale para conceder.
  */
 export function montarSql(pedido) {
-  const { finalidade, email, identidade, nota, correlacao, minutos, segredo, atorUserId = 'sistema-operacional' } = pedido;
+  const { finalidade, email, identidade, nota, correlacao, minutos, segredo, atorUserId = ATOR_DA_INSCRICAO } = pedido;
   if (!FINALIDADES.includes(finalidade)) throw new Error(MOTIVOS.finalidade_invalida);
   if (typeof segredo !== 'string' || segredo.length < MINIMO_DO_SEGREDO) throw new Error(MOTIVOS.segredo_curto);
   if (!BASE64URL.test(segredo)) throw new Error(MOTIVOS.segredo_nao_base64url);
