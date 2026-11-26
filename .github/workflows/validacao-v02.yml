@@ -45,7 +45,7 @@ jobs:
           node --test scripts/validate-gate1-human-accessibility-evidence.test.mjs
           # Guardrails do seed comercial rodam na raiz; a imagem API tem contexto ./apps/api.
           node --test scripts/seed-commercial-pilots.test.mjs
-          node --test scripts/provisionar-proprietario-master.test.mjs scripts/recuperar-acesso-master.test.mjs
+          node --test scripts/provisionar-proprietario-master.test.mjs scripts/recuperar-acesso-master.test.mjs scripts/revogar-inscricao-master.test.mjs scripts/lib/execucao-direta.test.mjs
 
       - name: Instalar o Poppler
         run: sudo apt-get update -qq && sudo apt-get install -y -qq poppler-utils
@@ -483,6 +483,7 @@ jobs:
             -p "$COMPOSE_PROJECT_NAME" \
             run --rm --no-deps \
             -v "$PWD/scripts/provisionar-proprietario-master.policy.mjs:/scripts/provisionar-proprietario-master.policy.mjs:ro" \
+            -v "$PWD/scripts/recuperar-acesso-master.policy.mjs:/scripts/recuperar-acesso-master.policy.mjs:ro" \
             -v "$PWD/apps/api/tests-postgres:/app/tests-postgres:ro" \
             api node --test "tests-postgres/*.test.mjs"
 
