@@ -3,11 +3,14 @@ import { pathToFileURL } from 'node:url';
 import { PrismaClient } from '@prisma/client';
 import { inspectSandboxPayment, readSandboxPayment } from '../dist/asaas-sandbox-refund.js';
 
+// Only errors constructed here may be presented to the operator.
+class VerificationError extends Error {}
+
 export async function verifySandboxRefund(db, eventId, requestId) {
   const organizationId = process.env.ASAAS_REFUND_SANDBOX_ORGANIZATION_ID;
   const token = process.env.ASAAS_REFUND_SANDBOX_TOKEN;
   if (!organizationId?.trim() || process.env.ASAAS_REFUND_SANDBOX_EXECUTION_ORGANIZATION_ID !== organizationId ||
-      !token?.trim() || !eventId?.trim() || !requestId?.trim()) throw new Error('Configuração de homologação incompleta.');
+      !token?.trim() || !eventId?.trim() || !requestId?.trim()) throw new VerificationError('Configuração de homologação incompleta.');
 
   const [op] = await db.$queryRaw`
     SELECT op."requestId", op."paymentId", op."amountCents", op."reconciledAt",
@@ -22,10 +25,17 @@ export async function verifySandboxRefund(db, eventId, requestId) {
       AND g."organizationId" = op."organizationId" AND g."eventId" = op."eventId"
     WHERE op."organizationId" = ${organizationId} AND op."eventId" = ${eventId} AND op."requestId" = ${requestId}
       AND op.status = 'RECONCILED' AND op."reconciledAt" IS NOT NULL AND r.status = 'APPROVED'
-      AND ((c.id IS NULL) <> (g.id IS NULL))`;
-  if (!op?.checkoutId) throw new Error('Conciliação local indisponível.');
-  const observed = inspectSandboxPayment(op, await readSandboxPayment(op.paymentId, token));
-  if (!observed.matched || observed.status !== 'RECONCILED') throw new Error('Confirmação do provedor pendente.');
+      AND ((c.id IS NULL) <> (g.id IS NULL))`.catch(() => {
+      throw new VerificationError('Consulta ao banco de homologação indisponível.');
+    });
+  if (!op?.checkoutId) throw new VerificationError('Conciliação local indisponível.');
+  const payment = await readSandboxPayment(op.paymentId, token).catch(() => {
+    throw new VerificationError('Consulta ao Asaas Sandbox indisponível.');
+  });
+  let observed;
+  try { observed = inspectSandboxPayment(op, payment); }
+  catch { throw new VerificationError('Cobrança ou histórico incompatível com o pedido.'); }
+  if (!observed.matched || observed.status !== 'RECONCILED') throw new VerificationError('Confirmação do provedor pendente.');
 
   const evidenceHash = createHash('sha256').update(JSON.stringify([
     'asaas-sandbox-refund-v1', organizationId, eventId, requestId, op.checkoutId,
@@ -37,6 +47,9 @@ export async function verifySandboxRefund(db, eventId, requestId) {
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const db = new PrismaClient();
   try { console.log(JSON.stringify(await verifySandboxRefund(db, process.argv[2], process.argv[3]))); }
-  catch { console.error('Conciliação do Pix de homologação não comprovada.'); process.exitCode = 1; }
+  catch (error) {
+    console.error(error instanceof VerificationError ? error.message : 'Conciliação do Pix de homologação não comprovada.');
+    process.exitCode = 1;
+  }
   finally { await db.$disconnect(); }
 }
