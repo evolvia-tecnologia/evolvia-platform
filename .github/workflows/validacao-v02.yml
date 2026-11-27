@@ -471,6 +471,8 @@ jobs:
           retention-days: 7
 
       # Depois das provas públicas: as fixtures deste passo não devem entrar nas capturas de /eventos.
+      # Os arquivos compartilham o mesmo schema. O ensaio de rollback executa DDL exclusivo.
+      # As transações simultâneas dentro de cada teste continuam concorrentes.
       - name: Provar área de atuação no PostgreSQL
         run: |
           docker compose \
@@ -478,7 +480,7 @@ jobs:
             -p "$COMPOSE_PROJECT_NAME" \
             run --rm --no-deps \
             -v "$PWD/apps/api/tests-postgres:/app/tests-postgres:ro" \
-            api node --test "tests-postgres/*.test.mjs"
+            api node --test --test-concurrency=1 "tests-postgres/*.test.mjs"
 
       - name: Exibir logs em caso de falha
         if: failure()
