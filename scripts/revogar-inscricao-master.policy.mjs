@@ -42,6 +42,7 @@
  *     pratica, uma linha so; o SQL devolve a contagem em vez de supor.
  */
 
+import { randomInt } from 'node:crypto';
 import { hostDoBanco, pareceProducao } from './recuperar-acesso-master.policy.mjs';
 
 /** Marca de dollar-quoting deste bloco. Nenhum valor pode conte-la. */
@@ -62,6 +63,8 @@ export const MOTIVOS = Object.freeze({
     'Recusado: --confirmar-host precisa repetir exatamente o host do DATABASE_URL. E a guarda que impede rodar no banco errado.',
   confirmacao_ausente:
     'Recusado: falta --confirmar-revogacao. Fechar autorizacao pendente e ato deliberado, nao efeito colateral de um comando digitado pela metade.',
+  confirmacao_com_valor:
+    'Recusado: --confirmar-revogacao nao aceita valor. Escreva a flag sozinha. `--confirmar-revogacao=false` era lido como SIM, porque o valor apos o = era descartado — quem escreveu false autorizava. Agora e recusado, e nao reinterpretado.',
   email_invalido:
     'Recusado: informe --email do titular, em forma valida e com ate 254 caracteres.',
   identidade_invalida:
@@ -89,6 +92,7 @@ export function lerArgumentos(argv) {
     correlacao: null,
     confirmarHost: null,
     confirmouRevogacao: false,
+    confirmacaoComValor: false,
   };
   for (let i = 0; i < argv.length; i += 1) {
     const bruto = argv[i];
@@ -102,7 +106,14 @@ export function lerArgumentos(argv) {
       case '--nota': entrada.nota = proximo(); break;
       case '--correlacao': entrada.correlacao = proximo(); break;
       case '--confirmar-host': entrada.confirmarHost = proximo(); break;
-      case '--confirmar-revogacao': entrada.confirmouRevogacao = true; break;
+      // Flag booleana. Valor embutido nao e aceito NEM reinterpretado: antes
+      // este case ignorava `embutido` e marcava true, entao
+      // `--confirmar-revogacao=false` autorizava a revogacao. Marcar e deixar
+      // `decidirEntrada` recusar, para a recusa sair com motivo proprio.
+      case '--confirmar-revogacao':
+        if (embutido !== null) entrada.confirmacaoComValor = true;
+        else entrada.confirmouRevogacao = true;
+        break;
       default: break;
     }
   }
@@ -128,6 +139,7 @@ export function decidirEntrada(entrada, env = {}) {
   }
   if (env.EVOLVIA_AMBIENTE !== 'homologacao') return recusa(MOTIVOS.ambiente_nao_declarado);
   if (entrada.confirmarHost !== host) return recusa(MOTIVOS.host_nao_confirmado);
+  if (entrada.confirmacaoComValor === true) return recusa(MOTIVOS.confirmacao_com_valor);
   if (entrada.confirmouRevogacao !== true) return recusa(MOTIVOS.confirmacao_ausente);
 
   if (typeof entrada.email !== 'string' || entrada.email.length > 254 || !EMAIL.test(entrada.email)) {
@@ -159,10 +171,20 @@ function texto(valor) {
   return `'${valor.replace(/'/gu, "''")}'`;
 }
 
-/** Id no estilo cuid, so para a chave primaria da trilha. Nao e segredo. */
+/**
+ * Id no estilo cuid, so para a chave primaria da trilha. Nao e segredo.
+ *
+ * `randomInt` e nao `Math.random`: a politica irma ja gera este mesmo id com
+ * `randomInt` (`recuperar-acesso-master.policy.mjs`, na funcao equivalente), e
+ * duas familias de aleatoriedade para a mesma coisa no mesmo fluxo e divergencia
+ * sem ganho. O efeito pratico de um id previsivel aqui e modesto mas real: quem
+ * pudesse inserir a linha antes faria a PK colidir, o `RAISE` do bloco desfaria
+ * TUDO, e a revogacao nao aconteceria — negacao de uma operacao de seguranca.
+ * `sorteia` continua injetavel porque o teste precisa de id estavel.
+ */
 export function idEstiloCuid(sorteia) {
   const alfabeto = 'abcdefghijklmnopqrstuvwxyz0123456789';
-  const pega = sorteia ?? ((limite) => Math.floor(Math.random() * limite));
+  const pega = sorteia ?? ((limite) => randomInt(limite));
   let saida = 'c';
   for (let i = 0; i < 24; i += 1) saida += alfabeto[pega(alfabeto.length)];
   return saida;
