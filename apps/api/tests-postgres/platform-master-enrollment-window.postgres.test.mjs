@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import test, { after, before } from 'node:test';
 import { randomBytes, randomUUID } from 'node:crypto';
 import { PlatformMasterService } from '../dist/platform-master.service.js';
+import { validarFiltroDoRelatorio } from '../dist/platform-audit-report.js';
 import { prisma, pessoa, identidade, repositorio, sha256, subirApp, derrubarApp } from './master-fixtures.mjs';
 
 before(async () => { await subirApp(); });
@@ -98,7 +99,14 @@ for (const caso of ['expirada', 'revogada', 'outro titular', 'outra finalidade']
     const linhas = await f.trilha(userId);
     assert.equal(linhas.length, 1, `trilha com ${linhas.length} linha(s)`);
     assert.equal(linhas[0].result, 'DENIED');
-    assert.equal(linhas[0].action, 'inscricao_master:concluir');
+    assert.equal(linhas[0].action, 'inscricao_master:CONCLUIR');
+    // A acao gravada tem de ser FILTRAVEL pelo relatorio. Nao e detalhe de
+    // forma: `validarFiltroDoRelatorio` recusa sufixo minusculo de proposito, e
+    // a versao anterior gravava `inscricao_master:concluir` — a linha existia e
+    // `/platform/master/audit` devolvia 400 para a propria acao que alguem
+    // procura ao investigar recusas. Validador real, sobre a linha real.
+    assert.equal(validarFiltroDoRelatorio({ acoes: [linhas[0].action] }).ok, true,
+      `acao gravada nao passa no filtro do relatorio: ${linhas[0].action}`);
     assert.equal(linhas[0].changes.motivo, MOTIVO_ESPERADO[caso]);
     // O segredo nunca entra na trilha.
     assert.equal(JSON.stringify(linhas[0].changes).includes(f.pedido.segredo), false);
