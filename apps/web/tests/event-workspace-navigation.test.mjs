@@ -5,7 +5,7 @@ import ts from 'typescript';
 const url = source => 'data:text/javascript;base64,' + Buffer.from(source).toString('base64');
 const compile = path => ts.transpileModule(readFileSync(new URL(path, import.meta.url), 'utf8'), {compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX}}).outputText;
 const modules = {
-  react: url('let cursor=0;const state=new Map();export const reset=()=>{cursor=0;};export const clear=()=>{cursor=0;state.clear();};export const useState=initial=>{const index=cursor++;const value=state.has(index)?state.get(index):(typeof initial==="function"?initial():initial);return [value,next=>state.set(index,typeof next==="function"?next(value):next)];};export const useRef=value=>({current:value});export const useEffect=()=>{};'),
+  react: url('let cursor=0;const state=new Map();export const reset=()=>{cursor=0;};export const clear=()=>{cursor=0;state.clear();};export const useState=initial=>{const index=cursor++;const value=state.has(index)?state.get(index):(typeof initial==="function"?initial():initial);return [value,next=>state.set(index,typeof next==="function"?next(value):next)];};export const useRef=value=>({current:value});export const useEffect=()=>{};export const seed=(index,value)=>state.set(index,value);'),
   'react/jsx-runtime': url('export const jsx=(type,props)=>({type,props});export const jsxs=jsx;export const Fragment="fragment";'),
   'next/link': url('export default "a";'),
   'next/navigation': url('let currentPath = "/eventos/demo/painel/check-in"; export const useRouter = () => ({replace(){}}); export const usePathname = () => currentPath; export const setPathname = (value) => { currentPath = value; };'),
@@ -35,7 +35,25 @@ function rewriteImports(source) {
   return rewritten;
 }
 const source = rewriteImports(compile('../components/event-workspace.tsx'));
-const {default: Workspace} = await import(url(source));
+const {default: EventWorkspace} = await import(url(source));
+const navigationHooks = await import(modules.react);
+// This synchronous harness tests navigation only. Real capabilities requests and
+// denial are exercised in event-foundation-access.test.mjs with React rendering.
+const CAPABILITIES_STATE_INDEX = 4;
+function Workspace(props) {
+  navigationHooks.reset();
+  navigationHooks.seed(CAPABILITIES_STATE_INDEX, { papel: 'OWNER', escopado: false, acoes: [] });
+  return EventWorkspace(props);
+}
+test('navigation harness preserves undefined state unless explicitly seeded', () => {
+  navigationHooks.clear();
+  try {
+    assert.equal(navigationHooks.useState(undefined)[0], undefined);
+    navigationHooks.seed(CAPABILITIES_STATE_INDEX, { papel: 'OWNER', escopado: false, acoes: [] });
+    navigationHooks.reset();
+    assert.equal(navigationHooks.useState(undefined)[0], undefined);
+  } finally { navigationHooks.clear(); }
+});
 const text = node => Array.isArray(node) ? node.map(text).join('') : node && typeof node === 'object' ? text(node.props?.children) : String(node ?? '');
 const nodes = node => Array.isArray(node) ? node.flatMap(nodes) : node && typeof node === 'object' ? [node, ...nodes(node.props?.children)] : [];
 function navigation(scientific, section='check-in', capabilities=[], format='IN_PERSON') {
@@ -241,4 +259,3 @@ test('acesso direto a transmissão presencial mostra recusa e não monta formul�
   assert.match(text(tree), /Transmissão indisponível neste evento/u);
   assert.ok(nodes(tree).some(node => node.type === 'a' && node.props.href === '/eventos/demo/configuracao?review=foundation'));
 });
-
