@@ -33,6 +33,33 @@ ensure_env_var() {
 ensure_env_var "EVOLVIA_PUBLIC_BASE_URL" "https://${HOMOLOGATION_DOMAIN}"
 ensure_env_var "EVOLVIA_PUBLIC_INDEXING" "0"
 
+# O SHA é calculado UMA vez, aqui, antes do build.
+#
+# Antes ele era calculado só na hora de aplicar o Nginx. Com duas leituras de
+# `git rev-parse` no mesmo script, um commit que chegasse entre elas faria a
+# imagem ser construída de um SHA e o diretório de backup registrar outro — e o
+# registro do deploy passaria a apontar para código que não é o que está no ar.
+# Uma leitura, um valor, os dois usos.
+DEPLOY_SHA="$(git rev-parse --verify HEAD)"
+
+# Vai para o .env porque é de lá que o Compose interpola o argumento de build.
+# Assim o SHA entra na IMAGEM, e `/health` responde de qual código o binário
+# veio — não o que este deploy alega.
+ensure_env_var "EVOLVIA_BUILD_SHA" "$DEPLOY_SHA"
+
+# As quatro variáveis que a inscrição da Área Master exige em homologação.
+#
+# Estavam documentadas e não configuradas: `janelaDeInscricao` responde 404 por
+# projeto quando qualquer uma delas não casa, e o default do Compose é
+# `localhost`. O ensaio do primeiro acesso falhava por configuração, não por
+# código, e o operador não tinha como perceber — 404 é o que a rota responde
+# também quando está tudo certo e o segredo está errado.
+#
+# `EVOLVIA_PUBLIC_BASE_URL` já é definida acima e tem de coincidir com o origin.
+ensure_env_var "EVOLVIA_AMBIENTE" "homologacao"
+ensure_env_var "PLATFORM_MASTER_RP_ID" "${HOMOLOGATION_DOMAIN}"
+ensure_env_var "PLATFORM_MASTER_ORIGIN" "https://${HOMOLOGATION_DOMAIN}"
+
 echo "[EVOLVIA] Uso de disco Docker antes da manutenção:"
 docker system df || true
 
@@ -59,6 +86,31 @@ for i in $(seq 1 60); do
   sleep 3
 done
 
+# O que subiu tem de ser o que foi construído.
+#
+# Esta é a guarda contra o modo de falha mais silencioso do deploy: imagem
+# reaproveitada do cache, contêiner que não reiniciou, ou build que falhou sem
+# derrubar o script. Nos três casos os serviços respondem — e respondem código
+# velho. Sem esta conferência, o deploy termina dizendo "disponível" e ninguém
+# descobre até alguém ensaiar contra o SHA errado.
+#
+# Falha o deploy de propósito: publicar sem saber o que foi publicado é o que
+# torna todo ensaio de aceite inatribuível.
+#
+# `|| true` nao e descuido: com `set -Eeuo pipefail`, um curl que falha derruba
+# a atribuicao e o script morre ANTES da mensagem abaixo. O operador receberia
+# um erro de curl em vez do diagnostico. Com o `|| true`, a falha vira valor
+# vazio e cai no `if`, que diz o que aconteceu.
+BUILD_SERVIDO="$(curl -fsS --max-time 10 http://127.0.0.1:4000/health 2>/dev/null \
+  | sed -n 's/.*"build"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' || true)"
+if [[ "$BUILD_SERVIDO" != "$DEPLOY_SHA" ]]; then
+  echo "[EVOLVIA] ERRO: a API responde o build '${BUILD_SERVIDO:-ausente}', e o deploy construiu ${DEPLOY_SHA}."
+  echo "[EVOLVIA] Imagem do cache, contêiner não reiniciado, ou build silenciosamente falho. Nada foi publicado no Nginx."
+  docker compose ps --all
+  exit 1
+fi
+echo "[EVOLVIA] Build servido conferido: ${DEPLOY_SHA}."
+
 sudo mkdir -p /opt/evolvia/backups/nginx /var/www/certbot
 
 NGINX_TEMPLATE="infra/nginx/evolvia.conf"
@@ -71,7 +123,6 @@ else
   echo "[EVOLVIA] Certificado ainda não encontrado; mantendo HTTP restrito ao domínio para emissão ACME."
 fi
 
-DEPLOY_SHA="$(git rev-parse --verify HEAD)"
 NGINX_SOURCE="$(mktemp /tmp/evolvia-nginx.XXXXXX.conf)"
 trap 'rm -f "$NGINX_SOURCE"' EXIT
 install -m 0600 "$NGINX_TEMPLATE" "$NGINX_SOURCE"

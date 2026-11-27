@@ -24,6 +24,8 @@ model PlatformMasterIdentity {
   pendingChallengeKind     PlatformCeremonyKind?
   pendingChallengeExpires  DateTime?
 
+  enrollmentWindows PlatformMasterEnrollmentWindow[]
+
   @@index([role, status])
 }
 
@@ -54,4 +56,26 @@ model PlatformMasterSession {
 
   @@index([identityId, createdAt])
   @@index([expiresAt])
+}
+
+enum PlatformEnrollmentPurpose {
+  BOOTSTRAP
+  RECOVERY
+}
+
+model PlatformMasterEnrollmentWindow {
+  id            String                    @id
+  identityId    String
+  identity      PlatformMasterIdentity    @relation(fields: [identityId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  secretDigest  String                    @unique @db.Char(64)
+  purpose       PlatformEnrollmentPurpose
+  openedByNote  String                    @db.VarChar(200)
+  correlationId String                    @db.VarChar(64)
+  expiresAt     DateTime
+  consumedAt    DateTime?
+  revokedAt     DateTime?
+  challengeHash String?                   @db.Char(64)
+  createdAt     DateTime                  @default(now())
+
+  @@index([identityId, expiresAt])
 }

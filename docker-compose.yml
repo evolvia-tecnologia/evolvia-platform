@@ -37,7 +37,13 @@ services:
     networks: [evolvia-internal]
 
   migrate:
-    build: ./apps/api
+    # Mesmos argumentos de build do servico `api`, de proposito: os dois
+    # compartilham a imagem, e argumento divergente faria o Compose construir
+    # duas, com o migrate rodando codigo diferente do que atende as rotas.
+    build:
+      context: ./apps/api
+      args:
+        EVOLVIA_BUILD_SHA: ${EVOLVIA_BUILD_SHA:-}
     restart: "no"
     command: ["npx", "prisma", "migrate", "deploy"]
     environment:
@@ -51,7 +57,10 @@ services:
     networks: [evolvia-internal]
 
   api:
-    build: ./apps/api
+    build:
+      context: ./apps/api
+      args:
+        EVOLVIA_BUILD_SHA: ${EVOLVIA_BUILD_SHA:-}
     restart: unless-stopped
     environment:
       NODE_ENV: production
@@ -65,6 +74,9 @@ services:
       EVOLVIA_EMAIL_DELIVERY_ENDPOINT: ${EVOLVIA_EMAIL_DELIVERY_ENDPOINT:-}
       EVOLVIA_EMAIL_DELIVERY_TOKEN: ${EVOLVIA_EMAIL_DELIVERY_TOKEN:-}
       EVOLVIA_EMAIL_FROM: ${EVOLVIA_EMAIL_FROM:-}
+      EVOLVIA_AMBIENTE: ${EVOLVIA_AMBIENTE:-}
+      PLATFORM_MASTER_RP_ID: ${PLATFORM_MASTER_RP_ID:-localhost}
+      PLATFORM_MASTER_ORIGIN: ${PLATFORM_MASTER_ORIGIN:-http://localhost:3000}
       ASAAS_MODE: ${ASAAS_MODE:-}
       ASAAS_ENVIRONMENT: ${ASAAS_ENVIRONMENT:-sandbox}
       ASAAS_ALLOW_PRODUCTION: ${ASAAS_ALLOW_PRODUCTION:-false}
