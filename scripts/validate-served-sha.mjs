@@ -32,6 +32,7 @@
  *   node scripts/validate-served-sha.mjs --url "$HOMOLOGATION_URL" --sha "$GITHUB_SHA"
  */
 
+import { parseArgs } from 'node:util';
 import { chamadoDiretamente } from './lib/execucao-direta.mjs';
 
 /** Caminho publico da rota de saude atras do proxy. */
@@ -51,21 +52,13 @@ export const MOTIVOS = Object.freeze({
 });
 
 export function lerArgumentos(argv) {
-  const entrada = { url: null, sha: null, caminho: CAMINHO_PADRAO };
-  for (let i = 0; i < argv.length; i += 1) {
-    const bruto = argv[i];
-    const [chave, embutido] = bruto.startsWith('--') && bruto.includes('=')
-      ? [bruto.slice(0, bruto.indexOf('=')), bruto.slice(bruto.indexOf('=') + 1)]
-      : [bruto, null];
-    const proximo = () => (embutido !== null ? embutido : argv[(i += 1)]);
-    switch (chave) {
-      case '--url': entrada.url = proximo(); break;
-      case '--sha': entrada.sha = proximo(); break;
-      case '--caminho': entrada.caminho = proximo(); break;
-      default: break;
-    }
+  try {
+    const { values } = parseArgs({ args: argv, strict: true, allowPositionals: false,
+      options: { url: { type: 'string' }, sha: { type: 'string' }, caminho: { type: 'string' } } });
+    return { url: values.url ?? null, sha: values.sha ?? null, caminho: values.caminho ?? CAMINHO_PADRAO };
+  } catch {
+    return { url: null, sha: null, caminho: CAMINHO_PADRAO };
   }
-  return entrada;
 }
 
 export function decidirEntrada(entrada) {
@@ -82,10 +75,16 @@ export function decidirEntrada(entrada) {
   // maiuscula faria a comparacao falhar por caixa num caso que esta correto.
   const sha = typeof entrada.sha === 'string' ? entrada.sha.trim().toLowerCase() : '';
   if (!SHA.test(sha)) return { autorizado: false, motivo: MOTIVOS.sha_invalido };
+  if (base.username || base.password || base.search || base.hash) return { autorizado: false, motivo: MOTIVOS.url_invalida };
   const caminho = typeof entrada.caminho === 'string' && entrada.caminho.startsWith('/')
     ? entrada.caminho
     : CAMINHO_PADRAO;
-  return { autorizado: true, alvo: new URL(caminho, base).toString(), sha };
+  let alvo;
+  try { alvo = new URL(caminho, base); } catch { return { autorizado: false, motivo: MOTIVOS.url_invalida }; }
+  if (alvo.origin !== base.origin || alvo.username || alvo.password || alvo.search || alvo.hash) {
+    return { autorizado: false, motivo: MOTIVOS.url_invalida };
+  }
+  return { autorizado: true, alvo: alvo.toString(), sha };
 }
 
 /**
@@ -118,6 +117,9 @@ export function avaliar({ status, corpo, shaEsperado }) {
       motivo: 'A imagem servida foi construida sem EVOLVIA_BUILD_SHA. Reconstrua passando o argumento de build.',
     };
   }
+  if (build.length !== 40 || !/^[0-9a-f]{40}$/iu.test(build)) {
+    return { ok: false, motivo: 'O build servido precisa conter um SHA completo de 40 caracteres hexadecimais.' };
+  }
   if (!build.toLowerCase().startsWith(shaEsperado)) {
     return {
       ok: false,
@@ -137,7 +139,7 @@ export async function executar(argv, saida, erro, buscar = fetch) {
   let status;
   let corpo = null;
   try {
-    const resposta = await buscar(decisao.alvo, { headers: { accept: 'application/json' } });
+    const resposta = await buscar(decisao.alvo, { redirect: 'error', signal: AbortSignal.timeout(10000), headers: { accept: 'application/json' } });
     status = resposta.status;
     const texto = await resposta.text();
     try {

@@ -15,9 +15,8 @@ const VERSION = '0.2.0-alpha.3';
  * nao inventar valor nem omitir o campo: campo ausente faria um verificador
  * antigo passar por omissao, e um valor fabricado seria pior que nenhum.
  */
-const BUILD = process.env.EVOLVIA_BUILD_SHA && process.env.EVOLVIA_BUILD_SHA.length > 0
-  ? process.env.EVOLVIA_BUILD_SHA
-  : 'desconhecido';
+const buildSha = process.env.EVOLVIA_BUILD_SHA ?? '';
+const BUILD = /^[0-9a-f]{40}$/iu.test(buildSha) && buildSha.length === 40 ? buildSha.toLowerCase() : 'desconhecido';
 
 @Controller('health')
 export class HealthController {

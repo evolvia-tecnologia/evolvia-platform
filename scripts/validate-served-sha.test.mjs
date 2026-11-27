@@ -161,3 +161,14 @@ test('entrada recusada nao chega a buscar nada', async () => {
   assert.equal(codigo, 1);
   assert.equal(buscou, false, 'recusa de entrada nao pode tocar a rede');
 });
+
+test('rejeita campo abreviado ou adulterado mesmo com prefixo esperado válido', () => {
+  for (const build of [SHA.slice(0, 12), SHA + '-dirty', SHA + 'a', SHA + '\\n']) {
+    assert.equal(avaliar({status: 200, corpo: {build}, shaEsperado: SHA.slice(0, 12)}).ok, false);
+  }
+});
+test('argumento desconhecido ou sem valor e caminho de outra origem falham', () => {
+  for (const extra of [['--extra'], ['--caminho'], ['--caminho', '//example.invalid/health']]) {
+    assert.equal(decidirEntrada(lerArgumentos(['--url',URL_BASE,'--sha',SHA,...extra])).autorizado,false);
+  }
+});
