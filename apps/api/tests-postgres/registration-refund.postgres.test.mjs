@@ -825,14 +825,16 @@ test('uma notificação de Pix concilia dois participantes a partir da mesma con
   }
   let reads = 0;
   let denied = false;
+  let mismatch = true;
   t.mock.method(globalThis, 'fetch', async (url, init) => {
     assert.equal(init.method, 'GET');
     assert.equal(url.pathname, '/v3/payments/' + paymentId);
     reads++;
     return Response.json({ id: paymentId, billingType: 'PIX', checkoutSession: group.providerCheckoutId, value: 15,
-      refunds: requests.map((req, i) => ({ description: 'Evolvia/' + req.id, value: 7.5, status: i ? (denied ? 'CANCELLED' : 'PENDING') : 'DONE' })) });
+      refunds: requests.map((req, i) => ({ description: 'Evolvia/' + req.id, value: i && mismatch ? 8 : 7.5, status: i ? (denied ? 'CANCELLED' : 'PENDING') : 'DONE' })) });
   });
-  await refunds.reconcileSandboxWebhook('fixture-hook', { event: 'PAYMENT_PARTIALLY_REFUNDED', payment: { id: paymentId } });
+  await rejects(refunds.reconcileSandboxWebhook('fixture-hook', { event: 'PAYMENT_PARTIALLY_REFUNDED', payment: { id: paymentId } }), 409);
+  mismatch = false;
   assert.equal(reads, 1);
   const rows = await prisma.$queryRaw`SELECT "requestId", status FROM "SandboxRefundOperation" WHERE "paymentId" = ${paymentId}`;
   assert.deepEqual(Object.fromEntries(rows.map(row => [row.requestId, row.status])), {
@@ -977,6 +979,14 @@ test('sandbox Pix permite uma única reiteração explícita após HTTP 400 defi
   history = [{ description: 'Evolvia/' + req.id, value: 7.5, status: 'DONE' }];
   const reconciled = await execute();
   assert.equal(reconciled.processingStatus, 'RECONCILED');
+  const readsAtConfirmation = reads;
+  assert.deepEqual(await execute(), reconciled);
+  assert.equal(reads, readsAtConfirmation);
+  const audits = await prisma.auditLog.findMany({ where: { organizationId, eventId: event.id, entityId: req.id,
+    action: { in: ['refund.sandbox_claimed', 'refund.sandbox_status'] } } });
+  assert.ok(audits.every(log => log.actorUserId === people.owner.id));
+  assert.deepEqual(audits.filter(log => log.action === 'refund.sandbox_claimed').map(log => log.metadata.attempt).sort(), [1, 2]);
+  assert.deepEqual(audits.filter(log => log.action === 'refund.sandbox_status').map(log => log.metadata.status).sort(), ['FAILED', 'RECONCILED']);
   assert.equal(reconciled.moneyReturned, false);
   assert.equal(posts, 2);
 });
@@ -1019,4 +1029,22 @@ test('sandbox Pix bloqueia terceira tentativa mesmo com dois erros 400 definitiv
   const op = await prisma.sandboxRefundOperation.findUniqueOrThrow({ where: { requestId: req.id } });
   assert.equal(op.status, 'FAILED');
   assert.equal(op.attempts, 2);
+});
+
+test('CLI de conciliação não expõe argumentos ou credenciais em falhas', async () => {
+  const { spawnSync } = await import('node:child_process');
+  const { fileURLToPath } = await import('node:url');
+  const cli = fileURLToPath(new URL('../scripts/verify-sandbox-refund.mjs', import.meta.url));
+  const env = { ...process.env, ASAAS_REFUND_SANDBOX_TOKEN: 'sensitive-fixture',
+    ASAAS_REFUND_SANDBOX_ORGANIZATION_ID: 'fixture', ASAAS_REFUND_SANDBOX_EXECUTION_ORGANIZATION_ID: 'fixture',
+    DATABASE_URL: 'postgresql://test:sensitive-fixture@127.0.0.1:1/test?connect_timeout=1' };
+  for (const [args, reason] of [
+    [[], 'Configuração de homologação incompleta.'],
+    [['event-fixture', 'private-request'], 'Consulta ao banco de homologação indisponível.'],
+  ]) {
+    const result = spawnSync(process.execPath, [cli, ...args], { env, encoding: 'utf8', timeout: 10000 });
+    assert.equal(result.status, 1);
+    assert.equal(result.stdout, '');
+    assert.equal(result.stderr.trim(), reason);
+  }
 });

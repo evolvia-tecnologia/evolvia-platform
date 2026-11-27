@@ -80,7 +80,7 @@ export class RegistrationRefundService {
         WHERE "organizationId" = ${org} AND "paymentId" = ${due.paymentId} AND status = 'PROCESSING'`;
       return due.paymentId;
     });
-    if (paymentId) await this.reconcileSandboxPayment(org, paymentId, token);
+    if (paymentId) await this.reconcileSandboxPayment(org, paymentId, token, 'WORKER');
   }
 
   async publicPolicy(slugValue: string, now = new Date()) {
@@ -582,7 +582,7 @@ export class RegistrationRefundService {
     const select = { organizationId: true, status: true, preparedAmountCents: true, sandboxPaymentId: true,
       preparedCheckout: { select: fields }, preparedOrderCheckout: { select: fields } } as const;
     const initial = await this.prisma.registrationRefundRequest.findFirst({
-      where, select: { ...select, sandboxOperation: { select: { status: true, attempts: true } } },
+      where, select: { ...select, sandboxOperation: { select: { status: true, attempts: true, organizationId: true, eventId: true, paymentId: true, amountCents: true, reconciledAt: true } } },
     });
     if (!initial) throw new NotFoundException('Pedido não encontrado.');
     const { sandboxOperation, ...request } = initial;
@@ -602,6 +602,13 @@ export class RegistrationRefundService {
     }
     const op = { requestId, paymentId: request.sandboxPaymentId, checkoutId: checkout.providerCheckoutId,
       amountCents: request.preparedAmountCents, checkoutCents: checkout.amountCents };
+    if (sandboxOperation?.status === 'RECONCILED') {
+      if (sandboxOperation.organizationId !== organizationId || sandboxOperation.eventId !== eventId ||
+          sandboxOperation.paymentId !== op.paymentId || sandboxOperation.amountCents !== op.amountCents ||
+          !sandboxOperation.reconciledAt) throw new ConflictException('Operação divergente do pedido preparado.');
+      return { requestId, environment: 'SANDBOX', processingStatus: 'RECONCILED', amountCents: op.amountCents,
+        sandboxRefundConfirmed: true, moneyReturned: false };
+    }
     const observed = inspectSandboxPayment(op, await readSandboxPayment(op.paymentId, token));
     const claim = await this.prisma.$transaction(async tx => {
       const owner = await tx.$queryRaw<{ id: string }[]>`
@@ -636,25 +643,37 @@ export class RegistrationRefundService {
           AND "SandboxRefundOperation"."amountCents" = ${op.amountCents}
           AND ${retryRequested && !observed.matched && observed.eligible}`;
       if (inserted && !observed.matched && !observed.eligible) throw new ConflictException('Cobrança indisponível para nova operação.');
+      if (inserted && !observed.matched) {
+        await tx.auditLog.create({ data: { organizationId, eventId, actorUserId: userId,
+          action: 'refund.sandbox_claimed', entityType: 'RegistrationRefundRequest', entityId: requestId,
+          metadata: { attempt: retryRequested ? 2 : 1, amountCents: op.amountCents, origin: 'OWNER', status: 'PROCESSING' } } });
+      }
       return inserted === 1 && !observed.matched;
     });
     const status = claim ? await submitSandboxRefund(op, token) : observed.status;
-    const saved = await this.saveSandboxStatus(organizationId, eventId, requestId, op.paymentId, op.amountCents, status);
+    const saved = await this.saveSandboxStatus(organizationId, eventId, requestId, op.paymentId, op.amountCents, status, 'OWNER', userId);
     return { requestId, environment: 'SANDBOX', processingStatus: saved.status, amountCents: op.amountCents,
       sandboxRefundConfirmed: saved.status === 'RECONCILED', moneyReturned: false };
   }
 
   private async saveSandboxStatus(organizationId: string, eventId: string, requestId: string,
-    paymentId: string, amountCents: number, status: string) {
-    const [saved] = await this.prisma.$queryRaw<{ status: string }[]>`
-      UPDATE "SandboxRefundOperation" SET
-        status = CASE WHEN status = 'RECONCILED' OR ${status} = 'RECONCILED' THEN 'RECONCILED'
-                      WHEN status = 'FAILED' THEN status ELSE ${status} END,
+    paymentId: string, amountCents: number, status: string, origin: 'OWNER' | 'WEBHOOK' | 'WORKER', actorUserId?: string) {
+    return this.prisma.$transaction(async tx => {
+      const [previous] = await tx.$queryRaw<{ status: string }[]>`
+        SELECT status FROM "SandboxRefundOperation"
+        WHERE "requestId" = ${requestId} AND "organizationId" = ${organizationId} AND "eventId" = ${eventId}
+          AND "amountCents" = ${amountCents} AND "paymentId" = ${paymentId} FOR UPDATE`;
+      if (!previous) throw new ConflictException('Operação divergente do pedido preparado.');
+      if (previous.status === status || previous.status === 'RECONCILED' ||
+          (previous.status === 'FAILED' && status !== 'RECONCILED')) return previous;
+      await tx.$executeRaw`UPDATE "SandboxRefundOperation" SET status = ${status},
         "reconciledAt" = CASE WHEN ${status} = 'RECONCILED' THEN COALESCE("reconciledAt", now()) ELSE "reconciledAt" END
-      WHERE "requestId" = ${requestId} AND "organizationId" = ${organizationId} AND "eventId" = ${eventId}
-        AND "amountCents" = ${amountCents} AND "paymentId" = ${paymentId} RETURNING status`;
-    if (!saved) throw new ConflictException('Operação divergente do pedido preparado.');
-    return saved;
+        WHERE "requestId" = ${requestId}`;
+      await tx.auditLog.create({ data: { organizationId, eventId, actorUserId, entityId: requestId,
+        entityType: 'RegistrationRefundRequest', action: 'refund.sandbox_status',
+        metadata: { origin, previous: previous.status, status, amountCents } } });
+      return { status };
+    });
   }
 
   async reconcileSandboxWebhook(header: string | undefined, input: unknown) {
@@ -673,10 +692,10 @@ export class RegistrationRefundService {
     if (typeof paymentId !== 'string' || !/^pay_[a-zA-Z0-9_-]{1,196}$/.test(paymentId)) {
       throw new BadRequestException('Referência de cobrança inválida.');
     }
-    await this.reconcileSandboxPayment(org, paymentId, token);
+    await this.reconcileSandboxPayment(org, paymentId, token, 'WEBHOOK');
   }
 
-  private async reconcileSandboxPayment(org: string, paymentId: string, token: string) {
+  private async reconcileSandboxPayment(org: string, paymentId: string, token: string, origin: 'WEBHOOK' | 'WORKER') {
     const rows = await this.prisma.$queryRaw<Array<{ requestId: string; eventId: string; amountCents: number;
       checkoutId: string; checkoutCents: number }>>`
       SELECT op."requestId", op."eventId", op."amountCents",
@@ -693,10 +712,18 @@ export class RegistrationRefundService {
         AND ((c.id IS NULL) <> (g.id IS NULL))`;
     if (!rows.length) return;
     const payment = await readSandboxPayment(paymentId, token);
+    let divergence: ConflictException | undefined;
     for (const row of rows) {
-      const observed = inspectSandboxPayment({ ...row, paymentId }, payment);
-      if (observed.matched) await this.saveSandboxStatus(org, row.eventId, row.requestId, paymentId, row.amountCents, observed.status);
+      let observed;
+      try { observed = inspectSandboxPayment({ ...row, paymentId }, payment); }
+      catch (error) {
+        if (!(error instanceof ConflictException)) throw error;
+        divergence = error;
+        continue;
+      }
+      if (observed.matched) await this.saveSandboxStatus(org, row.eventId, row.requestId, paymentId, row.amountCents, observed.status, origin);
     }
+    if (divergence) throw divergence;
   }
 
   // Simulation requires an explicit opt-in and writes only a local receipt.
