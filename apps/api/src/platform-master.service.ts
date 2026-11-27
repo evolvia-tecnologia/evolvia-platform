@@ -88,7 +88,7 @@ export interface ContextoMaster {
  * `field` da resposta; as de catálogo e relatório ainda entregam `erros`, que é
  * só a frase. A assimetria é transitória e deliberada: os validadores daquelas
  * ainda não nomeiam o campo, e `recusaDeValidacao` aceita as duas formas para
- * que a migração acontueça um validador por vez, sem que nenhuma rota pare de
+ * que a migração aconteça um validador por vez, sem que nenhuma rota pare de
  * funcionar nem passe a afirmar um campo que ninguém informou.
  */
 @Injectable()
