@@ -21,6 +21,28 @@ import type { PedidoDeConcessao } from './platform-grant-request.ts';
 import type { Alvo } from './platform-grant-policy.ts';
 
 const TAMANHO_DO_TOKEN = 32;
+
+/**
+ * Prefixo da acao da inscricao na trilha. O sufixo vai em MAIUSCULAS.
+ *
+ * Nao e escolha estetica. `validarFiltroDoRelatorio` aceita
+ * `^[a-z_]{3,40}(:[A-Z_]{3,40})?$`, e `platform-audit-report.test.mjs` recusa
+ * `consultar:minuscula` de proposito — o sufixo apos os dois-pontos e
+ * SCREAMING_SNAKE em todo o contrato. Gravar `inscricao_master:abrir` fazia a
+ * linha existir e NAO poder ser filtrada: `/platform/master/audit` devolvia 400
+ * justamente para a acao que alguem procura ao investigar recusas, que e o
+ * motivo de a trilha existir. Achado da revisao da #744, conferido contra o
+ * validador e contra o teste que o fixa.
+ */
+export const ACAO_DA_INSCRICAO = 'inscricao_master';
+
+/** As duas etapas, e o sufixo de cada uma. Fechado de proposito. */
+export const SUFIXO_DA_ETAPA = Object.freeze({ abrir: 'ABRIR', concluir: 'CONCLUIR' } as Record<string, string>);
+
+/** A acao gravada. Etapa desconhecida vira `OUTRA`, nunca minuscula. */
+export const acaoDaInscricao = (etapa: string): string =>
+  `${ACAO_DA_INSCRICAO}:${SUFIXO_DA_ETAPA[etapa] ?? 'OUTRA'}`.slice(0, 60);
+
 const hash = (valor: string): string => createHash('sha256').update(valor).digest('hex');
 
 /** O alcance de uma linha, na forma das colunas de `PlatformGrant`. */
@@ -66,7 +88,7 @@ export interface ContextoMaster {
  * `field` da resposta; as de catálogo e relatório ainda entregam `erros`, que é
  * só a frase. A assimetria é transitória e deliberada: os validadores daquelas
  * ainda não nomeiam o campo, e `recusaDeValidacao` aceita as duas formas para
- * que a migração aconteça um validador por vez, sem que nenhuma rota pare de
+ * que a migração acontueça um validador por vez, sem que nenhuma rota pare de
  * funcionar nem passe a afirmar um campo que ninguém informou.
  */
 @Injectable()
@@ -177,25 +199,43 @@ export class PlatformMasterService {
    * segredo certo com finalidade errada e segredo errado produzem a mesma
    * ausência de linha. Separá-los exigiria guardar o segredo de outra forma, o
    * que o desenho recusa.
+   *
+   * Envolvida em try/catch pela mesma razao que `registrarRecusaDeInscricao`:
+   * esta consulta EXPLICA a recusa, nao a decide. Antes, uma falha de banco
+   * aqui escapava antes do `NotFoundException` e trocava o 404 por 500 — ou
+   * seja, a indisponibilidade da explicacao passava a dizer ao cliente que o
+   * erro foi do servidor, e nao que a janela nao existe, nas duas rotas que
+   * chegam por `janelaDeInscricao`. Achado da revisao da #744.
+   *
+   * `motivo_indisponivel` e deliberadamente distinto de `janela_indisponivel`:
+   * um diz "nao foi possivel apurar", o outro diz "apurei e estava assim".
+   * Trilha imprecisa e ruim; trilha que mente sobre o que apurou e pior.
    */
-  private async motivoDaJanelaRecusada(identityId: string, secretDigest: string) {
-    const pelaDigest = await this.prisma.platformMasterEnrollmentWindow.findFirst({
-      where: { identityId, secretDigest },
-      select: { consumedAt: true, revokedAt: true, expiresAt: true, correlationId: true },
-    });
-    if (!pelaDigest) {
-      const abertas = await this.prisma.platformMasterEnrollmentWindow.count({
-        where: { identityId, consumedAt: null, revokedAt: null, expiresAt: { gt: new Date() } },
+  private async motivoDaJanelaRecusada(
+    identityId: string,
+    secretDigest: string,
+  ): Promise<{ motivo: string; correlationId: string | null }> {
+    try {
+      const pelaDigest = await this.prisma.platformMasterEnrollmentWindow.findFirst({
+        where: { identityId, secretDigest },
+        select: { consumedAt: true, revokedAt: true, expiresAt: true, correlationId: true },
       });
-      return {
-        motivo: abertas > 0 ? 'segredo_ou_finalidade_divergente' : 'sem_janela_aberta',
-        correlationId: null as string | null,
-      };
+      if (!pelaDigest) {
+        const abertas = await this.prisma.platformMasterEnrollmentWindow.count({
+          where: { identityId, consumedAt: null, revokedAt: null, expiresAt: { gt: new Date() } },
+        });
+        return {
+          motivo: abertas > 0 ? 'segredo_ou_finalidade_divergente' : 'sem_janela_aberta',
+          correlationId: null as string | null,
+        };
+      }
+      if (pelaDigest.revokedAt) return { motivo: 'janela_revogada', correlationId: pelaDigest.correlationId };
+      if (pelaDigest.consumedAt) return { motivo: 'janela_ja_consumida', correlationId: pelaDigest.correlationId };
+      if (pelaDigest.expiresAt <= new Date()) return { motivo: 'janela_vencida', correlationId: pelaDigest.correlationId };
+      return { motivo: 'janela_indisponivel', correlationId: pelaDigest.correlationId };
+    } catch {
+      return { motivo: 'motivo_indisponivel', correlationId: null };
     }
-    if (pelaDigest.revokedAt) return { motivo: 'janela_revogada', correlationId: pelaDigest.correlationId };
-    if (pelaDigest.consumedAt) return { motivo: 'janela_ja_consumida', correlationId: pelaDigest.correlationId };
-    if (pelaDigest.expiresAt <= new Date()) return { motivo: 'janela_vencida', correlationId: pelaDigest.correlationId };
-    return { motivo: 'janela_indisponivel', correlationId: pelaDigest.correlationId };
   }
 
   /**
@@ -232,7 +272,7 @@ export class PlatformMasterService {
         data: {
           actorUserId: dados.userId,
           targetUserId: dados.userId,
-          action: `inscricao_master:${dados.etapa}`.slice(0, 60),
+          action: acaoDaInscricao(dados.etapa),
           scopeKind: 'GLOBAL',
           result: dados.resultado,
           reason: `${dados.resultado === 'FAILED' ? 'Falha' : 'Recusa'} na inscrição: ${dados.motivo}.`.slice(0, 200),
