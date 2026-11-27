@@ -1,4 +1,4 @@
-import { IsArray, IsBoolean, IsInt, IsObject, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
+import { IsIn, Matches, IsArray, IsBoolean, IsInt, IsObject, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
 
 /**
  * DTOs da Área Master (#665).
@@ -180,4 +180,20 @@ export class ConcluirCerimoniaDto {
   @IsString()
   @MaxLength(120)
   rotulo?: string | null;
+}
+
+export class AbrirInscricaoMasterDto {
+  @IsIn(['BOOTSTRAP', 'RECOVERY'])
+  finalidade!: 'BOOTSTRAP' | 'RECOVERY';
+
+  @Matches(/^[A-Za-z0-9_-]{43,128}$/)
+  segredo!: string;
+}
+
+export class ConsumirInscricaoMasterDto extends AbrirInscricaoMasterDto {
+  @Matches(/^[A-Za-z0-9_-]{16,512}$/)
+  desafio!: string;
+
+  @IsObject()
+  resposta!: Record<string, unknown>;
 }

@@ -45,6 +45,7 @@ jobs:
           node --test scripts/validate-gate1-human-accessibility-evidence.test.mjs
           # Guardrails do seed comercial rodam na raiz; a imagem API tem contexto ./apps/api.
           node --test scripts/seed-commercial-pilots.test.mjs
+          node --test scripts/provisionar-proprietario-master.test.mjs scripts/recuperar-acesso-master.test.mjs scripts/revogar-inscricao-master.test.mjs scripts/lib/execucao-direta.test.mjs
 
       - name: Instalar o Poppler
         run: sudo apt-get update -qq && sudo apt-get install -y -qq poppler-utils
@@ -311,6 +312,7 @@ jobs:
       API_HOST_PORT: "4000"
       WEB_HOST_PORT: "3000"
       EVOLVIA_CI_MODE: "1"
+      EVOLVIA_AMBIENTE: ci
       ASAAS_MODE: ci_stub
       ASAAS_WEBHOOK_TOKEN: evolvia_ci_webhook_token_32_characters_minimum
       EVOLVIA_PUBLIC_BASE_URL: http://127.0.0.1:3000
@@ -471,12 +473,17 @@ jobs:
           retention-days: 7
 
       # Depois das provas públicas: as fixtures deste passo não devem entrar nas capturas de /eventos.
+      - name: Validar primeiro acesso Master com PostgreSQL e autenticador virtual do Chrome
+        run: node scripts/ci-master-enrollment.mjs
+
       - name: Provar área de atuação no PostgreSQL
         run: |
           docker compose \
             --env-file .env.ci \
             -p "$COMPOSE_PROJECT_NAME" \
             run --rm --no-deps \
+            -v "$PWD/scripts/provisionar-proprietario-master.policy.mjs:/scripts/provisionar-proprietario-master.policy.mjs:ro" \
+            -v "$PWD/scripts/recuperar-acesso-master.policy.mjs:/scripts/recuperar-acesso-master.policy.mjs:ro" \
             -v "$PWD/apps/api/tests-postgres:/app/tests-postgres:ro" \
             api node --test "tests-postgres/*.test.mjs"
 
