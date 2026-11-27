@@ -289,3 +289,25 @@ test('G2.10/G2.11: failure after consent persistence rolls back order, entries, 
   assert.equal(await prisma.registrationRefundAcceptance.count({ where }), 0);
   assert.equal(await prisma.auditLog.count({ where }), 0);
 });
+
+test('G2.10 reinicia a transação inteira após SQLSTATE 40001 de uma leitura com lock', async () => {
+  const ctx = await fixture('raw-conflict');
+  let attempts = 0;
+  const coordinated = {
+    $transaction: (callback, options) => prisma.$transaction(async tx => {
+      attempts++;
+      if (attempts === 1) {
+        await tx.eventRegistrationLot.findUniqueOrThrow({ where: { id: ctx.lot.id } });
+        // Another connection commits after this Serializable snapshot was established.
+        await prisma.eventRegistrationLot.update({ where: { id: ctx.lot.id }, data: { quantity: 3 } });
+        await tx.$queryRaw`SELECT id FROM "EventRegistrationLot" WHERE id = ${ctx.lot.id} FOR UPDATE`;
+      }
+      return callback(tx);
+    }, options),
+  };
+  const service = new RegistrationReservationsService(coordinated, {}, {}, refunds);
+  const result = await service.reserveOrder(ctx.event.slug, order(ctx, 'raw'), randomUUID());
+  assert.equal(attempts, 2);
+  assert.equal(result.entryCount, 2);
+  assert.equal(await prisma.eventRegistrationOrder.count({ where: { eventId: ctx.event.id } }), 1);
+});

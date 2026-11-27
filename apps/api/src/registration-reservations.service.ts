@@ -601,7 +601,9 @@ export class RegistrationReservationsService {
           };
         }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
       } catch (error) {
-        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2034') continue;
+        // Prisma reports Serializable conflicts from raw row locks as P2010 with the PostgreSQL SQLSTATE.
+        if (error instanceof Prisma.PrismaClientKnownRequestError &&
+            (error.code === 'P2034' || (error.code === 'P2010' && error.meta?.code === '40001'))) continue;
         if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
           // Two identical requests may both pass the initial lookup. The unique
           // constraint selects the winner; replay it instead of reporting a
