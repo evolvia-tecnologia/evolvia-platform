@@ -28,6 +28,7 @@
  */
 
 import { randomBytes } from 'node:crypto';
+import { chamadoDiretamente } from './lib/execucao-direta.mjs';
 import { decidirEntrada, lerArgumentos, montarSql } from './recuperar-acesso-master.policy.mjs';
 
 /** 32 bytes. Em base64url da 43 caracteres, que e o minimo exigido. */
@@ -84,13 +85,14 @@ export function executar(argv, env, saida, erro) {
   return 0;
 }
 
-const executadoDiretamente = process.argv[1] && import.meta.url.endsWith(process.argv[1].split('/').pop());
-if (executadoDiretamente) {
-  const codigo = executar(
+if (chamadoDiretamente(import.meta.url, process.argv[1])) {
+  // `process.exitCode`, nao `process.exit`: o SQL vai para a saida padrao, e
+  // `process.exit` pode encerrar antes de o buffer esvaziar quando a saida e um
+  // cano (`| psql`). SQL truncado que executa pela metade e pior que erro.
+  process.exitCode = executar(
     process.argv.slice(2),
     process.env,
     (linha) => process.stdout.write(`${linha}\n`),
     (linha) => process.stderr.write(`${linha}\n`),
   );
-  process.exit(codigo);
 }

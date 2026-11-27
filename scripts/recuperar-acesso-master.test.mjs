@@ -10,9 +10,11 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createHash, randomBytes } from 'node:crypto';
 import {
+  ATOR_DA_INSCRICAO,
   FINALIDADES, JANELA_MAXIMA_MINUTOS, JANELA_PADRAO_MINUTOS, MINIMO_DO_SEGREDO, MOTIVOS,
   decidirEntrada, digestDaInscricao, hostDoBanco, lerArgumentos, montarSql,
 } from './recuperar-acesso-master.policy.mjs';
+import { ehAtorSistemico } from './provisionar-proprietario-master.policy.mjs';
 
 const SEGREDO = randomBytes(32).toString('base64url');
 const IDENT = 'cmasteridentidade000000001';
@@ -251,4 +253,107 @@ test('marcador de produção na senha não classifica o banco como produção', 
   const env = { ...AMBIENTE, DATABASE_URL: 'postgresql://teste:prod@homologacao-db/evolvia' };
   assert.equal(decidirEntrada(base(), env).autorizado, true);
   assert.equal(decidirEntrada(base(), { ...env, DATABASE_URL: env.DATABASE_URL + '-prod' }).motivo, MOTIVOS.producao);
+});
+
+// ------------------------------------------- janela unica por identidade (A2)
+//
+// Os quatro casos abaixo nasceram de um mutante que sobreviveu. Em 26/11,
+// trocando no SQL gerado
+//
+//     IF janela_vence IS NOT NULL THEN   ->   IF false THEN
+//
+// as 22 asseracoes deste arquivo continuavam verdes. A guarda que impede dois
+// segredos validos ao mesmo tempo nao tinha teste nenhum, nem aqui nem no
+// PostgreSQL. O efeito concorrente esta em
+// `apps/api/tests-postgres/platform-master-enrollment-abertura.postgres.test.mjs`;
+// aqui prende-se o TEXTO, que e o que este modulo produz.
+
+const GUARDA_DE_JANELA_UNICA = '  IF janela_vence IS NOT NULL THEN';
+
+const sqlDasDuasFinalidades = () => ({
+  boot: montarSql({ ...base(), segredo: SEGREDO }),
+  rec: montarSql({
+    ...base({ finalidade: 'RECOVERY', confirmouBootstrap: false, confirmouRecuperacao: true }),
+    segredo: SEGREDO,
+  }),
+});
+
+test('a guarda de janela unica existe e recusa com mensagem, nao em silencio', () => {
+  for (const [qual, sql] of Object.entries(sqlDasDuasFinalidades())) {
+    assert.ok(sql.includes(GUARDA_DE_JANELA_UNICA),
+      `${qual}: sem a guarda, duas execucoes deixariam dois segredos validos`);
+    // `RAISE EXCEPTION` e nao zero linhas afetadas: o operador le silencio como
+    // sucesso, e aqui silencio significaria "abri uma segunda janela".
+    assert.ok(/IF janela_vence IS NOT NULL THEN\n\s*RAISE EXCEPTION 'Ja existe autorizacao aberta/u.test(sql),
+      `${qual}: a guarda nao levanta excecao`);
+  }
+});
+
+test('a guarda e INDEPENDENTE da finalidade: bootstrap aberto bloqueia recuperacao', () => {
+  // O SELECT da guarda nao pode filtrar por `purpose`. Se filtrasse, uma janela
+  // de BOOTSTRAP aberta nao impediria abrir uma de RECOVERY, e RECOVERY APAGA
+  // credenciais — dois segredos vivos com efeitos diferentes.
+  const { boot, rec } = sqlDasDuasFinalidades();
+  for (const [qual, sql] of Object.entries({ boot, rec })) {
+    const guarda = sql.slice(sql.indexOf('SELECT w."expiresAt" INTO janela_vence'), sql.indexOf(GUARDA_DE_JANELA_UNICA));
+    assert.ok(guarda.length > 0, `${qual}: nao achei o SELECT da guarda`);
+    assert.ok(!guarda.includes('purpose'),
+      `${qual}: a guarda filtra por finalidade e deixaria passar a outra`);
+  }
+});
+
+test('a guarda olha so janela ABERTA, para nao travar o titular por historico', () => {
+  // Se bastasse existir linha, uma tentativa abandonada travaria o titular ate
+  // alguem apagar registro a mao — e o sentido da janela curta e poder repetir.
+  const { boot } = sqlDasDuasFinalidades();
+  const guarda = boot.slice(boot.indexOf('SELECT w."expiresAt" INTO janela_vence'), boot.indexOf(GUARDA_DE_JANELA_UNICA));
+  for (const condicao of ['"consumedAt" IS NULL', '"revokedAt" IS NULL', '"expiresAt" > now()']) {
+    assert.ok(guarda.includes(condicao), `a guarda ignora ${condicao} e travaria por historico`);
+  }
+});
+
+test('a guarda vem ANTES do INSERT da janela', () => {
+  // Conferir depois de inserir nao e conferir: a segunda janela ja existiria, e
+  // so o rollback da excecao a desfaria — por acidente, nao por desenho.
+  const { boot, rec } = sqlDasDuasFinalidades();
+  for (const [qual, sql] of Object.entries({ boot, rec })) {
+    const posicaoDaGuarda = sql.indexOf(GUARDA_DE_JANELA_UNICA);
+    const posicaoDoInsert = sql.indexOf('  INSERT INTO "PlatformMasterEnrollmentWindow"');
+    assert.ok(posicaoDaGuarda > 0 && posicaoDoInsert > 0, `${qual}: faltou guarda ou INSERT`);
+    assert.ok(posicaoDaGuarda < posicaoDoInsert, `${qual}: a guarda esta depois do INSERT`);
+  }
+});
+
+test('a revogacao da identidade vem DEPOIS da guarda, na recuperacao', () => {
+  // Ordem com consequencia real: revogar antes de conferir a janela deixaria o
+  // titular sem credencial E sem autorizacao nova se a guarda recusasse. O
+  // rollback do bloco cobre isso hoje; a ordem o torna independente do rollback.
+  const { rec } = sqlDasDuasFinalidades();
+  assert.ok(rec.indexOf(GUARDA_DE_JANELA_UNICA) < rec.indexOf('DELETE FROM "PlatformWebAuthnCredential"'),
+    'a revogacao acontece antes de saber se a janela pode abrir');
+});
+
+// ------------------------------------------------- ator da trilha (A1 adjunto)
+
+test('a trilha registra ator SISTEMICO, reconhecido pelo predicado compartilhado', () => {
+  // Defeito medido em 26/11: o default era `sistema-operacional`, que nao casa
+  // o prefixo `sistema:`. `ehAtorSistemico` devolvia false, e o relatorio de
+  // auditoria classificava a abertura de janela como acao de PESSOA — quando
+  // nenhuma pessoa agiu pela aplicacao.
+  assert.equal(ehAtorSistemico(ATOR_DA_INSCRICAO), true,
+    'o ator desta operacao nao e reconhecido como sistemico');
+  const { boot, rec } = sqlDasDuasFinalidades();
+  for (const [qual, sql] of Object.entries({ boot, rec })) {
+    assert.ok(sql.includes(`'${ATOR_DA_INSCRICAO}'`), `${qual}: o ator sistemico nao chegou ao SQL`);
+    assert.ok(!sql.includes('sistema-operacional'), `${qual}: sobrou a literal antiga`);
+  }
+});
+
+test('o ator da trilha nao pode ser o titular', () => {
+  // Registrar o titular como ator afirmaria que ele se autoconcedeu a janela
+  // pela aplicacao. Quem autorizou esta em `reason`, como na #690.
+  const sql = montarSql({ ...base(), segredo: SEGREDO });
+  const trilha = sql.slice(sql.indexOf('INSERT INTO "PlatformAuditLog"'));
+  assert.ok(trilha.includes(`'${ATOR_DA_INSCRICAO}'`));
+  assert.ok(!trilha.includes('alvo_id,\n     ' + `'${ATOR_DA_INSCRICAO}'`), 'ator e alvo trocados');
 });

@@ -23,9 +23,11 @@
 // Nomear um segundo proprietário é ato do proprietário principal, pela Área
 // Master, com autoria e trilha — não há caminho por script.
 import { parseArgs } from 'node:util';
-import { fileURLToPath } from 'node:url';
-import { resolve } from 'node:path';
 import { decidirEntrada, montarSql } from './provisionar-proprietario-master.policy.mjs';
+// Reexportado porque o teste deste CLI prende a propriedade aqui, e porque a
+// decisão é a mesma nos dois scripts: uma implementação, não duas.
+export { chamadoDiretamente } from './lib/execucao-direta.mjs';
+import { chamadoDiretamente } from './lib/execucao-direta.mjs';
 
 /** Opções desta linha de comando, declaradas uma vez. */
 const OPCOES = {
@@ -94,22 +96,6 @@ export function executar(argv, env, saida, erro) {
   // Para stderr, de propósito: assim `> arquivo.sql` recebe só o SQL.
   erro(`\n-- Alvo conferido: host ${decisao.host}. Revise o SQL acima antes de executar.\n`);
   return 0;
-}
-
-/**
- * Executado diretamente? Comparar `import.meta.url` com `file://${argv[1]}`
- * montado à mão erra no Windows, onde o caminho usa `\\` e a URL de arquivo
- * leva letra de unidade — a igualdade simplesmente nunca dá certo, e o script
- * não roda. `fileURLToPath` faz a conversão na direção certa, e `resolve`
- * cobre a invocação por caminho relativo, em que `argv[1]` não vem absoluto.
- */
-export function chamadoDiretamente(urlDoModulo, caminhoDoArgv) {
-  if (typeof caminhoDoArgv !== 'string' || caminhoDoArgv === '') return false;
-  try {
-    return fileURLToPath(urlDoModulo) === resolve(caminhoDoArgv);
-  } catch {
-    return false;
-  }
 }
 
 if (chamadoDiretamente(import.meta.url, process.argv[1])) {
