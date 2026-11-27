@@ -1,3 +1,11 @@
+## Revisão técnica e acessos — 27/11/2026
+
+O fundador autorizou o Copilot Business como revisor técnico automatizado, com teto adicional de US$ 10. Antes de solicitar uma rodada, conferir revisão existente, autor, SHA e escopo. Uma revisão válida no mesmo SHA pode ser reutilizada. Após mudança, concentrar a revisão no diff e nas dependências atingidas; validar os checks exigidos no HEAD candidato. Evitar nova solicitação paga até confirmar saldo e necessidade. O proprietário controla o faturamento e o limite no GitHub. Gemini e Claude cobrem áreas independentes de sua autoria. O Work registra as evidências e integra conforme a política vigente. Aprovação do bot, independência humana e aceite funcional são registrados separadamente. [Decisão #717](https://github.com/evolvia-tecnologia/evolvia-platform/issues/717#issuecomment-7204277421).
+
+O piloto #743 recebeu duas respostas de cota insuficiente e depois uma revisão técnica com dois achados no SHA a347f800. Na #723 o GitHub registrou APPROVED do Copilot em 0649427e. A comprovação de recebimento real da mensagem continua pendente. [Revisão #723](https://github.com/evolvia-tecnologia/evolvia-platform/pull/723#pullrequestreview-6080983082).
+
+[Inventário dos acessos, permissões e rotas no SHA integrado](ACESSOS_E_PERFIS.md).
+
 ## Homologação pública em 26/11/2026
 
 O HEAD verificado de develop foi `ab02d8d859f29061ff45ec0ebfc27f17aa0ffe3a`. Os oito jobs da execução 45313903366 passaram, inclusive migration idempotente, fluxo funcional, PostgreSQL, ARM64 e publicação. O job de deploy registrou esse SHA em 24/11 e confirmou HTTPS 200, API e banco prontos. [Publicação](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/45313903366/job/138180865264).

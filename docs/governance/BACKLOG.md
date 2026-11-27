@@ -1,4 +1,8 @@
 
+## Publicação verificada em 24/11/2026
+
+O deploy da `develop` em `ab02d8d859f29061ff45ec0ebfc27f17aa0ffe3a` passou na verificação pública do Nginx (#108), incluindo HTTPS, cabeçalhos e a ocultação da versão. A coleta das imagens atualmente ativas e o aceite autenticado por perfil continuam pendentes. [Job de publicação](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/45313903366/job/138180865264) · [Coleta no VPS](https://github.com/evolvia-tecnologia/evolvia-platform/issues/571#issuecomment-7200660810).
+
 ## Reconciliação G5.8 I/T — 23/11/2026 (PR #708 integrada)
 
 Implementação **96,9%**; conclusão comprovada **72,3%**; **89/93** unidades integradas; **0/11 Gates encerrados**.
