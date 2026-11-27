@@ -50,40 +50,61 @@ export function linksDoOperadorRestrito(
     areasComAcao.add(areaDaAcao(item.acao));
   }
 
+  // O POSTO e o unico destino operacional. Antes havia tres, e dois eram
+  // vazamento:
+  //
+  //  - `/painel/inscricoes` monta a pagina administrativa de inscricoes, com
+  //    valores, pagamentos e a acao Trocar categoria. Qualquer acao da area
+  //    `inscricao` — inclusive `inscricao_ler` — abria esse destino. E pior: os
+  //    endpoints `RegistrationOperationsService.list` e `changeCategory`
+  //    autorizam por PAPEL (`STAFF_ROLES`, que inclui OPERATOR) e nao conferem
+  //    concessao por acao, entao o operador de leitura conseguia alterar
+  //    categoria de verdade. Conferido lendo o controller e o service: o unico
+  //    guard ali e `AuthGuard`. O menu nao corrige isso — so parava de oferecer.
+  //  - `/painel/show` monta `ShowOperationsConsole`, que NAO executa
+  //    `presenca_dia` nem `atividade_acesso` e oferece links de Divulgacao e de
+  //    Categorias e lotes, reintroduzindo configuracao na tela do operador,
+  //    inclusive em evento que nao e show.
+  //
+  // E o posto passou a aparecer para `material` e `relatorios` tambem: ele
+  // atende essas areas, e sem isso o operador com apenas `kit_ler` ou
+  // `relatorio` ficava com Minhas permissoes e mais nada, sem alcancar tarefa
+  // que lhe foi concedida.
+  const AREAS_DO_POSTO = ['credenciamento', 'acesso', 'material', 'inscricao', 'relatorios'] as const;
   const extras: LinkDoOperador[] = [];
-  if (areasComAcao.has('credenciamento') || areasComAcao.has('acesso')) {
+  if (AREAS_DO_POSTO.some((area) => areasComAcao.has(area))) {
     extras.push({
       href: `/eventos/${id}/painel/check-in`,
-      rotulo: 'Credenciamento',
+      rotulo: 'Posto de atendimento',
       area: 'credenciamento',
-    });
-  }
-  if (areasComAcao.has('inscricao')) {
-    extras.push({
-      href: `/eventos/${id}/painel/inscricoes`,
-      rotulo: 'Inscrições',
-      area: 'inscricao',
-    });
-  }
-  if (areasComAcao.has('acesso')) {
-    extras.push({
-      href: `/eventos/${id}/painel/show`,
-      rotulo: 'Acessos e catracas',
-      area: 'acesso',
     });
   }
 
   return [...base, ...extras];
 }
 
-/** Seções do painel que o shell restrito pode abrir sem cair no menu de organizador. */
+/**
+ * A rota aberta e um dos atalhos permitidos?
+ *
+ * Confere o PATHNAME, e nao a `section`, porque secao nao identifica rota:
+ * `/painel/permissoes` tambem roda com `section="check-in"` e monta
+ * `OperatorCapabilities`, que e a tela de GESTAO de permissoes do organizador.
+ * Pela versao anterior, operador com atalho de check-in passava nesta funcao e
+ * montava aquela tela digitando a URL — em vez de receber a recusa do shell.
+ *
+ * Comparacao por igualdade ou por prefixo de segmento (`alvo + '/'`), nunca por
+ * `includes`: `/painel/permissoes` NAO pode casar com
+ * `/painel/minhas-permissoes`, e o sufixo e justamente o que `includes` casaria.
+ */
 export function secaoPermitidaAoOperador(
-  section: string,
+  pathname: string,
   links: readonly LinkDoOperador[],
 ): boolean {
-  if (section === 'overview') return false;
-  return links.some((link) => link.href.includes(`/painel/${section}`)
-    || (section === 'check-in' && link.href.endsWith('/painel/check-in'))
-    || (section === 'registrations' && link.href.endsWith('/painel/inscricoes'))
-    || (section === 'show' && link.href.endsWith('/painel/show')));
+  if (typeof pathname !== 'string' || pathname === '') return false;
+  const aberta = pathname.replace(/[?#].*$/u, '').replace(/\/+$/u, '');
+  if (aberta === '') return false;
+  return links.some((link) => {
+    const alvo = link.href.replace(/\/+$/u, '');
+    return aberta === alvo || aberta.startsWith(`${alvo}/`);
+  });
 }
