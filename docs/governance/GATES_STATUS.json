@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
   "baseline": "Gates v1 — 93 unidades e pesos preservados; reconciliação do Git em 08/10/2026",
-  "sourceSha": "393ab9930d205dcb592cbf283b55c3fd1d2d86e3",
-  "ciRun": 45105953160,
-  "deployJob": null,
+  "sourceSha": "99a041a128ac6d8d3cd35c908d5e6e5bf01b1204",
+  "ciRun": 45259500761,
+  "deployJob": 138127736334,
   "gateStatus": "0/11 encerrados; sem Go de produção",
   "publicAcceptance": {
     "passed": 1,
@@ -644,17 +644,18 @@
           "criterion": "Aviso ao autor após submissão/correção",
           "integrated": true,
           "ci": true,
-          "deployed": false,
+          "deployed": true,
           "accepted": false,
-          "evidence": "PR #610 integrada em develop@71cb31fef5ae32cfe75e35ddee9a31c458ebbb38; claim PostgreSQL concorrente PR #708 integrado por squash em develop@393ab9930d205dcb592cbf283b55c3fd1d2d86e3; CI #45105953160 COMPLETED/SUCCESS (qualidade, PostgreSQL, ARM64), 0 threads. Evidência I/T de código e CI, não de envio externo, deploy ou aceite.",
-          "next": "Validar fluxo autorizado e destinatário/opt-in em homologação com SHA servido; confirmar timeout/crash UNKNOWN e dois workers; D/F permanecem falsos.",
-          "implementationState": "Integrado (I/T; D/F pendentes)",
-          "ciSourceSha": "393ab9930d205dcb592cbf283b55c3fd1d2d86e3"
+          "evidence": "PR #610 integrada em develop@71cb31fef5ae32cfe75e35ddee9a31c458ebbb38; claim PostgreSQL concorrente PR #708 integrado por squash em develop@393ab9930d205dcb592cbf283b55c3fd1d2d86e3; CI #45105953160 COMPLETED/SUCCESS (qualidade, PostgreSQL, ARM64), 0 threads. Evidência I/T de código e CI, não de envio externo, deploy ou aceite. Atualização de 23/11 BRT: deploy da fonte 99a041a128ac6d8d3cd35c908d5e6e5bf01b1204 confirmado na tentativa 2. https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/45259500761/job/138127736334",
+          "next": "Comprovar o aviso de submissão/correção com opt-in, destinatário autorizado e recebimento em caixa controlada.",
+          "implementationState": "Integrado, testado e publicado em homologação. Aceite pendente.",
+          "ciSourceSha": "393ab9930d205dcb592cbf283b55c3fd1d2d86e3",
+          "deployedSourceSha": "99a041a128ac6d8d3cd35c908d5e6e5bf01b1204"
         }
       ],
-      "points": 23,
+      "points": 24,
       "total": 32,
-      "percent": 71.875,
+      "percent": 75,
       "implementationPercent": 100
     },
     {
@@ -818,12 +819,13 @@
           "criterion": "Carta de aceite e comunicação ao autor",
           "integrated": true,
           "ci": true,
-          "deployed": false,
+          "deployed": true,
           "accepted": false,
-          "evidence": "#518 merged por squash na develop e46268121378b77343231366922fd6a6b723830d; CI PR 44958147485 success; PG 137012174728 passou 255/255, inclusive testes 220 (aceite/recusa VIEWED e isolamento) e 221 (download DOWNLOADED + sessão); CI pós-merge 45086466534: qualidade, ARM64, migração/integração success. Publicação executada, mas prova pública reprovou por Server: nginx/1.24.0 (Ubuntu); sem aceite humano nem SHA servido correlacionado.",
-          "next": "Operador autorizado corrigir Nginx ativo #108 (server_tokens) e repetir prova pública do SHA; Work validar no navegador homologado autor correto/terceiro/outra organização, aceite/recusa e VIEWED/DOWNLOADED + trilha; obter aceite humano F. Nenhum e-mail real foi enviado.",
-          "implementationState": "Integrado e testado; homologação/aceite pendentes",
-          "ciSourceSha": "e46268121378b77343231366922fd6a6b723830d"
+          "evidence": "#518 merged por squash na develop e46268121378b77343231366922fd6a6b723830d; CI PR 44958147485 success; PG 137012174728 passou 255/255, inclusive testes 220 (aceite/recusa VIEWED e isolamento) e 221 (download DOWNLOADED + sessão); CI pós-merge 45086466534: qualidade, ARM64, migração/integração success. Publicação executada, mas prova pública reprovou por Server: nginx/1.24.0 (Ubuntu); sem aceite humano nem SHA servido correlacionado. Atualização de 23/11 BRT: deploy da fonte 99a041a128ac6d8d3cd35c908d5e6e5bf01b1204 confirmado na tentativa 2. https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/45259500761/job/138127736334",
+          "next": "Validar a carta de aceite/recusa na sessão do autor, negativa de acesso de terceiro e de outra organização, VIEWED e DOWNLOADED. Obter aceite humano.",
+          "implementationState": "Integrado, testado e publicado em homologação. Aceite pendente.",
+          "ciSourceSha": "e46268121378b77343231366922fd6a6b723830d",
+          "deployedSourceSha": "99a041a128ac6d8d3cd35c908d5e6e5bf01b1204"
         },
         {
           "id": "G7.5",
@@ -852,9 +854,9 @@
           "ciSourceSha": "3c97223ee389eaff0a6a9934f1cc55ea9b2f8dc2"
         }
       ],
-      "points": 17,
+      "points": 18,
       "total": 24,
-      "percent": 70.83333333333334,
+      "percent": 75,
       "implementationPercent": 100
     },
     {
@@ -1327,30 +1329,30 @@
       "implementationPercent": 100
     }
   ],
-  "globalPercent": 72.30790043290044,
+  "globalPercent": 72.97077922077922,
   "globalImplementationPercent": 96.9155844155844,
-  "ciSourceSha": null,
-  "sourceTreeSha": "24dacfd558543ad3d6643759c7a9c55c4ef425fa",
-  "auditedAtUtc": "2026-11-19T11:12:33.964Z",
-  "deploymentOfCurrentSourceConfirmed": false,
-  "deployRun": null,
+  "ciSourceSha": "99a041a128ac6d8d3cd35c908d5e6e5bf01b1204",
+  "sourceTreeSha": "8d2aae821012c2eb1c9985a5730049b26a840dfe",
+  "auditedAtUtc": "2026-11-24T00:43:17Z",
+  "deploymentOfCurrentSourceConfirmed": true,
+  "deployRun": 45259500761,
   "previousSnapshot": {
-    "sourceSha": "4337c99cd83cec1939b3744910032165c370cd85",
-    "auditedAtUtc": "2026-10-26T05:33:26Z",
-    "ciRun": 40272157015,
-    "deployJob": 121414197364
+    "sourceSha": "393ab9930d205dcb592cbf283b55c3fd1d2d86e3",
+    "ciRun": 45105953160,
+    "deployJob": null,
+    "globalPercent": 72.30790043290044
   },
   "integratedCriteria": 89,
   "criteriaCount": 93,
-  "methodNote": "Reconciliação de 19/11 validada novamente após a integração #680 em 20/11. G2.10 (#471) e G10.10 (#642) sustentam I/T/D. #680 melhora UX e declara que não conclui G2.11; #694 somente simulação (moneyReturned:false). Não dar novo crédito a G2.11/G2.13/G2.14/G5.8/G6.8 nem a refinamentos de critérios existentes; para G7.4 vale a reconciliação pontual comprovada após #518. Revisão do HEAD develop e evidências não equivale a homologação/Go de produção.\nReconciliação pontual após merge #518: G7.4 recebeu SOMENTE I e T por código integrado + CI PostgreSQL/ARM64. D=0/F=0 porque gate público #108 falhou após publicação e não há jornada autenticada/aceite do autor. Evidências PR #518 e workflows 44958147485 / 45086466534. 0/11 Gates encerrados; sem Go.\nReconciliação de 23/11 após merge da #708: a restrição histórica de NÃO creditar G5.8 foi superada exclusivamente para I/T. O serviço de avisos científicos e claim durável PostgreSQL de #610/#708 passaram no CI 45105953160; D/F continuam sem evidência de entrega real ou aceite. Permanecem sem crédito adicional G2.11, G2.13, G2.14, G6.8. Histórico acima mantido.",
+  "methodNote": "Reconciliação de 19/11 validada novamente após a integração #680 em 20/11. G2.10 (#471) e G10.10 (#642) sustentam I/T/D. #680 melhora UX e declara que não conclui G2.11; #694 somente simulação (moneyReturned:false). Não dar novo crédito a G2.11/G2.13/G2.14/G5.8/G6.8 nem a refinamentos de critérios existentes; para G7.4 vale a reconciliação pontual comprovada após #518. Revisão do HEAD develop e evidências não equivale a homologação/Go de produção.\nReconciliação pontual após merge #518: G7.4 recebeu SOMENTE I e T por código integrado + CI PostgreSQL/ARM64. D=0/F=0 porque gate público #108 falhou após publicação e não há jornada autenticada/aceite do autor. Evidências PR #518 e workflows 44958147485 / 45086466534. 0/11 Gates encerrados; sem Go.\nReconciliação de 23/11 após merge da #708: a restrição histórica de NÃO creditar G5.8 foi superada exclusivamente para I/T. O serviço de avisos científicos e claim durável PostgreSQL de #610/#708 passaram no CI 45105953160; D/F continuam sem evidência de entrega real ou aceite. Permanecem sem crédito adicional G2.11, G2.13, G2.14, G6.8. Histórico acima mantido.\nReconciliação de 27/11: publicação histórica de G5.8 e G7.4 confirmada na tentativa 2 de 45259500761. Os dois critérios receberam D e seguem com aceite funcional pendente. O registro lastConfirmedDeployment preserva a publicação posterior de ab02d8d8.",
   "lastCrossCheck": {
     "localDate": "2026-11-23",
-    "developSha": "393ab9930d205dcb592cbf283b55c3fd1d2d86e3",
-    "latestMergeNumber": 708,
+    "developSha": "99a041a128ac6d8d3cd35c908d5e6e5bf01b1204",
+    "latestMergeNumber": 700,
     "integratedCriteria": 89,
     "criteriaCount": 93,
     "implementationPercent": 96.9155844155844,
-    "verifiedPercent": 72.30790043290044,
+    "verifiedPercent": 72.97077922077922,
     "gateClosure": "0/11",
     "noAdditionalCredit": [
       680,
@@ -1362,7 +1364,7 @@
       689,
       706
     ],
-    "limitation": "G5.8: I/T comprovados com #610 e #708, CI 45105953160; D/F não comprovados. Deploy develop 45107963987 reprovou gate Nginx #108 (Server expõe versão). Sem envio real, inbox, SHA público correlacionado ou aceite do autor. G2.11/G2.13/G2.14/G6.8 continuam abertos."
+    "limitation": "D confirmado para G5.8 e G7.4. Recebimento controlado e jornada autenticada da carta com aceite permanecem pendentes."
   },
   "integrationCiRun": null,
   "technicalValidation": {
