@@ -96,7 +96,7 @@ async function reservation(ctx, key) {
   return { eventId: ctx.event.id, organizationId: ctx.organizationId, reservationId: row.id };
 }
 
-async function createDecidedSubmission(ctx, scope, title, status) {
+async function createDecidedSubmission(ctx, scope, title, status, stationPublicCode) {
   const email = `autor-${randomBytes(4).toString('hex')}@evolvia-ci.local`;
   const person = await prisma.scientificPerson.create({
     data: {
@@ -119,7 +119,7 @@ async function createDecidedSubmission(ctx, scope, title, status) {
       status,
       currentVersion: 1,
       submittedAt: new Date(),
-      stationPublicCode: Math.floor(Math.random() * 900) + 100,
+      stationPublicCode,
     },
   });
   await prisma.scientificSubmissionAuthor.create({
@@ -156,9 +156,9 @@ before(async () => {
   ctx.authorA = await reservation(ctx.a, 'ana');
   ctx.peerA = await reservation(ctx.a, 'bia');
   ctx.authorB = await reservation(ctx.b, 'carla');
-  ctx.accepted = await createDecidedSubmission(ctx.a, ctx.authorA, 'Trabalho aceito', 'ACCEPTED');
-  ctx.rejected = await createDecidedSubmission(ctx.a, ctx.authorA, 'Trabalho recusado', 'REJECTED');
-  ctx.foreign = await createDecidedSubmission(ctx.b, ctx.authorB, 'Trabalho outra org', 'ACCEPTED');
+  ctx.accepted = await createDecidedSubmission(ctx.a, ctx.authorA, 'Trabalho aceito', 'ACCEPTED', 101);
+  ctx.rejected = await createDecidedSubmission(ctx.a, ctx.authorA, 'Trabalho recusado', 'REJECTED', 102);
+  ctx.foreign = await createDecidedSubmission(ctx.b, ctx.authorB, 'Trabalho outra org', 'ACCEPTED', 101);
 });
 
 after(async () => {
