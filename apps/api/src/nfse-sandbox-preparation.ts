@@ -14,22 +14,17 @@ function preparationView(saved: SavedPreparation) {
   return { environment: 'SANDBOX', status: 'PREPARED', ...saved, issueAuthorized: false } as const;
 }
 
-export async function readFiscalSandboxPreparation(db: Pick<PrismaClient, '$queryRaw'>, userId: string, eventId: string, receiptId: string) {
-  const [saved] = await db.$queryRaw<SavedPreparation[]>`
-    SELECT d."sandboxProvider" AS provider, d."sandboxPreparedAt" AS "preparedAt", d."idempotencyKey"
-    FROM "FiscalReceiptDraft" d
-    JOIN "EventRegistrationPaymentReceipt" r ON r.id = d."receiptId" AND r."organizationId" = d."issuerId"
-    JOIN "Event" e ON e.id = r."eventId" AND e."organizationId" = r."organizationId"
-    JOIN "OrganizationMembership" m ON m."organizationId" = e."organizationId"
-    WHERE r.id = ${receiptId} AND e.id = ${eventId} AND m."userId" = ${userId}
-      AND m.status = 'ACTIVE' AND m.role = 'OWNER'
-      AND d."sandboxProvider" IS NOT NULL AND d."sandboxPreparedAt" IS NOT NULL`;
-  if (!saved) throw new NotFoundException('Preparação fiscal indisponível.');
-  return preparationView(saved);
+type FiscalDatabase = Pick<PrismaClient, '$transaction'>;
+
+export function readFiscalSandboxPreparation(db: FiscalDatabase, userId: string, eventId: string, receiptId: string) {
+  return sandboxPreparation(db, userId, eventId, receiptId, 'read');
 }
 
-// Persist the sandbox binding, never a municipal protocol or an issuance result.
-export function prepareFiscalSandbox(db: Pick<PrismaClient, '$transaction'>, userId: string, eventId: string, receiptId: string) {
+export function prepareFiscalSandbox(db: FiscalDatabase, userId: string, eventId: string, receiptId: string) {
+  return sandboxPreparation(db, userId, eventId, receiptId, 'prepare');
+}
+
+function sandboxPreparation(db: FiscalDatabase, userId: string, eventId: string, receiptId: string, mode: 'read' | 'prepare') {
   return db.$transaction(async tx => {
     const [row] = await tx.$queryRaw<PreparationRow[]>`
       SELECT r."organizationId", r."reservationId", r."amountCents", d."issuerId", d."recipientId", d."serviceCode",
@@ -47,18 +42,22 @@ export function prepareFiscalSandbox(db: Pick<PrismaClient, '$transaction'>, use
         AND c."amountCents" = r."amountCents" AND s.status = 'CONFIRMED'
       FOR UPDATE OF d FOR SHARE OF r, e, m, c, s`;
     if (!row) throw new NotFoundException('Prévia fiscal indisponível.');
-    const provider = process.env.EVOLVIA_NFSE_SANDBOX_PROVIDER;
-    if ((provider !== 'enotas' && provider !== 'notazz') ||
-        process.env.EVOLVIA_NFSE_SANDBOX_ORGANIZATION_ID !== row.organizationId ||
-        process.env.EVOLVIA_NFSE_SANDBOX_MUNICIPALITY !== row.municipalityIbgeCode) {
-      throw new ServiceUnavailableException('Preparação fiscal de homologação desabilitada.');
-    }
     try {
       const current = prepareFiscalInvoiceDraft({ ...row, receiptId, eventId, currency: 'BRL', paymentStatus: 'CONFIRMED' });
       if (current.idempotencyKey !== row.idempotencyKey) throw new ConflictException('Os dados do recibo divergiram da prévia fiscal.');
     } catch (error) {
       if (error instanceof FiscalInvoicePolicyError) throw new ConflictException('O recibo perdeu a elegibilidade fiscal.');
       throw error;
+    }
+    if (mode === 'read') {
+      if (!row.sandboxProvider || !row.sandboxPreparedAt) throw new NotFoundException('Preparação fiscal indisponível.');
+      return preparationView({ provider: row.sandboxProvider, preparedAt: row.sandboxPreparedAt, idempotencyKey: row.idempotencyKey });
+    }
+    const provider = process.env.EVOLVIA_NFSE_SANDBOX_PROVIDER;
+    if ((provider !== 'enotas' && provider !== 'notazz') ||
+        process.env.EVOLVIA_NFSE_SANDBOX_ORGANIZATION_ID !== row.organizationId ||
+        process.env.EVOLVIA_NFSE_SANDBOX_MUNICIPALITY !== row.municipalityIbgeCode) {
+      throw new ServiceUnavailableException('Preparação fiscal de homologação desabilitada.');
     }
     if (row.sandboxProvider && row.sandboxProvider !== provider) {
       throw new ConflictException('O recibo já foi preparado com outro provedor.');

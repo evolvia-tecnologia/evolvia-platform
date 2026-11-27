@@ -201,6 +201,18 @@ test('preparação sandbox persiste um único vínculo por recibo sob concorrên
   const persisted = await read(token);
   assert.equal(persisted.status, 200);
   assert.deepEqual(await persisted.json(), records[0]);
+  await db.$transaction([
+    db.eventRegistrationCheckout.update({ where: { id: receipt.checkoutId }, data: { amountCents: 900 } }),
+    db.eventRegistrationPaymentReceipt.update({ where: { id: receipt.id }, data: { amountCents: 900 } }),
+  ]);
+  assert.equal((await read(token)).status, 409);
+  await db.eventRegistrationCheckout.update({ where: { id: receipt.checkoutId }, data: { status: 'CANCELED' } });
+  assert.equal((await read(token)).status, 404);
+  await db.$transaction([
+    db.eventRegistrationCheckout.update({ where: { id: receipt.checkoutId }, data: { amountCents: 750, status: 'PAID' } }),
+    db.eventRegistrationPaymentReceipt.update({ where: { id: receipt.id }, data: { amountCents: 750 } }),
+  ]);
+  assert.deepEqual(await (await read(token)).json(), records[0]);
   assert.equal((await read(outsider.token)).status, 404);
   await db.organizationMembership.updateMany({
     where: { userId: owner.id, organizationId: org.id }, data: { role: 'ADMIN' },
