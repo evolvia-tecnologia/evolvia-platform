@@ -281,3 +281,73 @@ test('com host confirmado e sem confirmacao, a recusa e a da confirmacao', () =>
   assert.equal(saida.length, 0);
   assert.equal(erro[0], MOTIVOS.confirmacao_ausente);
 });
+
+// ------------------- achados da revisao independente da #744 (26/11) -------------------
+
+test('--confirmar-revogacao=false NAO autoriza, e a recusa tem motivo proprio', () => {
+  // O achado: o parser separava `chave=valor` e este case descartava o valor,
+  // marcando a confirmacao como verdadeira. Com os demais campos validos, quem
+  // escreveu `=false` recebia o SQL de revogacao. A flag passa a ser recusada
+  // quando vem com valor, em vez de reinterpretada.
+  const a = lerArgumentos(['--confirmar-revogacao=false']);
+  assert.equal(a.confirmouRevogacao, false, 'nao pode virar true');
+  assert.equal(a.confirmacaoComValor, true);
+  assert.equal(decidirEntrada(base({ confirmouRevogacao: false, confirmacaoComValor: true }), AMBIENTE).motivo,
+    MOTIVOS.confirmacao_com_valor);
+});
+
+test('--confirmar-revogacao=true tambem e recusado: nao se reinterpreta a flag', () => {
+  // Deliberado. Aceitar `=true` obrigaria a decidir o que fazer com `=1`,
+  // `=sim`, `=FALSE` — e o unico erro que importa aqui e autorizar sem querer.
+  for (const forma of ['--confirmar-revogacao=true', '--confirmar-revogacao=1', '--confirmar-revogacao=']) {
+    const a = lerArgumentos([forma]);
+    assert.equal(a.confirmouRevogacao, false, forma);
+    assert.equal(a.confirmacaoComValor, true, forma);
+  }
+});
+
+test('a flag sozinha continua autorizando', () => {
+  const a = lerArgumentos(['--confirmar-revogacao']);
+  assert.equal(a.confirmouRevogacao, true);
+  assert.equal(a.confirmacaoComValor, false);
+  assert.equal(decidirEntrada(base(), AMBIENTE).autorizado, true);
+});
+
+test('com tudo valido e --confirmar-revogacao=false, nenhum SQL e impresso', () => {
+  // O teste que prende a consequencia do achado, nao so a leitura do argumento:
+  // antes, esta execucao imprimia o bloco de revogacao.
+  const saida = [];
+  const erro = [];
+  const codigo = executar(
+    ['--email', 'titular@evolvia-ci.local', '--identidade', IDENT,
+      '--nota', 'Chamado CH-7.', '--correlacao', 'ch-7',
+      '--confirmar-host', 'homologacao-db', '--confirmar-revogacao=false'],
+    AMBIENTE, (t) => saida.push(t), (t) => erro.push(t),
+  );
+  assert.equal(codigo, 1);
+  assert.equal(saida.length, 0, 'imprimiu SQL com a confirmacao negada');
+  assert.equal(erro[0], MOTIVOS.confirmacao_com_valor);
+});
+
+test('a ordem das recusas nao muda: producao antes da confirmacao malformada', () => {
+  // Um comando com `=false` apontado para producao tem de ser recusado POR SER
+  // producao. Senao o operador corrige a flag e dispara no banco errado.
+  const producao = { ...AMBIENTE, DATABASE_URL: 'postgresql://evolvia:x@db-prod:5432/evolvia', EVOLVIA_AMBIENTE: 'producao' };
+  const r = decidirEntrada(base({ confirmouRevogacao: false, confirmacaoComValor: true }), producao);
+  assert.equal(r.autorizado, false);
+  assert.equal(r.motivo, MOTIVOS.producao);
+});
+
+test('idEstiloCuid sorteia com crypto por padrao, e segue injetavel', () => {
+  // `randomInt` do node:crypto, como a politica irma. O que da para prender aqui
+  // sem medir entropia: o indice fica no intervalo, o alfabeto e respeitado, e a
+  // injecao continua valendo — e dela que os testes de SQL estavel dependem.
+  const limites = new Set();
+  idEstiloCuid((limite) => { limites.add(limite); return 0; });
+  assert.deepEqual([...limites], [36], 'o sorteio recebe o tamanho do alfabeto');
+  assert.equal(idEstiloCuid(() => 0), 'c' + 'a'.repeat(24));
+  assert.equal(idEstiloCuid(() => 35), 'c' + '9'.repeat(24));
+  const muitos = new Set(Array.from({ length: 200 }, () => idEstiloCuid()));
+  assert.equal(muitos.size, 200, 'colidiu em 200 sorteios');
+  for (const id of muitos) assert.match(id, /^c[a-z0-9]{24}$/u);
+});
