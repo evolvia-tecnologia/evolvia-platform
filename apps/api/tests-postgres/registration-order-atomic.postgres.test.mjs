@@ -102,6 +102,29 @@ test('G2.10 PostgreSQL Serializable: two concurrent 2-entry orders never oversel
   }
 });
 
+test('G2.10 PostgreSQL: raw SQLSTATE 40001 rolls back every write and retries the whole reservation', async () => {
+  const ctx = await fixture('serialization-retry');
+  let attempts = 0;
+  const client = {
+    $transaction: (work, options) => prisma.$transaction(async (tx) => {
+      assert.equal(options.isolationLevel, 'Serializable');
+      attempts += 1;
+      const result = await work(tx);
+      if (attempts === 1) {
+        await tx.$executeRaw`DO $$ BEGIN RAISE EXCEPTION 'serialization regression' USING ERRCODE = '40001'; END $$`;
+      }
+      return result;
+    }, options),
+  };
+  const service = new RegistrationReservationsService(client, {}, {}, refunds);
+  const result = await service.reserveOrder(ctx.event.slug, order(ctx, 'retry'), randomUUID());
+  assert.equal(attempts, 2);
+  assert.equal(result.entryCount, 2);
+  const where = { eventId: ctx.event.id, organizationId: ctx.organization.id };
+  assert.equal(await prisma.eventRegistrationOrder.count({ where }), 1);
+  assert.equal(await prisma.eventRegistrationReservation.count({ where }), 2);
+});
+
 test('G2.10 PostgreSQL: status capability is scoped to event and organization', async () => {
   const first = await fixture('tenant-a');
   const second = await fixture('tenant-b');
