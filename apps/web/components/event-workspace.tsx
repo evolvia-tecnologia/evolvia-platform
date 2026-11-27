@@ -128,7 +128,6 @@ function ClosedPanel({ message }: { message: string }) {
 /** CL02 — shell do OPERATOR: só atalhos que o servidor já listou + minhas permissões. */
 function RestrictedOperatorFrame({
   eventId,
-  section,
   pathname,
   eventName,
   orgName,
@@ -136,7 +135,6 @@ function RestrictedOperatorFrame({
   children,
 }: {
   eventId: string;
-  section: EventFlowSection;
   pathname: string;
   eventName: string;
   orgName: string;
@@ -144,8 +142,10 @@ function RestrictedOperatorFrame({
   children: ReactNode;
 }) {
   const links = linksDoOperadorRestrito(eventId, capabilities);
-  const permitted = secaoPermitidaAoOperador(section, links)
-    || /\/painel\/minhas-permissoes(?:\/|$)/u.test(pathname);
+  // `pathname`, nao `section`: ver a nota em `secaoPermitidaAoOperador`. A
+  // guarda solta de minhas-permissoes saiu porque esse atalho ja esta em
+  // `links`, e duas fontes para a mesma regra divergem com o tempo.
+  const permitted = secaoPermitidaAoOperador(pathname, links);
   const fallback = links.find((link) => link.href.endsWith('/painel/check-in'))?.href
     ?? `/eventos/${encodeURIComponent(eventId)}/painel/minhas-permissoes`;
 
@@ -352,7 +352,6 @@ export default function EventWorkspace({
   if (isPapelOperadorRestrito(operatorCapabilities.papel)) {
     return <RestrictedOperatorFrame
       eventId={eventId}
-      section={section}
       pathname={pathname}
       eventName={payload.event.name}
       orgName={payload.event.organization.name}
@@ -579,6 +578,3 @@ export default function EventWorkspace({
     </div>
   </div>;
 }
-
-
-
