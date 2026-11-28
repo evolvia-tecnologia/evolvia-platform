@@ -523,7 +523,7 @@ export default function EventWorkspace({
             <span><strong>Credenciamento</strong><small>Secretaria: consulta, ficha, etiqueta e check-in</small></span>
           </Link>
           <Link className={navClass(permissionsPath(pathname))} aria-current={permissionsPath(pathname) ? 'page' : undefined} href={`/eventos/${eventId}/painel/permissoes`} tabIndex={navigationTabIndex} onClick={closeMenu}>
-            <span aria-hidden="true">⠿</span>
+            <span aria-hidden="true">⚿</span>
             <span><strong>Permissões do balcão</strong><small>Quem pode o quê neste evento</small></span>
           </Link>
           </div>
