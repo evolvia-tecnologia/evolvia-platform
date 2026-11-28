@@ -1,5 +1,7 @@
+import { createHash, timingSafeEqual } from 'node:crypto';
+import { inspectSandboxPayment, readSandboxPayment, submitSandboxRefund } from './asaas-sandbox-refund';
 import { lookupSandboxRefundPayment } from './asaas-refund-payment-lookup';
-import { BadRequestException, ConflictException, Injectable, NotFoundException, UnauthorizedException, ServiceUnavailableException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, Logger, NotFoundException, UnauthorizedException, ServiceUnavailableException } from '@nestjs/common';
 import { EventStatus, MembershipRole, Prisma, RegistrationCheckoutStatus, RegistrationRefundRequestStatus, RegistrationReservationStatus } from '@prisma/client';
 import { AuthorizationService } from './authorization.service';
 import { participantHash, normalizeParticipantToken } from './participant-area-policy';
@@ -38,6 +40,48 @@ function policyError(error: unknown): never {
 @Injectable()
 export class RegistrationRefundService {
   constructor(private readonly prisma: PrismaService, private readonly authorization: AuthorizationService) {}
+
+  private recoveryTimer?: NodeJS.Timeout;
+  private readonly logger = new Logger(RegistrationRefundService.name);
+
+  onModuleInit() {
+    if (!this.sandboxRecoveryAccount()) return;
+    this.recoveryTimer = setInterval(() => {
+      void this.recoverSandboxRefund().catch(() => this.logger.warn('Falha na consulta de conciliação Pix sandbox.'));
+    }, 30_000);
+    this.recoveryTimer.unref();
+  }
+
+  onModuleDestroy() {
+    clearInterval(this.recoveryTimer);
+  }
+
+  private sandboxRecoveryAccount() {
+    const org = process.env.ASAAS_REFUND_SANDBOX_ORGANIZATION_ID;
+    const token = process.env.ASAAS_REFUND_SANDBOX_TOKEN?.trim();
+    return org && token && org === process.env.ASAAS_REFUND_SANDBOX_EXECUTION_ORGANIZATION_ID ? { org, token } : null;
+  }
+
+  async recoverSandboxRefund() {
+    const account = this.sandboxRecoveryAccount();
+    if (!account) return;
+    const { org, token } = account;
+    // Reserve the next read across instances, committing before contacting Asaas.
+    const paymentId = await this.prisma.$transaction(async tx => {
+      const [lock] = await tx.$queryRaw<{ acquired: boolean }[]>`
+        SELECT pg_try_advisory_xact_lock(hashtextextended(${'sandbox-refund-recovery/' + org}, 0)) AS acquired`;
+      if (!lock.acquired) return;
+      const [due] = await tx.$queryRaw<{ paymentId: string }[]>`
+        SELECT "paymentId" FROM "SandboxRefundOperation"
+        WHERE "organizationId" = ${org} AND status = 'PROCESSING' AND "nextCheckAt" <= now()
+        ORDER BY "nextCheckAt", "paymentId" LIMIT 1`;
+      if (!due) return;
+      await tx.$executeRaw`UPDATE "SandboxRefundOperation" SET "nextCheckAt" = now() + interval '5 minutes'
+        WHERE "organizationId" = ${org} AND "paymentId" = ${due.paymentId} AND status = 'PROCESSING'`;
+      return due.paymentId;
+    });
+    if (paymentId) await this.reconcileSandboxPayment(org, paymentId, token);
+  }
 
   async publicPolicy(slugValue: string, now = new Date()) {
     const event = await this.publishedEvent(slugValue);
@@ -530,8 +574,132 @@ export class RegistrationRefundService {
     });
   }
 
-  // Both commands operate exclusively on a local simulated receipt. The payment and
-  // registration remain unchanged; an organization must explicitly opt into simulation.
+  async processSandboxRefund(userId: string, eventId: string, requestId: string) {
+    const fields = { providerCheckoutId: true, provider: true, amountCents: true, status: true, paidAt: true } as const;
+    const where = { id: requestId, eventId, reservation: { event: { organization: {
+      memberships: { some: { userId, role: MembershipRole.OWNER, status: 'ACTIVE' as const } },
+    } } } };
+    const select = { organizationId: true, status: true, preparedAmountCents: true, sandboxPaymentId: true,
+      preparedCheckout: { select: fields }, preparedOrderCheckout: { select: fields } } as const;
+    const initial = await this.prisma.registrationRefundRequest.findFirst({
+      where, select: { ...select, sandboxOperation: { select: { status: true, attempts: true } } },
+    });
+    if (!initial) throw new NotFoundException('Pedido não encontrado.');
+    const { sandboxOperation, ...request } = initial;
+    // A duplicate already in flight before rejection is not an explicit retry.
+    const retryRequested = sandboxOperation?.status === 'FAILED' && sandboxOperation.attempts === 1;
+    const { organizationId } = request;
+    const token = process.env.ASAAS_REFUND_SANDBOX_TOKEN?.trim();
+    if (!token || process.env.ASAAS_REFUND_SANDBOX_ORGANIZATION_ID !== organizationId ||
+        process.env.ASAAS_REFUND_SANDBOX_EXECUTION_ORGANIZATION_ID !== organizationId) {
+      throw new ServiceUnavailableException('Processamento de homologação desabilitado.');
+    }
+    const checkout = request.preparedCheckout ?? request.preparedOrderCheckout;
+    if (request.status !== 'APPROVED' || !request.sandboxPaymentId || !request.preparedAmountCents ||
+        !checkout?.providerCheckoutId || !checkout.paidAt || checkout.provider !== 'ASAAS' || checkout.status !== 'PAID' ||
+        (request.preparedCheckout && request.preparedOrderCheckout)) {
+      throw new ConflictException('A execução exige uma cobrança paga e um pedido aprovado e preparado.');
+    }
+    const op = { requestId, paymentId: request.sandboxPaymentId, checkoutId: checkout.providerCheckoutId,
+      amountCents: request.preparedAmountCents, checkoutCents: checkout.amountCents };
+    const observed = inspectSandboxPayment(op, await readSandboxPayment(op.paymentId, token));
+    const claim = await this.prisma.$transaction(async tx => {
+      const owner = await tx.$queryRaw<{ id: string }[]>`
+        SELECT id FROM "OrganizationMembership" WHERE "userId" = ${userId} AND "organizationId" = ${organizationId}
+        AND role = 'OWNER' AND status = 'ACTIVE' FOR SHARE`;
+      if (!owner.length) throw new NotFoundException('Pedido não encontrado.');
+      // Lock the refund request, not just the operation insert: concurrent owners
+      // must serialize while claims and prepared payment references are rechecked.
+      // Never turn a conflicted claim into another provider POST after a timeout.
+      const locked = await tx.$queryRaw<Array<{ id: string }>>`SELECT id FROM "RegistrationRefundRequest"
+        WHERE id = ${requestId} AND "eventId" = ${eventId} AND "organizationId" = ${organizationId} FOR UPDATE`;
+      if (!locked.length) throw new NotFoundException('Pedido não encontrado.');
+      const current = await tx.registrationRefundRequest.findFirst({ where, select });
+      if (!current || JSON.stringify(current) !== JSON.stringify(request)) throw new ConflictException('O pedido mudou.');
+      // A first, definitively rejected HTTP 400/401/403 can be retried ONCE
+      // by an authorized OWNER who explicitly calls the processing endpoint.
+      // Ambiguous transport errors remain PROCESSING: never retry a possible
+      // successful provider POST merely because a later GET sees no refund.
+      // Match the immutable tenant/payment/amount and cap total provider POSTs at 2.
+      const inserted = await tx.$executeRaw`
+        INSERT INTO "SandboxRefundOperation" ("requestId","organizationId","eventId","paymentId","amountCents","attempts")
+        VALUES (${requestId},${organizationId},${eventId},${op.paymentId},${op.amountCents},${observed.matched ? 0 : 1})
+        ON CONFLICT ("requestId") DO UPDATE SET
+          status = 'PROCESSING',
+          attempts = "SandboxRefundOperation".attempts + 1,
+          "nextCheckAt" = now()
+        WHERE "SandboxRefundOperation".status = 'FAILED'
+          AND "SandboxRefundOperation".attempts = 1
+          AND "SandboxRefundOperation"."organizationId" = ${organizationId}
+          AND "SandboxRefundOperation"."eventId" = ${eventId}
+          AND "SandboxRefundOperation"."paymentId" = ${op.paymentId}
+          AND "SandboxRefundOperation"."amountCents" = ${op.amountCents}
+          AND ${retryRequested && !observed.matched && observed.eligible}`;
+      if (inserted && !observed.matched && !observed.eligible) throw new ConflictException('Cobrança indisponível para nova operação.');
+      return inserted === 1 && !observed.matched;
+    });
+    const status = claim ? await submitSandboxRefund(op, token) : observed.status;
+    const saved = await this.saveSandboxStatus(organizationId, eventId, requestId, op.paymentId, op.amountCents, status);
+    return { requestId, environment: 'SANDBOX', processingStatus: saved.status, amountCents: op.amountCents,
+      sandboxRefundConfirmed: saved.status === 'RECONCILED', moneyReturned: false };
+  }
+
+  private async saveSandboxStatus(organizationId: string, eventId: string, requestId: string,
+    paymentId: string, amountCents: number, status: string) {
+    const [saved] = await this.prisma.$queryRaw<{ status: string }[]>`
+      UPDATE "SandboxRefundOperation" SET
+        status = CASE WHEN status = 'RECONCILED' OR ${status} = 'RECONCILED' THEN 'RECONCILED'
+                      WHEN status = 'FAILED' THEN status ELSE ${status} END,
+        "reconciledAt" = CASE WHEN ${status} = 'RECONCILED' THEN COALESCE("reconciledAt", now()) ELSE "reconciledAt" END
+      WHERE "requestId" = ${requestId} AND "organizationId" = ${organizationId} AND "eventId" = ${eventId}
+        AND "amountCents" = ${amountCents} AND "paymentId" = ${paymentId} RETURNING status`;
+    if (!saved) throw new ConflictException('Operação divergente do pedido preparado.');
+    return saved;
+  }
+
+  async reconcileSandboxWebhook(header: string | undefined, input: unknown) {
+    const secret = process.env.ASAAS_REFUND_SANDBOX_WEBHOOK_TOKEN;
+    const org = process.env.ASAAS_REFUND_SANDBOX_ORGANIZATION_ID;
+    const token = process.env.ASAAS_REFUND_SANDBOX_TOKEN;
+    if (!secret?.trim() || !org || !token?.trim() || org !== process.env.ASAAS_REFUND_SANDBOX_EXECUTION_ORGANIZATION_ID) {
+      throw new ServiceUnavailableException('Conciliação sandbox desabilitada.');
+    }
+    const digest = (value: string) => createHash('sha256').update(value).digest();
+    if (typeof header !== 'string' || !timingSafeEqual(digest(header), digest(secret))) throw new UnauthorizedException();
+    const payload = input as { event?: unknown; payment?: { id?: unknown } } | null;
+    if (typeof payload?.event !== 'string') throw new BadRequestException('Evento inválido.');
+    if (!['PAYMENT_REFUNDED', 'PAYMENT_PARTIALLY_REFUNDED', 'PAYMENT_REFUND_IN_PROGRESS', 'PAYMENT_REFUND_DENIED'].includes(payload.event)) return;
+    const paymentId = payload.payment?.id;
+    if (typeof paymentId !== 'string' || !/^pay_[a-zA-Z0-9_-]{1,196}$/.test(paymentId)) {
+      throw new BadRequestException('Referência de cobrança inválida.');
+    }
+    await this.reconcileSandboxPayment(org, paymentId, token);
+  }
+
+  private async reconcileSandboxPayment(org: string, paymentId: string, token: string) {
+    const rows = await this.prisma.$queryRaw<Array<{ requestId: string; eventId: string; amountCents: number;
+      checkoutId: string; checkoutCents: number }>>`
+      SELECT op."requestId", op."eventId", op."amountCents",
+        COALESCE(c."providerCheckoutId", g."providerCheckoutId") AS "checkoutId",
+        COALESCE(c."amountCents", g."amountCents") AS "checkoutCents"
+      FROM "SandboxRefundOperation" op JOIN "RegistrationRefundRequest" r ON r.id = op."requestId"
+        AND r."organizationId" = op."organizationId" AND r."eventId" = op."eventId"
+        AND r."sandboxPaymentId" = op."paymentId" AND r."preparedAmountCents" = op."amountCents"
+      LEFT JOIN "EventRegistrationCheckout" c ON c.id = r."preparedCheckoutId"
+        AND c."organizationId" = op."organizationId" AND c."eventId" = op."eventId"
+      LEFT JOIN "EventRegistrationOrderCheckout" g ON g.id = r."preparedOrderCheckoutId"
+        AND g."organizationId" = op."organizationId" AND g."eventId" = op."eventId"
+      WHERE op."organizationId" = ${org} AND op."paymentId" = ${paymentId} AND op.status <> 'RECONCILED'
+        AND ((c.id IS NULL) <> (g.id IS NULL))`;
+    if (!rows.length) return;
+    const payment = await readSandboxPayment(paymentId, token);
+    for (const row of rows) {
+      const observed = inspectSandboxPayment({ ...row, paymentId }, payment);
+      if (observed.matched) await this.saveSandboxStatus(org, row.eventId, row.requestId, paymentId, row.amountCents, observed.status);
+    }
+  }
+
+  // Simulation requires an explicit opt-in and writes only a local receipt.
   async mockRefund(userId: string, eventId: string, requestId: string, command: 'ISSUE' | 'RECONCILE', now = new Date()) {
     const org = simulationOrganization();
     if (!org) throw new NotFoundException('Simulação indisponível.');
