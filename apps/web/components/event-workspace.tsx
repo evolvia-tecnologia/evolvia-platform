@@ -19,7 +19,7 @@ import {
   type EventFlowSection,
 } from '../lib/event-flow';
 import { eventStatusLabel } from '../lib/event-status-labels';
-import type { RespostaDeCapacidades } from '../lib/operator-journey';
+import { identidadeDoEvento, type RespostaDeCapacidades } from '../lib/operator-journey';
 import {
   isPapelOperadorRestrito,
   linksDoOperadorRestrito,
@@ -153,10 +153,12 @@ function RestrictedOperatorFrame({
     <a className={styles.skipLink} href="#event-admin-content">Pular para o conteúdo</a>
     <header className={styles.operationBar}>
       <Link className={styles.brand} href="/painel">EVOLVIA</Link>
-      <div className={styles.eventIdentity}>
-        <strong>{eventName}</strong>
-        <span>{orgName}</span>
-      </div>
+      {eventName || orgName ? (
+        <div className={styles.eventIdentity}>
+          {eventName ? <strong>{eventName}</strong> : null}
+          {orgName ? <span>{orgName}</span> : null}
+        </div>
+      ) : null}
       <Link className={styles.secondaryButton} href="/painel">Voltar ao painel</Link>
     </header>
     <p className={styles.operationNote}>
@@ -341,24 +343,44 @@ export default function EventWorkspace({
   if (shell === 'operation') {
     return <OperationalEventFrame section={section}><div key={eventId}>{children}</div></OperationalEventFrame>;
   }
-  if (shell === 'error' || !payload) {
-    return <ClosedPanel message={view.eventId === eventId ? view.error : ''} />;
-  }
 
+  // A ORDEM AQUI E O CONSERTO, e nao uma preferencia de estilo.
+  //
+  // A consulta do construtor de eventos exige OWNER/ADMIN/MANAGER
+  // (`EventWizardService.requireReadableEvent`). Para OPERATOR ela responde
+  // 403, `view.phase` vira 'error' e `shell` chega aqui como 'error'. Na ordem
+  // anterior o retorno de `shell === 'error' || !payload` vinha ANTES da
+  // selecao do shell restrito, entao `RestrictedOperatorFrame` era
+  // INALCANCAVEL: o operador recebia `ClosedPanel` mesmo com capabilities
+  // validas, e a tela que existe para ele nunca montava.
+  //
+  // Por isso a selecao por capabilities passa a vir primeiro, e a identidade
+  // do evento sai de `identidadeDoEvento`, que resolve pela resposta de
+  // capacidades e, na falta dela, pelo payload — degradando para vazio em vez
+  // de bloquear. O operador deixa de depender de um payload que ele nao pode
+  // buscar.
+  //
+  // `undefined` continua significando consulta em andamento, e so ela devolve
+  // LoadingPanel; `null` (consulta falhou) cai adiante, no ClosedPanel.
   if (operatorCapabilities === undefined) return <LoadingPanel />;
-  if (!operatorCapabilities?.papel) {
-    return <ClosedPanel message="Não foi possível verificar suas permissões neste evento." />;
-  }
-  if (isPapelOperadorRestrito(operatorCapabilities.papel)) {
+  if (isPapelOperadorRestrito(operatorCapabilities?.papel)) {
+    const identidade = identidadeDoEvento(operatorCapabilities, payload?.event ?? null);
     return <RestrictedOperatorFrame
       eventId={eventId}
       pathname={pathname}
-      eventName={payload.event.name}
-      orgName={payload.event.organization.name}
+      eventName={identidade.evento}
+      orgName={identidade.organizacao}
       capabilities={operatorCapabilities}
     >
       <div key={eventId}>{children}</div>
     </RestrictedOperatorFrame>;
+  }
+
+  if (shell === 'error' || !payload) {
+    return <ClosedPanel message={view.eventId === eventId ? view.error : ''} />;
+  }
+  if (!operatorCapabilities?.papel) {
+    return <ClosedPanel message="Não foi possível verificar suas permissões neste evento." />;
   }
 
   const isScientific = showsScientificNavigation(payload.event.profileCode, payload.answers.capabilities);
@@ -501,7 +523,7 @@ export default function EventWorkspace({
             <span><strong>Credenciamento</strong><small>Secretaria: consulta, ficha, etiqueta e check-in</small></span>
           </Link>
           <Link className={navClass(permissionsPath(pathname))} aria-current={permissionsPath(pathname) ? 'page' : undefined} href={`/eventos/${eventId}/painel/permissoes`} tabIndex={navigationTabIndex} onClick={closeMenu}>
-            <span aria-hidden="true">⚿</span>
+            <span aria-hidden="true">⠿</span>
             <span><strong>Permissões do balcão</strong><small>Quem pode o quê neste evento</small></span>
           </Link>
           </div>
