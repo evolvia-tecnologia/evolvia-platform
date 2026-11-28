@@ -103,3 +103,7 @@
   .metrics { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .formatList li { padding: var(--space-12); }
 }
+
+#regras, #conteudo, #autoria, #areas, #formas, #cegamento, #cartas, #lista, #estacao {
+  scroll-margin-top: calc(var(--space-80) + var(--space-8));
+}

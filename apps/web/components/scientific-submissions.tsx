@@ -7,6 +7,7 @@ import { api, getToken } from '../lib/api';
 import { localDateTimeInputValue } from '../lib/event-time-zone';
 import ScientificDecisionLetters from './scientific-decision-letters';
 import ScientificStationPanel from './scientific-station-panel';
+import ScientificWorksNav, { useScientificHashScroll } from './scientific-works-nav';
 import styles from './scientific-submissions.module.css';
 
 type ReviewMode = 'OPEN' | 'SINGLE_BLIND' | 'DOUBLE_BLIND';
@@ -284,6 +285,8 @@ export default function ScientificSubmissions({ eventId }: { eventId: string }) 
     return source.config.presentationFormats.map((item) => ({ ...item, submissionEnabled: false }));
   }
 
+  useScientificHashScroll(!loading && Boolean(payload));
+
   if (loading) return <main className={styles.page}><div className={styles.loading}>A EVA está preparando as configurações do processo de submissão...</div></main>;
   if (!payload) return <main className={styles.page}><div className={styles.error}>{error || 'Configuração de submissões indisponível.'}</div></main>;
 
@@ -298,6 +301,7 @@ export default function ScientificSubmissions({ eventId }: { eventId: string }) 
         <Link href={`/eventos/${eventId}/cientifico/trabalhos`}>Voltar aos trabalhos</Link>
         <Link href={`/eventos/${eventId}/painel`}>Voltar ao painel</Link>
       </nav>
+      <ScientificWorksNav eventId={eventId} />
       <div className={styles.hero}>
         <div>
           <span className={styles.eyebrow}>GATE A6 · CONFIGURAÇÃO DE TRABALHOS CIENTÍFICOS</span>
@@ -333,9 +337,9 @@ export default function ScientificSubmissions({ eventId }: { eventId: string }) 
       </section>
 
       <section className={styles.grid}>
-        <article className={styles.card}>
+        <article id="regras" className={styles.card}>
           <span className={styles.step}>1 · COMO FUNCIONA?</span><h2>Regras do processo</h2><p>Defina o que será obrigatório quando o autor preencher o trabalho em sua própria área.</p>
-          <div className={styles.ruleList} role="radiogroup" aria-label="Área científica">
+          <div id="areas" className={styles.ruleList} role="radiogroup" aria-label="Área científica">
             <label><input type="radio" name="area-mode" checked={!payload.config.requireArea} disabled={Boolean(saving)} onChange={() => saveConfig({ requireArea: false, requireSubarea: false })} /> Não pedir área</label>
             <label><input type="radio" name="area-mode" checked={payload.config.requireArea && !payload.config.requireSubarea} disabled={Boolean(saving)} onChange={() => saveConfig({ requireArea: true, requireSubarea: false })} /> Apenas área</label>
             <label><input type="radio" name="area-mode" checked={payload.config.requireArea && payload.config.requireSubarea} disabled={Boolean(saving)} onChange={() => saveConfig({ requireArea: true, requireSubarea: true })} /> Área e subárea</label>
@@ -351,10 +355,10 @@ export default function ScientificSubmissions({ eventId }: { eventId: string }) 
             <button className={styles.primary} disabled={Boolean(saving)}>{saving === 'taxonomy' ? 'Salvando…' : 'Inserir'}</button>
           </form>}
           {payload.config.requireArea && <div className={styles.chips}>{payload.taxonomy.filter((item) => item.level === 'AREA').map((area) => <span key={area.id}>{area.name}{payload.config.requireSubarea ? payload.taxonomy.filter((item) => item.level === 'SUBAREA' && item.parentId === area.id).map((item) => ` · ${item.name}`).join('') : ''}</span>)}</div>}
-          <label className={styles.field}>Modelo de avaliação<select value={payload.config.reviewMode} disabled={Boolean(saving)} onChange={(e) => saveConfig({ reviewMode: e.target.value as ReviewMode })}><option value="OPEN">Revisão aberta</option><option value="SINGLE_BLIND">Revisão cega simples</option><option value="DOUBLE_BLIND">Revisão duplo-cega</option></select><small>Atual: {reviewModeLabel[payload.config.reviewMode]}</small></label>
+          <label id="cegamento" className={styles.field}>Modelo de avaliação<select value={payload.config.reviewMode} disabled={Boolean(saving)} onChange={(e) => saveConfig({ reviewMode: e.target.value as ReviewMode })}><option value="OPEN">Revisão aberta</option><option value="SINGLE_BLIND">Revisão cega simples</option><option value="DOUBLE_BLIND">Revisão duplo-cega</option></select><small>Atual: {reviewModeLabel[payload.config.reviewMode]}</small></label>
         </article>
 
-        <article className={styles.card}>
+        <article id="conteudo" className={styles.card}>
           <span className={styles.step}>2 · CONTEÚDO DO TRABALHO</span><h2>Título e resumo</h2><p>A quantidade do título é em caracteres. A quantidade do resumo pode ser em caracteres ou em palavras.</p>
           <label className={styles.field}>Quantidade máxima de caracteres do título<input key={`title-${payload.config.titleMaxLength}`} type="number" min={50} max={1000} defaultValue={payload.config.titleMaxLength} disabled={Boolean(saving)} onBlur={(e) => saveConfig({ titleMaxLength: Number(e.target.value) })} /><small>Padrão Evolvia: 250 caracteres.</small></label>
           <label className={styles.field}>Quantidade do resumo<select value={payload.config.abstractCounterUnit} disabled={Boolean(saving)} onChange={(e) => saveConfig({ abstractCounterUnit: e.target.value as CounterUnit })}><option value="CHARACTERS">Caracteres</option><option value="WORDS">Palavras</option></select></label>
@@ -368,8 +372,8 @@ export default function ScientificSubmissions({ eventId }: { eventId: string }) 
           </div>
         </article>
 
-        <article className={styles.card}>
-          <span className={styles.step}>2 · O QUE SERÁ ACEITO?</span><h2>Modalidades de submissão</h2><p>Escolha o que o autor pode selecionar no envio: oral, tema livre, pôster, pôster digital ou outra modalidade deste evento.</p>
+        <article id="formas" className={styles.card}>
+          <span className={styles.step}>2 · O QUE SERÁ ACEITO?</span><h2>Formas de apresentação e prazos</h2><p>Modalidades de submissão: escolha o que o autor pode selecionar no envio — oral, tema livre, pôster, pôster digital ou outra modalidade deste evento. Forma de apresentação não é a mesma coisa que tipo de trabalho; aqui você também define prazos e blocos de cada opção.</p>
           <ul className={styles.formatList}>{visibleFormats(payload).map((item) => {
             const modality = payload.modalities.find((entry) => entry.code === item.code);
             return <li key={item.code}>
@@ -409,7 +413,7 @@ export default function ScientificSubmissions({ eventId }: { eventId: string }) 
           </form>
         </article>
 
-        <article className={styles.card}>
+        <article id="autoria" className={styles.card}>
           <span className={styles.step}>3 · LIMITES DO AUTOR</span><h2>Autoria</h2><p>Defina limites que serão validados no portal do autor. O organizador não preenche os autores aqui.</p>
           <div className={styles.twoCols}>
             <label className={styles.field}>Mínimo de autores<input key={`min-${payload.config.minAuthors}`} type="number" min={1} max={100} defaultValue={payload.config.minAuthors} disabled={Boolean(saving) || !payload.config.collectAdditionalAuthors} onBlur={(e) => saveConfig({ minAuthors: Number(e.target.value) })} /><small>1 aceita somente quem envia a inscrição.</small></label>
@@ -459,8 +463,8 @@ export default function ScientificSubmissions({ eventId }: { eventId: string }) 
           }} /></label>
         </article>
 
-        <article className={styles.card}>
-          <span className={styles.step}>6 · COMO A BANCA DECIDE</span><h2>Avaliadores e nota</h2><p>A nota com peso continua nos critérios da avaliação. Aqui você define quantas pessoas leem o trabalho e quem fecha a situação.</p>
+        <article id="cartas" className={styles.card}>
+          <span className={styles.step}>6 · COMO A BANCA DECIDE</span><h2>Avaliadores, nota e modelos de cartas</h2><p>A nota com peso continua nos critérios da avaliação. Aqui você define quantas pessoas leem o trabalho, quem fecha a situação e os modelos de carta. Envio e entrega da carta ao autor não acontecem nesta tela.</p>
           <label className={styles.field}>Avaliadores por trabalho <small>Vazio não limita</small><input key={`reviewers-${payload.config.reviewersPerSubmission ?? 'none'}`} type="number" min={1} max={10} defaultValue={payload.config.reviewersPerSubmission ?? ''} disabled={Boolean(saving)} onBlur={(e) => saveConfig({ reviewersPerSubmission: e.target.value ? Number(e.target.value) : null })} /></label>
           <label className={styles.field}>Forma da nota<select value={payload.config.evaluationStyle} disabled={Boolean(saving)} onChange={(e) => saveConfig({ evaluationStyle: e.target.value as EvaluationStyle })}><option value="ANALYTIC">Critérios com peso</option><option value="SYNTHETIC">Nota única de 0 a 10</option></select></label>
           <div className={styles.ruleList}>
@@ -488,7 +492,7 @@ export default function ScientificSubmissions({ eventId }: { eventId: string }) 
 
         <ScientificStationPanel eventId={eventId} />
 
-        <article className={`${styles.card} ${styles.cardWide}`}>
+        <article id="lista" className={`${styles.card} ${styles.cardWide}`}>
           <span className={styles.step}>4 · ACOMPANHAMENTO</span><h2>Trabalhos do evento</h2><p>Esta lista é administrativa e somente de acompanhamento. Edição de conteúdo, autoria, arquivo, correção e submissão acontecem na área do autor.</p>
           <div className={styles.submissionList}>
             {!payload.submissions.length && <div className={styles.empty}>Nenhum trabalho recebido ainda.</div>}

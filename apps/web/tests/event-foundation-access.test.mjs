@@ -133,6 +133,12 @@ test('visão geral carregada mostra prorrogação, local, imagens e lotes sem gr
           ['Categorias e lotes', '/eventos/evento-qa/painel/inscricoes/categorias-lotes'],
         ]);
         assert.equal(tree.root.findAllByType('h3').some((heading) => text(heading) === 'Informações do evento'), false);
+        const headings = tree.root.findAllByType('h2').map((heading) => text(heading));
+        assert.equal(headings.includes('Responsável financeiro'), false, profile);
+        assert.equal(headings.includes('Certificados'), false, profile);
+        const hrefs = tree.root.findAllByType('a').map((link) => link.props.href);
+        assert.equal(hrefs.some((href) => String(href).endsWith('/painel/financeiro')), false, profile);
+        assert.equal(hrefs.some((href) => String(href).endsWith('/painel/show')), profile === 'ENTERTAINMENT', profile);
         assert.deepEqual(calls, [{ path: '/event-wizard/evento-qa', method: undefined }]);
       });
   }

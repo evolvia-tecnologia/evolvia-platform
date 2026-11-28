@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { api, getToken } from '../lib/api';
+import ScientificWorksNav from './scientific-works-nav';
 import styles from './scientific-event-central.module.css';
 
 type Choice = 'RECOMMENDED' | 'CUSTOMIZED' | 'LATER';
@@ -78,13 +79,13 @@ const copy: Record<ScientificFlow, { eyebrow: string; title: string; lead: strin
     sectionBody: 'Comunicação e publicação do evento continuam aqui, sem entrar na sequência de trabalhos nem na grade.',
   },
   works: {
-    eyebrow: 'FLUXO DE TRABALHOS',
-    title: 'Trabalhos',
-    lead: 'Configure a submissão de resumos. O participante envia o trabalho na própria área. Neste fluxo ficam a distribuição, a avaliação e os resultados.',
-    evaTitle: 'Este fluxo é só de resumos',
-    evaBody: 'A EVA acompanha a configuração, a distribuição, a avaliação e os resultados. O participante envia o trabalho na área dele. Palestrantes, atividades, locais, dias e horários ficam na programação.',
-    sectionTitle: 'Configuração, distribuição, avaliação e resultados',
-    sectionBody: 'Escolha uma recomendação ou abra a etapa deste fluxo.',
+    eyebrow: 'TRABALHOS CIENTÍFICOS',
+    title: 'Trabalhos científicos',
+    lead: 'Um único módulo: configure regras, formas, autoria, cartas e critérios; gerencie lista, distribuição, avaliação, decisões e a estação. O autor envia o resumo na área dele. Programação científica continua em outra porta.',
+    evaTitle: 'Simples por fora, completo por dentro',
+    evaBody: 'Use a navegação abaixo para Configurações ou Gerenciamento. Cada atalho abre a tela já existente, sem duplicar dados. Comunicação e relatórios do painel ficam sinalizados quando não são exclusivos deste fluxo.',
+    sectionTitle: 'Decisões do fluxo e atalhos',
+    sectionBody: 'Registre a recomendação de cada etapa ou abra a configuração correspondente.',
   },
   program: {
     eyebrow: 'GRADE DE PROGRAMAÇÃO',
@@ -221,6 +222,7 @@ export default function ScientificEventCentral({ eventId, flow = 'entry' }: { ev
           {flow === 'works' && <p><Link href={`/eventos/${eventId}/cientifico/submissoes#estacao`}>Abrir a estação científica</Link> para publicar resumo e e-poster e copiar o link do totem.</p>}
         </div>
       </div>
+      {flow === 'works' && <ScientificWorksNav eventId={eventId} />}
       {error && <div className={styles.error} role="alert">{error}</div>}
       {flow === 'entry' && <div className={styles.doors}>
         <article className={styles.door}>

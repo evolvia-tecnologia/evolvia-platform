@@ -52,7 +52,7 @@ function catalogTypes() {
 }
 
 function scientificNavBlock(source) {
-  return source.match(/\{isScientific && <>[\s\S]*?<\/>\}/u)?.[0] ?? '';
+  return source.match(/\{\(hasWorks \|\| hasProgram\) && <>[\s\S]*?<\/>\}/u)?.[0] ?? '';
 }
 
 test('catálogo canônico possui os 20 tipos de evento da tabela', () => {
@@ -163,10 +163,9 @@ test('oferta da ficha no painel permanece autenticada, em português e acessíve
     css,
     /\.primaryButton,[\s\S]*\.secondaryButton \{[\s\S]*min-height: 44px/u,
   );
-  assert.match(
-    css,
-    /\.navItem:focus-visible,[\s\S]*\.primaryButton:focus-visible,[\s\S]*\.secondaryButton:focus-visible/u,
-  );
+  assert.match(css, /\.navItem:focus-visible,[\s\S]{0,180}outline: 3px solid var\(--color-focus-on-light\)/u);
+  assert.match(css, /\.primaryButton:focus-visible \{[\s\S]{0,120}outline: 3px solid var\(--color-focus-on-dark\)/u);
+  assert.match(css, /\.secondaryButton:focus-visible \{[\s\S]{0,120}outline: 3px solid var\(--color-focus-on-light\)/u);
   assert.match(css, /width: min\(320px, 88vw\)/u);
   assert.match(
     css,

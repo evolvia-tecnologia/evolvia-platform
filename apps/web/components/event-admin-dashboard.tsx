@@ -11,6 +11,9 @@ import {
   initialWorkspaceView,
   rejectWorkspaceLoad,
   replaceWorkspaceEvent,
+  showsCertificateNavigation,
+  showsEntertainmentNavigation,
+  showsPaymentNavigation,
   visibleWorkspacePayload,
 } from '../lib/event-flow';
 import { eventDateImpactNote, eventScheduleSummary } from '../lib/event-schedule';
@@ -212,6 +215,9 @@ export default function EventAdminDashboard({ eventId, section }: { eventId: str
 
   const capabilities = payload.answers.capabilities ?? [];
   const isScientific = payload.event.profileCode === 'SCIENTIFIC_EVENT' || capabilities.includes('scientific_submission');
+  const isShow = showsEntertainmentNavigation(payload.event.profileCode, payload.answers.eventType);
+  const hasPayment = showsPaymentNavigation(capabilities);
+  const hasCertificate = showsCertificateNavigation(capabilities);
   const eventStatus = eventStatusLabel(payload.event.status);
   const schedule = eventScheduleSummary(payload.answers);
 
@@ -288,7 +294,7 @@ export default function EventAdminDashboard({ eventId, section }: { eventId: str
                 <div className={styles.actionLinks}>
                   <Link className={styles.primaryButton} href={`/eventos/${eventId}/painel/check-in`}>Abrir posto</Link>
                   <Link className={styles.secondaryButton} href={`/eventos/${eventId}/painel/inscricoes`}>Ver inscrições</Link>
-                  <Link className={styles.secondaryButton} href={`/eventos/${eventId}/painel/show`}>Acessos e catracas</Link>
+                  {isShow && <Link className={styles.secondaryButton} href={`/eventos/${eventId}/painel/show`}>Acessos e catracas</Link>}
                 </div>
               </article>
             </div>
@@ -310,11 +316,16 @@ export default function EventAdminDashboard({ eventId, section }: { eventId: str
             <Link className={styles.secondaryButton} href={`/eventos/${eventId}/painel/avaliacao`}>Configurar avaliação</Link>
           </section>
 
-          <section className={styles.card} aria-labelledby="financial-responsibility-title">
+          {hasPayment && <section className={styles.card} aria-labelledby="financial-responsibility-title">
             <h2 id="financial-responsibility-title">Responsável financeiro</h2>
             <p>Confirme quem responde pela organização neste evento. A confirmação não emite nota fiscal.</p>
             <Link className={styles.secondaryButton} href={`/eventos/${eventId}/painel/financeiro`}>Revisar responsável</Link>
-          </section>
+          </section>}
+          {hasCertificate && <section className={styles.card} aria-labelledby="certificate-dashboard-title">
+            <h2 id="certificate-dashboard-title">Certificados</h2>
+            <p>Prepare o certificado de participação. Modelos por papel só aparecem quando o evento tem trabalhos científicos.</p>
+            <Link className={styles.secondaryButton} href={`/eventos/${eventId}/painel/certificados`}>Abrir certificados</Link>
+          </section>}
 
           <section className={styles.evaCard} aria-labelledby="eva-overview-title">
             <div className={styles.evaMark} aria-hidden="true">EVA</div>
