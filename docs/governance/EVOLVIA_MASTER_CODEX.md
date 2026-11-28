@@ -566,3 +566,7 @@ testes, rollback, PRs, commits, CI e ambiente.
 ## Patrimônio de decisão — checkpoint 14/11/2026, 19h BRT (proposta)
 
 Área Master: o proprietário da **plataforma** administra eventos de qualquer organização mediante autenticação forte, suporte auditável, suspensão reversível com status anterior persistido, reativação e exclusão lógica com preservação de provas/obrigações legais. Ações financeiras e comunicações reais exigem autorização separada. Papel OWNER organizacional não implica papel Master; concessões de equipe por escopo/ação/prazo, sem autoelevação. Relatórios reutilizam o escopo autorizado pelo guard e filtros apenas restringem. #675 ainda não fornece UI operacional e está bloqueado por CI/PR contra main. #676 exige correção de isolamento. Nenhuma dessas decisões representa implementação aceita ou deploy. Evidências e risco detalhados em [CLOSING_2026-11-14_19H.md](./CLOSING_2026-11-14_19H.md); manter decisões aprovadas no registro DECISIONS mediante revisão específica.
+
+### 24/11/2026 — Comunicação em lote e prontidão humana
+
+A #714 permite cancelar um lote preparado somente quando todos os destinatários ainda estão pendentes. Lote, destinatários e registro de auditoria mudam na mesma transação. Uma nova solicitação devolve o estado já salvo. O teste PostgreSQL cobre dois cancelamentos concorrentes e rollback quando existe destinatário em estado desconhecido. O aceite de entrega exige conciliação independente do transporte. A coordenação de etiquetas P0 e as evidências de integração ficam na #571.

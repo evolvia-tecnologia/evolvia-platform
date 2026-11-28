@@ -73,3 +73,25 @@ test('respostas nulas ou estruturais não lançam exceção de tipo', () => {
     assert.throws(() => validateCategoryAnswers(answers, fields, categoryB), /inválidas/);
   }
 });
+
+test('G6.8: consentimento de e-mail é opcional, não pré-selecionado e impossível de impor pelo organizador', () => {
+  for (const id of [categoryA, categoryB]) {
+    const fields = publicRegistrationFields([
+      { code: 'event_communications_consent', label: 'Aceite obrigatório e genérico',
+        type: 'TEXT', required: true, enabled: true, appliesToCategoryIds: [categoryA] },
+    ], id);
+    const consent = fields.find(field => field.code === 'event_communications_consent');
+    assert.ok(consent);
+    assert.equal(consent.type, 'CONSENT');
+    assert.equal(consent.required, false);
+    assert.equal(consent.appliesToCategoryIds, undefined);
+    assert.notEqual(consent.label, 'Aceite obrigatório e genérico');
+    assert.doesNotThrow(() => validateCategoryAnswers(base, fields, id));
+    assert.doesNotThrow(() => validateCategoryAnswers({ ...base, event_communications_consent: false }, fields, id));
+    assert.doesNotThrow(() => validateCategoryAnswers({ ...base, event_communications_consent: true }, fields, id));
+    for (const invalid of ['true', 'yes', 'on', 1, null, { consent: true }, []]) {
+      assert.throws(() => validateCategoryAnswers({ ...base, event_communications_consent: invalid }, fields, id), /verdadeiro ou falso/);
+    }
+    assert.throws(() => validateCategoryAnswers({ ...base, terms_acceptance: false, event_communications_consent: true }, fields, id), /obrigatório/);
+  }
+});
