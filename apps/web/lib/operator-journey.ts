@@ -29,6 +29,20 @@ export interface RespostaDeCapacidades {
   readonly escopado: boolean;
   readonly papel: string;
   readonly acoes: readonly ItemPermitido[];
+  /**
+   * Identidade do evento, para a moldura do operador restrito (CL01-B).
+   *
+   * OPCIONAL de propósito: a rota de autoatendimento ainda não a envia, e
+   * marcá-la obrigatória quebraria todo chamador existente num campo que o
+   * servidor não preenche. Enquanto estiver ausente, `identidadeDoEvento`
+   * resolve pelo payload do construtor; quando o servidor passar a enviá-la,
+   * o operador deixa de depender daquele payload — que ele não pode buscar,
+   * porque a consulta do construtor exige OWNER/ADMIN/MANAGER.
+   */
+  readonly evento?: {
+    readonly nome?: string | null;
+    readonly organizacao?: string | null;
+  } | null;
 }
 
 export interface EntradaDaJornada {
@@ -122,6 +136,52 @@ export function areaDaAcao(acao: string): AreaDoBalcao {
  */
 export function rotaDoPosto(eventId: string): string {
   return `/eventos/${encodeURIComponent(eventId)}/painel/check-in`;
+}
+
+/** Identidade do evento como a moldura restrita deve exibi-la. */
+export interface IdentidadeDoEvento {
+  /** Nome do evento, ou string vazia quando não há fonte. */
+  readonly evento: string;
+  /** Nome da organização, ou string vazia quando não há fonte. */
+  readonly organizacao: string;
+  /** false = nenhuma fonte trouxe identidade; a moldura deve omitir o bloco. */
+  readonly conhecida: boolean;
+}
+
+function texto(valor: unknown): string {
+  return typeof valor === 'string' ? valor.trim() : '';
+}
+
+/**
+ * Resolve a identidade do evento para a moldura do operador restrito.
+ *
+ * POR QUE ESTA FUNÇÃO EXISTE
+ * --------------------------
+ * A moldura restrita recebia nome do evento e da organização do payload do
+ * CONSTRUTOR de eventos. Mas aquela consulta exige OWNER/ADMIN/MANAGER: para
+ * OPERATOR ela responde 403, o payload não chega, e a moldura ficava sem
+ * identidade — o que, na ordem anterior de despacho, nem chegava a importar,
+ * porque o retorno de erro vinha antes e a moldura era inalcançável.
+ *
+ * Precedência, nesta ordem: o que o SERVIDOR mandou na própria resposta de
+ * capacidades; depois o payload do construtor, quando existir; e, se nenhuma
+ * das duas trouxer nada, string vazia com `conhecida: false`.
+ *
+ * NUNCA INVENTA. Sem fonte, devolve vazio e avisa que é vazio, para a moldura
+ * omitir o bloco em vez de exibir um rótulo fabricado como se fosse o nome do
+ * evento — mostrar "Evento" no lugar do nome seria mentir na tela, que é
+ * exatamente o que este módulo existe para não fazer.
+ */
+export function identidadeDoEvento(
+  resposta: RespostaDeCapacidades | null | undefined,
+  doPayload?: {
+    readonly name?: string | null;
+    readonly organization?: { readonly name?: string | null } | null;
+  } | null,
+): IdentidadeDoEvento {
+  const evento = texto(resposta?.evento?.nome) || texto(doPayload?.name);
+  const organizacao = texto(resposta?.evento?.organizacao) || texto(doPayload?.organization?.name);
+  return { evento, organizacao, conhecida: evento !== '' || organizacao !== '' };
 }
 
 /**
