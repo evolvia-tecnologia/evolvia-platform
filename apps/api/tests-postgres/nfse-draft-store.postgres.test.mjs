@@ -1,0 +1,252 @@
+import 'reflect-metadata';
+import assert from 'node:assert/strict';
+import test from 'node:test';
+import { randomUUID } from 'node:crypto';
+import { Module } from '@nestjs/common';
+import { NestFactory } from '@nestjs/core';
+import { JwtModule, JwtService } from '@nestjs/jwt';
+import { PrismaClient } from '@prisma/client';
+import { AuthGuard } from '../dist/auth.guard.js';
+import { AuthorizationService } from '../dist/authorization.service.js';
+import { PrismaService } from '../dist/prisma.service.js';
+import { EventFinancialResponsibilityController } from '../dist/event-financial-responsibility.controller.js';
+import { EventFinancialResponsibilityService } from '../dist/event-financial-responsibility.service.js';
+
+async function fiscalFixture(t) {
+  const db = new PrismaClient();
+  t.after(() => db.$disconnect());
+  class FiscalTestModule {}
+  Module({
+    imports: [JwtModule.register({ secret: randomUUID() })],
+    controllers: [EventFinancialResponsibilityController],
+    providers: [AuthGuard, AuthorizationService, EventFinancialResponsibilityService, { provide: PrismaService, useValue: db }],
+  })(FiscalTestModule);
+  const app = await NestFactory.create(FiscalTestModule, { logger: false });
+  t.after(() => app.close());
+  const server = await app.listen(0, '127.0.0.1');
+  async function createOwner() {
+    const slug = randomUUID();
+    const owner = await db.user.create({ data: { name: 'Teste fiscal', email: slug + '@example.invalid', passwordHash: 'fixture' } });
+    const org = await db.organization.create({ data: { name: 'Fiscal', slug, createdById: owner.id,
+      memberships: { create: { userId: owner.id, role: 'OWNER', status: 'ACTIVE' } } } });
+    return { owner, org, token: app.get(JwtService).sign({ sub: owner.id, email: owner.email }) };
+  }
+  const { owner, org, token } = await createOwner();
+  const outsider = await createOwner();
+  const event = await db.event.create({ data: { name: 'Teste fiscal', slug: randomUUID(), eventType: 'Outro',
+    format: 'IN_PERSON', registrationMode: 'PAID', status: 'CANCELLED', ownerId: owner.id, organizationId: org.id } });
+  const scope = { organizationId: org.id, eventId: event.id };
+  const catalog = await db.eventRegistrationCatalog.create({ data: scope });
+  const category = await db.eventRegistrationCategory.create({ data: { ...scope, catalogId: catalog.id, code: 'G', name: 'Geral' } });
+  const lot = await db.eventRegistrationLot.create({ data: { ...scope, categoryId: category.id, code: 'L', name: 'Lote',
+    startsAt: new Date('2026-01-01'), endsAt: new Date('2026-12-01'), priceCents: 750 } });
+  const paidAt = new Date('2026-10-01');
+  const reservation = await db.eventRegistrationReservation.create({ data: { ...scope, categoryId: category.id, lotId: lot.id,
+    protocol: randomUUID().slice(0,16), idempotencyKeyHash: randomUUID(), payloadHash: randomUUID(), identityHash: randomUUID(), emailHash: randomUUID(),
+    registrationData: {}, basePriceCents: 750, finalPriceCents: 750, status: 'CONFIRMED', confirmedAt: paidAt } });
+  const checkout = await db.eventRegistrationCheckout.create({ data: { ...scope, reservationId: reservation.id,
+    idempotencyKeyHash: randomUUID(), requestHash: randomUUID(), amountCents: 750, expiresAt: paidAt, paidAt, status: 'PAID' } });
+  const receipt = await db.eventRegistrationPaymentReceipt.create({ data: { ...scope, reservationId: reservation.id, checkoutId: checkout.id,
+    number: randomUUID().slice(0,20), sellerSnapshot: {}, amountCents: 750, paidAt } });
+  const url = 'http://127.0.0.1:' + server.address().port + '/events/' + event.id + '/financial-responsibility/receipts/' + receipt.id + '/nfse-draft';
+  const setup = { issuerId: org.id, recipientId: 'recipient', serviceCode: '12.01', municipalityIbgeCode: '3550308' };
+  const send = (auth, body) => fetch(url, { method: body === undefined ? 'GET' : 'PUT',
+    headers: { 'content-type': 'application/json', ...(auth && { authorization: 'Bearer ' + auth }) }, body: JSON.stringify(body) });
+  return { db, org, owner, token, outsider, checkout, receipt, url, setup, send };
+}
+
+test('prévia fiscal HTTP persiste uma vez e revalida organização, recibo e pagamento', async t => {
+  const { db, token, outsider, checkout, receipt, url, setup, send } = await fiscalFixture(t);
+  assert.equal((await send(null)).status, 401);
+  assert.equal((await send(outsider.token, setup)).status, 404);
+  assert.equal((await send(token)).status, 404);
+  assert.equal((await send(token, {})).status, 400);
+  assert.equal((await send(token, { ...setup, issuerId: outsider.org.id })).status, 400);
+  assert.equal((await send(token, { ...setup, serviceCode: '.-.' })).status, 400);
+  assert.equal(await db.fiscalReceiptDraft.count({ where: { receiptId: receipt.id } }), 0);
+  const sibling = await db.event.create({ data: { organizationId: receipt.organizationId, ownerId: (await db.organization.findUniqueOrThrow({ where: { id: receipt.organizationId } })).createdById,
+    name: 'Outro evento', slug: randomUUID(), eventType: 'Outro', registrationMode: 'PAID', format: 'IN_PERSON' } });
+  const otherEventUrl = url.replace('/events/' + receipt.eventId + '/', '/events/' + sibling.id + '/');
+  assert.equal((await fetch(otherEventUrl, { method: 'PUT', headers: { authorization: 'Bearer ' + token, 'content-type': 'application/json' }, body: JSON.stringify(setup) })).status, 404);
+  const requests = await Promise.all(Array.from({ length: 6 }, () => send(token, { ...setup, amountCents: 1, issueAuthorized: true })));
+  for (const response of requests) {
+    assert.equal(response.status, 200);
+    const draft = await response.json();
+    assert.equal(draft.amountCents, 750);
+    assert.equal(draft.issueAuthorized, false);
+    assert.equal(draft.status, 'AWAITING_MUNICIPAL_ADAPTER');
+  }
+  const audits = await db.auditLog.findMany({ where: { entityId: receipt.id, action: 'nfse.draft_prepared' } });
+  assert.equal(audits.length, 1);
+  assert.equal(audits[0].metadata, null);
+  assert.equal(audits[0].organizationId, receipt.organizationId);
+  assert.equal(await db.fiscalReceiptDraft.count({ where: { receiptId: receipt.id } }), 1);
+  assert.equal((await send(token, { ...setup, recipientId: 'other' })).status, 409);
+  assert.equal((await (await send(token)).json()).recipientId, setup.recipientId);
+  assert.equal((await send(outsider.token)).status, 404);
+  const headers = { authorization: 'Bearer ' + token };
+  for (const provider of ['enotas', 'notazz']) {
+    const adapterUrl = url + '/adapters/' + provider;
+    assert.equal((await fetch(adapterUrl, { headers: { authorization: 'Bearer ' + outsider.token } })).status, 404);
+    const response = await fetch(adapterUrl, { headers });
+    assert.equal(response.status, 200);
+    const preview = await response.json();
+    assert.equal(preview.provider, provider);
+    assert.equal(preview.operation, 'PREVIEW');
+    assert.equal(preview.issueAuthorized, false);
+    assert.equal(preview.service.amountCents, 750);
+    assert.equal(preview.source.receiptId, receipt.id);
+    assert.equal(preview.idempotencyKey, (await (await send(token)).json()).idempotencyKey);
+  }
+  assert.equal((await fetch(url + '/adapters/unknown', { headers })).status, 404);
+  await db.eventRegistrationCheckout.update({ where: { id: checkout.id }, data: { status: 'CANCELED' } });
+  assert.equal((await send(token)).status, 404);
+});
+
+test('dois tomadores concorrentes e revogação do OWNER preservam a primeira prévia', async t => {
+  const { db, org, owner, token, receipt, url, setup, send } = await fiscalFixture(t);
+  const proposals = [setup, { ...setup, recipientId: 'segundo-tomador' }];
+  const responses = await Promise.all(proposals.map(body => send(token, body)));
+  assert.deepEqual(responses.map(response => response.status).sort(), [200, 409]);
+  const winner = responses.findIndex(response => response.status === 200);
+  const draft = await responses[winner].json();
+  assert.equal(draft.recipientId, proposals[winner].recipientId);
+  assert.deepEqual(await (await send(token, proposals[winner])).json(), draft);
+  const membership = await db.organizationMembership.findFirstOrThrow({ where: { userId: owner.id, organizationId: org.id } });
+  await db.organizationMembership.update({ where: { id: membership.id }, data: { role: 'ADMIN' } });
+  assert.equal((await send(token)).status, 404);
+  assert.equal((await send(token, proposals[winner])).status, 404);
+  for (const provider of ['enotas', 'notazz']) {
+    assert.equal((await fetch(url + '/adapters/' + provider, { headers: { authorization: 'Bearer ' + token } })).status, 404);
+  }
+  const stored = await db.fiscalReceiptDraft.findUniqueOrThrow({ where: { receiptId: receipt.id } });
+  assert.equal(stored.recipientId, proposals[winner].recipientId);
+  assert.equal(stored.idempotencyKey, draft.idempotencyKey);
+});
+
+test('revogação confirmada depois da leitura impede gravar rascunho e auditoria', async t => {
+  const { db, org, owner, receipt, setup } = await fiscalFixture(t);
+  const { readOrPrepareFiscalDraft } = await import('../dist/nfse-draft-store.js');
+  let revoked = false;
+  const instrumented = db.$extends({ query: { eventRegistrationPaymentReceipt: {
+    async findFirst({ args, query }) {
+      const result = await query(args);
+      if (result && !revoked) {
+        const change = await db.organizationMembership.updateMany({ where: { userId: owner.id, organizationId: org.id }, data: { role: 'ADMIN' } });
+        assert.equal(change.count, 1);
+        revoked = true;
+      }
+      return result;
+    },
+  } } });
+  await assert.rejects(readOrPrepareFiscalDraft(instrumented, owner.id, receipt.eventId, receipt.id, { setup }),
+    error => error.getStatus?.() === 404);
+  assert.equal(revoked, true);
+  assert.equal(await db.fiscalReceiptDraft.count({ where: { receiptId: receipt.id } }), 0);
+  assert.equal(await db.auditLog.count({ where: { entityId: receipt.id, action: 'nfse.draft_prepared' } }), 0);
+});
+
+test('cancelamento do checkout após a leitura impede persistir prévia e auditoria', async t => {
+  const { db, owner, checkout, receipt, setup } = await fiscalFixture(t);
+  const { readOrPrepareFiscalDraft } = await import('../dist/nfse-draft-store.js');
+  let cancelled = false;
+  const instrumented = db.$extends({ query: { eventRegistrationPaymentReceipt: {
+    async findFirst({ args, query }) {
+      const result = await query(args);
+      if (result && !cancelled) {
+        await db.eventRegistrationCheckout.update({ where: { id: checkout.id }, data: { status: 'CANCELED' } });
+        cancelled = true;
+      }
+      return result;
+    },
+  } } });
+  await assert.rejects(readOrPrepareFiscalDraft(instrumented, owner.id, receipt.eventId, receipt.id, { setup }),
+    error => error.getStatus?.() === 404);
+  assert.equal(cancelled, true);
+  assert.equal(await db.fiscalReceiptDraft.count({ where: { receiptId: receipt.id } }), 0);
+  assert.equal(await db.auditLog.count({ where: { entityId: receipt.id, action: 'nfse.draft_prepared' } }), 0);
+});
+
+test('preparação sandbox persiste um único vínculo por recibo sob concorrência', async t => {
+  const { db, token, outsider, org, owner, receipt, url, setup, send } = await fiscalFixture(t);
+  const endpoint = url.replace(/nfse-draft$/, 'nfse-sandbox/preparation');
+  const prepare = auth => fetch(endpoint, { method: 'PUT', headers: { authorization: 'Bearer ' + auth } });
+  const config = { EVOLVIA_NFSE_SANDBOX_PROVIDER: 'enotas', EVOLVIA_NFSE_SANDBOX_ORGANIZATION_ID: org.id,
+    EVOLVIA_NFSE_SANDBOX_MUNICIPALITY: setup.municipalityIbgeCode };
+  for (const [key, value] of Object.entries(config)) {
+    const original = process.env[key];
+    process.env[key] = value;
+    t.after(() => { if (original === undefined) delete process.env[key]; else process.env[key] = original; });
+  }
+  assert.equal((await prepare(token)).status, 404);
+  const draft = await (await send(token, setup)).json();
+  const read = auth => fetch(endpoint, { headers: { authorization: 'Bearer ' + auth } });
+  assert.equal((await read(token)).status, 404);
+  assert.equal((await prepare(outsider.token)).status, 404);
+  process.env.EVOLVIA_NFSE_SANDBOX_MUNICIPALITY = '0000000';
+  assert.equal((await prepare(token)).status, 503);
+  process.env.EVOLVIA_NFSE_SANDBOX_MUNICIPALITY = setup.municipalityIbgeCode;
+  const responses = await Promise.all(Array.from({ length: 5 }, () => prepare(token)));
+  const records = [];
+  for (const response of responses) {
+    assert.equal(response.status, 200);
+    records.push(await response.json());
+  }
+  for (const record of records) {
+    assert.deepEqual(record, records[0]);
+    assert.equal(record.idempotencyKey, draft.idempotencyKey);
+    assert.equal(record.issueAuthorized, false);
+    assert.equal(record.status, 'PREPARED');
+  }
+  process.env.EVOLVIA_NFSE_SANDBOX_PROVIDER = 'notazz';
+  assert.equal((await prepare(token)).status, 409);
+  const persisted = await read(token);
+  assert.equal(persisted.status, 200);
+  assert.deepEqual(await persisted.json(), records[0]);
+  await db.$transaction([
+    db.eventRegistrationCheckout.update({ where: { id: receipt.checkoutId }, data: { amountCents: 900 } }),
+    db.eventRegistrationPaymentReceipt.update({ where: { id: receipt.id }, data: { amountCents: 900 } }),
+  ]);
+  assert.equal((await read(token)).status, 409);
+  await db.eventRegistrationCheckout.update({ where: { id: receipt.checkoutId }, data: { status: 'CANCELED' } });
+  assert.equal((await read(token)).status, 404);
+  await db.$transaction([
+    db.eventRegistrationCheckout.update({ where: { id: receipt.checkoutId }, data: { amountCents: 750, status: 'PAID' } }),
+    db.eventRegistrationPaymentReceipt.update({ where: { id: receipt.id }, data: { amountCents: 750 } }),
+  ]);
+  assert.deepEqual(await (await read(token)).json(), records[0]);
+  assert.equal((await read(outsider.token)).status, 404);
+  await db.organizationMembership.updateMany({
+    where: { userId: owner.id, organizationId: org.id }, data: { role: 'ADMIN' },
+  });
+  assert.equal((await read(token)).status, 404);
+  const logs = await db.auditLog.findMany({ where: { entityId: receipt.id, action: 'nfse.sandbox_prepared' } });
+  assert.equal(logs.length, 1);
+  assert.equal(logs[0].metadata, null);
+});
+
+test('valor alterado no recibo e checkout invalida o rascunho antes de preparar no sandbox', async t => {
+  const { db, org, token, receipt, checkout, send, setup, url } = await fiscalFixture(t);
+  const config = {
+    EVOLVIA_NFSE_SANDBOX_PROVIDER: 'enotas',
+    EVOLVIA_NFSE_SANDBOX_ORGANIZATION_ID: org.id,
+    EVOLVIA_NFSE_SANDBOX_MUNICIPALITY: setup.municipalityIbgeCode,
+  };
+  for (const [key, value] of Object.entries(config)) {
+    const previous = process.env[key];
+    process.env[key] = value;
+    t.after(() => { if (previous === undefined) delete process.env[key]; else process.env[key] = previous; });
+  }
+  assert.equal((await send(token, setup)).status, 200);
+  await db.$transaction([
+    db.eventRegistrationCheckout.update({ where: { id: checkout.id }, data: { amountCents: 900 } }),
+    db.eventRegistrationPaymentReceipt.update({ where: { id: receipt.id }, data: { amountCents: 900 } }),
+  ]);
+  const response = await fetch(url.replace(/nfse-draft$/, 'nfse-sandbox/preparation'), {
+    method: 'PUT', headers: { authorization: 'Bearer ' + token },
+  });
+  assert.equal(response.status, 409);
+  const [stored] = await db.$queryRaw`SELECT "sandboxPreparedAt" FROM "FiscalReceiptDraft" WHERE "receiptId" = ${receipt.id}`;
+  assert.equal(stored.sandboxPreparedAt, null);
+  assert.equal(await db.auditLog.count({ where: { entityId: receipt.id, action: 'nfse.sandbox_prepared' } }), 0);
+});

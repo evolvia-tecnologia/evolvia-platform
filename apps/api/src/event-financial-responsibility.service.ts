@@ -1,3 +1,6 @@
+import { readOrPrepareFiscalDraft } from './nfse-draft-store';
+import { prepareFiscalSandbox, readFiscalSandboxPreparation } from './nfse-sandbox-preparation';
+import type { FiscalSetup } from './nfse-draft-policy';
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { MembershipRole, Prisma } from '@prisma/client';
 import { AuthorizationService } from './authorization.service';
@@ -26,6 +29,18 @@ export class EventFinancialResponsibilityService {
     private readonly prisma: PrismaService,
     private readonly authorization: AuthorizationService,
   ) {}
+
+  fiscalDraft(userId: string, eventId: string, receiptId: string, command?: { setup: FiscalSetup }) {
+    return readOrPrepareFiscalDraft(this.prisma, userId, eventId, receiptId, command);
+  }
+
+  sandboxPreparation(userId: string, eventId: string, receiptId: string) {
+    return readFiscalSandboxPreparation(this.prisma, userId, eventId, receiptId);
+  }
+
+  prepareSandbox(userId: string, eventId: string, receiptId: string) {
+    return prepareFiscalSandbox(this.prisma, userId, eventId, receiptId);
+  }
 
   private async eventFor(userId: string, eventId: string) {
     const event = await this.prisma.event.findUnique({
