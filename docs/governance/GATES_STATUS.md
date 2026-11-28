@@ -1,3 +1,20 @@
+## Homologação — verificação de 26/11/2026
+
+O último deploy bem-sucedido da `develop` publicou `ab02d8d859f29061ff45ec0ebfc27f17aa0ffe3a` em 24/11 às 02h54 UTC. O job confirmou HTTPS 200, disponibilidade da API e do PostgreSQL e ocultação da versão do Nginx. [Log de publicação](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/45313903366/job/138180865264).
+
+Em 26/11, a API pública respondeu com status `ready`, banco `ok` e versão `0.2.0-alpha.3`. A identificação do SHA pelo serviço em execução, a configuração efetiva de WebAuthn e o aceite autenticado por perfil seguem pendentes. A regressão pública em navegador percorreu início, catálogo e página do evento corporativo fictício. O roteiro para confirmar as imagens ativas e as variáveis no host está na [#571](https://github.com/evolvia-tecnologia/evolvia-platform/issues/571#issuecomment-7200660810). Os indicadores por critério permanecem no último fechamento EVO-018. Os registros datados abaixo preservam o histórico.
+
+
+## Reconciliação de #719 e #743 — 27/11/2026
+
+Implementação **96,9%**; conclusão comprovada **73,0%**; **89/93** unidades integradas; **0/11 Gates encerrados**.
+
+Na tentativa 2 da execução 45259500761, o publicador registrou `99a041a128ac6d8d3cd35c908d5e6e5bf01b1204`, contendo G5.8 e G7.4. A API e o PostgreSQL responderam prontos e o redirecionamento HTTP retornou 308. A matriz incorpora a publicação desses dois critérios uma única vez. O recebimento autorizado do aviso e o aceite da jornada autenticada das cartas continuam pendentes. O registro de 24/11 para `ab02d8d8` permanece como evidência de publicação posterior. A identificação das imagens em execução depende da coleta no host. [Publicação](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/45259500761/job/138127736334)
+
+| Gate | Nome | Implementação | Conclusão | Pontos |
+|---|---|---:|---:|---:|
+| 5 | Submissão pelo autor | 100,0% | 75,0% | 24/32 |
+| 7 | Decisão científica | 100,0% | 75,0% | 18/24 |
 
 ## Reconciliação G5.8 I/T — 23/11/2026 (PR #708 integrada)
 
