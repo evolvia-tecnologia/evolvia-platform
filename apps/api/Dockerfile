@@ -29,6 +29,8 @@ RUN apk add --no-cache openssl
 COPY package.json package-lock.json ./
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/dist ./dist
+COPY scripts/verify-confirmation-inbox.mjs ./scripts/verify-confirmation-inbox.mjs
+RUN node -e "import('./scripts/verify-confirmation-inbox.mjs')"
 COPY prisma ./prisma
 EXPOSE 4000
 CMD ["node", "dist/main.js"]
