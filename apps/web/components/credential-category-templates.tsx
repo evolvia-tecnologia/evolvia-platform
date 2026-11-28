@@ -263,7 +263,7 @@ export default function CredentialCategoryTemplates({
                       <option value="left">À esquerda</option><option value="center">Centralizado</option><option value="right">À direita</option>
                     </select>
                   </label>}
-                  {code === 'barcode' && <p>O código de barras usa toda a largura disponível para favorecer a leitura no scanner.</p>}
+                  {code === 'barcode' && <p>O código de barras fica lado a lado com o QR na largura útil reservada, preservando a proporção do Code128.</p>}
                   {code !== 'qr' && code !== 'barcode' && <>
                     <label className={styles.boldOption}><input type="checkbox" aria-label={`Negrito de ${display(code)}`} disabled={busy || !organizer}
                       checked={(ownStyle(code) ?? DEFAULT_STYLE).bold} onChange={(event) => changeStyle(code, { bold: event.target.checked })} /> Negrito</label>
@@ -317,7 +317,7 @@ export default function CredentialCategoryTemplates({
               : savedTemplate
                 ? 'Modelo salvo e utilizado na impressão desta categoria.'
                 : 'Etiqueta histórica em uso nesta categoria (sem modelo próprio salvo).'}</p>
-            <p>Dados fictícios para visualização · {widthMm / 10} × {heightMm / 10} cm. A impressão utiliza dados reais da inscrição.</p>
+            <p>Dados fictícios para visualização · {widthMm / 10} × {heightMm / 10} cm. Reduzir para caber ativo. A impressão utiliza o mesmo layout e dados reais da inscrição.</p>
             <CredentialLabel label={preview} preview />
           </aside>
         </div>

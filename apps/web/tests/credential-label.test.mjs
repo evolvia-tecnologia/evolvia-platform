@@ -4,9 +4,11 @@ import {readFileSync} from 'node:fs';
 import ts from 'typescript';
 const url=s=>'data:text/javascript;base64,'+Buffer.from(s).toString('base64');
 const compile=p=>ts.transpileModule(readFileSync(new URL(p,import.meta.url),'utf8'),{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX}}).outputText;
-const modules={react:url('export const useEffect=()=>{}; export const useRef=v=>({current:v}); export const useState=v=>[typeof v==="function"?v():v,()=>{}];'),'react/jsx-runtime':url('export const Fragment=Symbol.for("react.fragment");export const jsx=(type,props)=>({type,props});export const jsxs=jsx;'),'./print-surface':url('export default "print-surface";'),'./credential-barcode':url('export default "barcode";'),'./credential-qr':url('export default "qr";'),'./credential-label':url('export default "label";'),'../lib/api':url('export const api=(...args)=>globalThis.__labelSaveApi(...args);')};
+const layoutModule=(()=>{const metrics=url(compile('../lib/label-text-metrics.ts'));const code128=url(compile('../lib/code128.ts'));return url(compile('../lib/credential-label-layout.ts').replace(/from ['"]\.\/label-text-metrics['"]/g,`from ${JSON.stringify(metrics)}`).replace(/from ['"]\.\/code128['"]/g,`from ${JSON.stringify(code128)}`));})();
+const modules={react:url('export const useEffect=()=>{}; export const useRef=v=>({current:v}); export const useState=v=>[typeof v==="function"?v():v,()=>{}];'),'react/jsx-runtime':url('export const Fragment=Symbol.for("react.fragment");export const jsx=(type,props)=>({type,props});export const jsxs=jsx;'),'./print-surface':url('export default "print-surface";'),'./credential-barcode':url('export default "barcode";'),'./credential-qr':url('export default "qr";'),'./credential-label':url('export default "label";'),'../lib/api':url('export const api=(...args)=>globalThis.__labelSaveApi(...args);'),'../lib/credential-label-layout':layoutModule};
 async function load(p,css){return (await import(url(compile(p).replace(/from ['"]([^'"]+)['"]/g,(_,name)=>'from '+JSON.stringify(name===css?url('export default new Proxy({},{get:(_,key)=>key});'):modules[name]??name))))).default;}
 const Label=await load('../components/credential-label.tsx','./credential-label.module.css');
+const {credentialLabelLayout,LABEL_SIZE_PRESETS}=await import(modules['../lib/credential-label-layout']);
 const Settings=await load('../components/credential-label-settings.tsx','./credential-label-settings.module.css');
 const nodes=n=>Array.isArray(n)?n.flatMap(nodes):n&&typeof n==='object'?[n,...nodes(n.props?.children)]:[];
 const text=n=>Array.isArray(n)?n.map(text).join(''):n&&typeof n==='object'?text(n.props?.children):String(n??'');
@@ -14,8 +16,20 @@ const base={eventName:'Evento',name:'Nome do participante',company:'Instituiçã
 test('etiqueta sem linhas opcionais permanece renderizável e com dimensões finitas',()=>{
  for(const lines of [undefined,null,[]]){const tree=Label({label:{...base,lines},preview:true});const n=nodes(tree).find(x=>x.type==='section');assert.ok(n,'a prévia precisa conter a etiqueta');assert.match(text(tree),/Nome do participante/);assert.equal(n.props.style.width,'90mm');assert.ok(Number.isFinite(n.props.style['--label-scale']));assert.equal(nodes(n).filter(x=>x.props?.className==='line').length,0);}
 });
-test('texto ocupa área própria e barcode é irmão da área QR, sem dividir a coluna de texto',()=>{
- const tree=Label({label:{...base,lines:['Área'],barcode:'EVB1.demo'},preview:true});const n=nodes(tree).find(x=>x.type==='section');assert.ok(n,'a prévia precisa conter a etiqueta');assert.deepEqual(n.props.children.filter(Boolean).map(x=>x.props.className),['copy','codes','barcode']);assert.equal(n.props['data-qr'],true);assert.equal(n.props['data-barcode'],true);
+test('texto ocupa área própria e QR+barras ficam lado a lado na faixa de códigos',()=>{
+ const tree=Label({label:{...base,lines:['Área'],barcode:'EVB1.demo'},preview:true});
+ const n=nodes(tree).find(x=>x.type==='section');
+ assert.ok(n,'a prévia precisa conter a etiqueta');
+ assert.deepEqual(n.props.children.filter(Boolean).map(x=>x.props.className),['copy','codesRow']);
+ assert.equal(n.props['data-codes'],'both');
+ assert.equal(n.props['data-qr'],false,'com ambos os códigos o QR sai da coluna lateral');
+ assert.equal(n.props['data-barcode'],true,'faixa inferior ativa para o par QR+barras');
+ const row=n.props.children.filter(Boolean).find(x=>x.props.className==='codesRow');
+ assert.equal(row.props['data-codes'],'both');
+ const rowKids=Array.isArray(row.props.children)
+  ? row.props.children
+  : [].concat(row.props.children?.props?.children ?? []);
+ assert.deepEqual(rowKids.filter(Boolean).map(x=>x.props.className),['codes','barcode']);
 });
 test('nome legado longo não sofre clamp silencioso e etiqueta pequena avisa sobre legibilidade',()=>{
  const css=readFileSync(new URL('../components/credential-label.module.css',import.meta.url),'utf8');
@@ -118,17 +132,20 @@ test('editor global isola eventos e não expõe erro técnico de outro tenant',(
 });
 
 
-test('bloqueia prévia de texto comprimido a cerca de metade antes da impressão térmica', () => {
- const label={...base,qr:null,widthMm:60,heightMm:15,
-   orderedContent:[{code:'preferred_name',kind:'text',value:'Participante'.repeat(10)}]};
+test('bloqueia prévia quando a medição real exige escala abaixo do limiar legível', () => {
+ const label={...base,qr:null,widthMm:60,heightMm:12,name:null,company:null,category:null,lines:[],
+   orderedContent:[{code:'preferred_name',kind:'text',value:'Participante Internacional '.repeat(12)}]};
+ const layout=credentialLabelLayout(label);
  const preview=Label({label,preview:true});
  const sheet=nodes(preview).find(node=>node.type==='section');
  const scale=Number(sheet.props.style['--label-scale']);
- assert.ok(scale>.4 && scale<.65,
-   'fixture deve cobrir escala antes considerada imprimível no limiar de 40%');
+ assert.equal(scale,layout.scale,'prévia e motor compartilham a mesma escala medida');
+ assert.ok(scale < 0.65,'escala fica abaixo do limiar térmico de legibilidade');
+ assert.equal(layout.fitWarning,true);
  assert.equal(sheet.props['data-fit-warning'],true,
-   'texto reduzido em mais de 35% não deve ser impresso automaticamente');
+   'impressão bloqueada quando a medição real não cabe com legibilidade');
  assert.ok(nodes(preview).some(node=>node.props?.role==='alert'));
+ assert.equal(Label({label,preview:false}),null,'mesma decisão bloqueia a superfície de impressão');
 });
 
 
@@ -138,8 +155,116 @@ test('QR e barras ordenados usam um único layout e bloqueiam ausência do códi
       {code:'qr',kind:'qr',value:''}, {code:'barcode',kind:'barcode',value:''}]};
   const sheet=nodes(Label({label:both,preview:true})).find(n=>n.type==='section');
   assert.equal(sheet.props['data-fit-warning'],false);
-  assert.ok(nodes(Label({label:both,preview:true})).some(n=>n.props?.className==='orderedBarcode'));
+  assert.equal(sheet.props['data-codes'],'both');
+  assert.ok(nodes(Label({label:both,preview:true})).some(n=>n.props?.className==='codesRow'));
+  assert.ok(nodes(Label({label:both,preview:true})).some(n=>n.props?.className==='barcode'));
   assert.equal(nodes(Label({label:{...both,barcode:null},preview:true})).find(n=>n.type==='section').props['data-fit-warning'],true);
   assert.equal(nodes(Label({label:{...both,qr:null},preview:true})).find(n=>n.type==='section').props['data-fit-warning'],true);
   assert.equal(nodes(Label({label:{...both,heightMm:20,widthMm:40},preview:true})).find(n=>n.type==='section').props['data-fit-warning'],true);
+});
+
+test('9×4 cm com ambos os códigos limita a largura das barras e preserva proporção', () => {
+  const css=readFileSync(new URL('../components/credential-label.module.css',import.meta.url),'utf8');
+  const barcodeSrc=readFileSync(new URL('../components/credential-barcode.tsx',import.meta.url),'utf8');
+  assert.match(css,/\.codesRow\[data-codes="both"\]/u);
+  assert.match(css,/--label-barcode-width/u);
+  assert.doesNotMatch(css,/\.barcode \{[^}]*grid-column:\s*1\s*\/\s*-1/u,'barras não ocupam a grade inteira');
+  assert.match(barcodeSrc,/preserveAspectRatio="xMidYMid meet"/u);
+  assert.doesNotMatch(barcodeSrc,/preserveAspectRatio="none"/u);
+  const both={...base,barcode:'EVB1.demo',widthMm:90,heightMm:40};
+  const sheet=nodes(Label({label:both,preview:true})).find(n=>n.type==='section');
+  const barcodeW=Number.parseFloat(sheet.props.style['--label-barcode-width']);
+  const qrW=Number.parseFloat(sheet.props.style['--label-qr-size']);
+  const barH=Number.parseFloat(sheet.props.style['--label-barcode-height']);
+  assert.ok(barcodeW < 90 - qrW,'largura das barras deixa espaço ao QR e às margens');
+  assert.ok(barH <= 5.5,'altura das barras não domina a etiqueta 9×4');
+  assert.ok(qrW >= 12 && qrW <= 14,'QR em modo ambos fica na faixa legível sem exagero');
+});
+
+test('todos os presets oficiais cobrem QR, barras, ambos e nenhum sem corte silencioso', () => {
+  const css=readFileSync(new URL('../components/credential-label.module.css',import.meta.url),'utf8');
+  assert.doesNotMatch(css,/overflow:\s*hidden/u,'impressão não corta conteúdo com overflow hidden');
+  assert.equal(LABEL_SIZE_PRESETS.length,5,'lista oficial de tamanhos');
+  for (const size of LABEL_SIZE_PRESETS) {
+    const short={...base,widthMm:size.widthMm,heightMm:size.heightMm,name:'Ana',company:'Org',category:'VIP',lines:[],barcode:null};
+    const longName='Participante Internacional '.repeat(8);
+    const variants=[
+      { ...short, qr:'EVQ1.demo', barcode:null },
+      { ...short, qr:null, barcode:'EVB1.demo', codeMode:'BARCODE' },
+      { ...short, qr:'EVQ1.demo', barcode:'EVB1.demo' },
+      { ...short, qr:null, barcode:null, codeMode:undefined, name:longName },
+      { ...short, name:null, company:null, category:null, lines:[], qr:'EVQ1.demo',
+        orderedContent:[{code:'preferred_name',kind:'text',value:'Bia',style:{align:'center',bold:true,color:'#111827',fontSizeMm:4}},
+          {code:'qr',kind:'qr',value:''}] },
+      { ...short, name:null, company:null, category:null, lines:[], qr:'EVQ1.demo', barcode:'EVB1.demo',
+        orderedContent:[{code:'preferred_name',kind:'text',value:longName},
+          {code:'qr',kind:'qr',value:''},{code:'barcode',kind:'barcode',value:''}] },
+    ];
+    for (const label of variants) {
+      const preview=Label({label,preview:true});
+      const sheet=nodes(preview).find(n=>n.type==='section');
+      assert.ok(sheet,`${size.preset} precisa renderizar prévia`);
+      assert.equal(sheet.props.style.width,`${size.widthMm}mm`);
+      assert.equal(sheet.props.style.height,`${size.heightMm}mm`);
+      assert.equal(sheet.props['data-reduce-to-fit'],true);
+      assert.ok(Number.isFinite(sheet.props.style['--label-scale']));
+      const layout=credentialLabelLayout(label);
+      assert.equal(layout.reduceToFit,true);
+      const print=Label({label,preview:false});
+      if (layout.fitWarning) {
+        assert.equal(print,null,`${size.preset} ilegível não imprime`);
+        assert.ok(nodes(preview).some(n=>n.props?.role==='alert'),`${size.preset} avisa na prévia`);
+      } else {
+        assert.equal(print.type,'print-surface',`${size.preset} legível usa a mesma superfície`);
+        assert.equal(print.props.widthMm,size.widthMm);
+        assert.equal(print.props.heightMm,size.heightMm);
+      }
+    }
+  }
+});
+
+test('motor compartilhado reduz para caber e bloqueia abaixo do limiar em 8×3', () => {
+  const crowded={...base,widthMm:80,heightMm:30,name:'Nome '.repeat(40),company:'Empresa '.repeat(20),lines:['Cargo '.repeat(20)],barcode:'EVB1.demo'};
+  const layout=credentialLabelLayout(crowded);
+  assert.equal(layout.reduceToFit,true);
+  assert.ok(layout.scale < 1);
+  assert.equal(layout.fitWarning,true);
+  assert.ok(layout.bothCodes || layout.showBarcode);
+  assert.ok(layout.measuredHeightMm > 0,'altura total medida inclui tipografia e códigos');
+});
+
+test('medição usa avanço por glifo e geometria CSS — não largura média por caractere', async () => {
+  const layoutSrc=readFileSync(new URL('../lib/credential-label-layout.ts',import.meta.url),'utf8');
+  const metricsSrc=readFileSync(new URL('../lib/label-text-metrics.ts',import.meta.url),'utf8');
+  assert.match(layoutSrc,/label-text-metrics/u);
+  assert.match(layoutSrc,/LABEL_PAD_MM|LABEL_SHEET_GAP_MM|LABEL_COPY_GAP_MM/u);
+  assert.match(layoutSrc,/code128Modules/u);
+  assert.doesNotMatch(layoutSrc,/fontMm \* 0\.55|textWidthMm \/ \(emphasis/u);
+  assert.doesNotMatch(metricsSrc,/avg(Char|Width)|meanWidth|averageChar/iu);
+  assert.match(metricsSrc,/Não usa largura média por caractere/u);
+  assert.match(metricsSrc,/glyphAdvanceEm|measureRunWidthMm|wrapTextToWidth/u);
+
+  const metricsUrl=url(compile('../lib/label-text-metrics.ts'));
+  const {measureRunWidthMm,wrapTextToWidth}=await import(metricsUrl);
+  const narrow=measureRunWidthMm('iiii',4.2);
+  const wide=measureRunWidthMm('WWWW',4.2);
+  assert.ok(wide > narrow * 1.5,'W e i têm avanços distintos — não média única');
+  assert.ok(wrapTextToWidth('Nome completo do participante',20,4.2,{uppercase:true}).length >= 2);
+
+  const short=credentialLabelLayout({...base,name:'Ana',company:null,category:null,lines:[],barcode:null,widthMm:80,heightMm:30});
+  const tall=credentialLabelLayout({...base,name:'Ana',company:'Org',category:'VIP',lines:['Cargo'],barcode:'EVB1.demo',widthMm:80,heightMm:30});
+  assert.ok(tall.measuredHeightMm > short.measuredHeightMm,
+    'altura total cresce com linhas, gaps e faixa de códigos reais');
+  assert.equal(tall.bothCodes,true);
+  assert.equal(tall.codesMode,'both');
+});
+
+test('código incompatível com Code128 mantém a prévia acessível e bloqueia impressão', () => {
+  for (const orderedContent of [undefined, [{ kind: 'barcode', code: 'barcode', value: '' }]]) {
+    const label = { ...base, barcode: 'EVB1.ação', orderedContent };
+    const preview = nodes(Label({ label, preview: true }));
+    assert.ok(preview.some(node => node.props?.role === 'alert' && /barras inválido/u.test(text(node))));
+    assert.ok(!preview.some(node => node.type === 'barcode'));
+    assert.equal(Label({ label }), null);
+  }
 });
