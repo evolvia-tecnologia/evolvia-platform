@@ -1,4 +1,4 @@
-import { DeskPolicyError, deskDisplayName, labelFieldAllowed } from './event-desk-policy';
+import { defaultLabelConfig, DeskPolicyError, deskDisplayName, labelFieldAllowed } from './event-desk-policy';
 
 /**
  * Models are stored in eventCapability.config.categoryLabelTemplates, not in
@@ -127,7 +127,9 @@ export function updateCategoryLabelTemplate(config: unknown, categoryId: string,
   }
   if (index === -1) stored.push(updated);
   else stored[index] = updated;
-  return { ...current, categoryLabelTemplates: stored };
+  // Persist the effective paper on first customization so new layouts stay 8x3.
+  const firstLayout = current.label == null && (!Array.isArray(raw) || raw.length === 0);
+  return { ...current, ...(firstLayout ? { label: defaultLabelConfig() } : {}), categoryLabelTemplates: stored };
 }
 
 export function categoryBadgeItems(
