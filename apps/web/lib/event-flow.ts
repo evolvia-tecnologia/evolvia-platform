@@ -181,6 +181,19 @@ export function eventTimeZoneLabel(timeZone: string | null | undefined): string 
   return labels[timeZone] ?? timeZone;
 }
 
+export function eventDateReviewHref(eventId: string): string {
+  return `/eventos/${eventId}/configuracao?review=foundation&step=identity`;
+}
+
+export function eventLocationReviewHref(eventId: string): string {
+  return `/eventos/${eventId}/configuracao?review=foundation&step=location`;
+}
+
+export function eventFormatReviewHref(eventId: string): string {
+  return `/eventos/${eventId}/configuracao?review=foundation&step=format`;
+}
+
+
 export function maskTaxId(value: string | null | undefined): string {
   if (!value) return 'documento protegido';
   const compact = value.toUpperCase().replace(/[.\-/\s]/g, '');

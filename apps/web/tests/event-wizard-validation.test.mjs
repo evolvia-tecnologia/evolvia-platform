@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
-import { firstIncompleteWizardStep, wizardStepIssues } from '../lib/event-wizard-validation.ts';
+import { queueWizardSave, saveCurrentDraftBeforeExit, wizardScheduleRejection } from '../lib/event-wizard-save.ts';
+import { firstIncompleteWizardStep, nextWizardCompletion, openedWizardStep, showWizardCompletion, wizardStepIssues } from '../lib/event-wizard-validation.ts';
 const valid = { organizationId: 'org', eventType: 'Congresso científico', subjectAreas: ['saude'], format: 'IN_PERSON', name: 'Congresso teste', startDate: '2026-11-01T12:00:00Z', endDate: '2026-11-02T12:00:00Z', timeZone: 'America/Sao_Paulo', venue: 'Centro de eventos', registrationMode: 'FREE', capabilities: ['registration'] };
 test('cada etapa bloqueia sua informação obrigatória antes de continuar', () => {
   for (const [index, patch] of [[0,{organizationId:''}], [0,{eventType:''}], [0,{subjectAreas:[]}], [1,{format:''}], [2,{name:''}], [2,{startDate:null}], [2,{timeZone:''}], [3,{venue:'   '}], [4,{registrationMode:''}], [5,{capabilities:[]}]]) {
@@ -38,4 +39,94 @@ test('salva as áreas iniciais antes de navegar para a configuração', () => {
   assert.ok(patch >= 0);
   assert.ok(navigation > patch);
   assert.equal(block.match(/router\.replace\(/gu)?.length, 1);
+});
+
+const wizardSteps = ['profile', 'format', 'identity', 'location', 'registration', 'capabilities', 'review'];
+
+test('o painel abre a etapa de datas já alcançada e recusa pular etapa pendente', () => {
+  assert.equal(openedWizardStep('review', 'identity', wizardSteps), 'identity');
+  assert.equal(openedWizardStep('profile', 'identity', wizardSteps), 'profile');
+  assert.equal(openedWizardStep('identity', 'unknown', wizardSteps), 'identity');
+  assert.equal(openedWizardStep('review', null, wizardSteps), 'review');
+});
+
+async function salvarNoFormulario(step, draft, response) {
+  const state = {
+    draft,
+    savedStep: { current: 'profile' },
+    queue: { current: Promise.resolve() },
+    requests: [],
+    notice: '',
+    error: '',
+    dirty: true,
+    saveState: 'idle',
+  };
+  try {
+    await saveCurrentDraftBeforeExit({
+      currentDraft: () => state.draft,
+      save: (snapshot) => queueWizardSave(step, snapshot, {
+        queue: state.queue,
+        savedStep: state.savedStep,
+        getDirty: () => state.dirty,
+        currentDraft: () => state.draft,
+        request: async (targetStep) => { state.requests.push(targetStep); return response(snapshot); },
+        applyPayload: () => {},
+        setDirty: (value) => { state.dirty = value; },
+        setSaveState: (value) => { state.saveState = value; },
+        isConflict: () => false,
+        recoverLatest: async () => {},
+        rejectionOf: (snapshot, payload) => wizardScheduleRejection(snapshot, payload.answers),
+      }),
+    });
+    state.notice = step === 'identity' ? 'Datas salvas' : 'Local salvo';
+  } catch (reason) {
+    state.error = reason instanceof Error ? reason.message : 'falha';
+  }
+  return state;
+}
+
+test('revisão pedida pelo painel permanece no formulário depois do salvamento', async () => {
+  assert.equal(showWizardCompletion('COMPLETED', '?review=foundation&step=identity', false), false);
+  assert.equal(showWizardCompletion('COMPLETED', '', false), true);
+  assert.equal(showWizardCompletion('COMPLETED', null, true), false);
+  assert.equal(showWizardCompletion('DRAFT', '?review=foundation', false), false);
+
+  const dates = { startDate: '2026-11-01T12:00:00.000Z', endDate: '2026-11-02T12:00:00.000Z', timeZone: 'America/Sao_Paulo' };
+  const saved = await salvarNoFormulario('identity', dates, (snapshot) => ({ session: { revision: 4 }, answers: snapshot }));
+  assert.deepEqual(saved.requests, ['identity']);
+  assert.equal(saved.notice, 'Datas salvas');
+  assert.equal(saved.dirty, false);
+  assert.equal(saved.saveState, 'saved');
+  assert.equal(saved.savedStep.current, 'identity');
+  assert.equal(showWizardCompletion('COMPLETED', '?review=foundation&step=identity', false), false);
+
+  const rejected = await salvarNoFormulario('identity', dates, () => ({
+    session: { revision: 4 },
+    answers: { ...dates, endDate: '2026-11-01T12:00:00.000Z' },
+  }));
+  assert.deepEqual(rejected.requests, ['identity']);
+  assert.equal(rejected.notice, '');
+  assert.equal(rejected.dirty, true);
+  assert.equal(rejected.saveState, 'error');
+  assert.equal(rejected.draft.endDate, dates.endDate);
+  assert.match(rejected.error, /manteve a data anterior/);
+
+  const kept = { ...dates, venue: 'Centro novo', venuePending: false };
+  const local = await salvarNoFormulario('location', kept, () => ({
+    session: { revision: 4 },
+    answers: { ...kept, venue: 'Auditório' },
+  }));
+  assert.deepEqual(local.requests, ['location']);
+  assert.equal(local.notice, '');
+  assert.equal(local.dirty, true);
+  assert.equal(local.saveState, 'error');
+  assert.equal(local.draft.venue, 'Centro novo');
+  assert.match(local.error, /manteve o local anterior/);
+});
+
+test('revisar respostas não volta para a conclusão no salvamento seguinte', () => {
+  assert.equal(nextWizardCompletion(false, false, 'COMPLETED', null, false), false);
+  assert.equal(nextWizardCompletion(false, true, 'COMPLETED', '', false), true);
+  assert.equal(nextWizardCompletion(false, true, 'COMPLETED', '?review=foundation&step=identity', false), false);
+  assert.equal(nextWizardCompletion(true, false, 'COMPLETED', null, true), false);
 });

@@ -47,17 +47,17 @@ export type AgendaResultante = {
 /**
  * Espelho exato das guardas de `persistEventData`.
  *
- * Lá a escrita é:
+ * A escrita distingue três casos por campo:
  *
- * ```ts
- * if (answers.startDate || answers.datesPending)
- *   data.startDate = answers.startDate ? new Date(answers.startDate) : null;
- * ```
+ * 1. chave ausente / `undefined` — não entra no update (preserva o gravado);
+ * 2. valor presente (ISO/`Date`) — grava;
+ * 3. `null` explícito — limpa a coluna (painel "Alterar datas" / #651).
  *
- * Ou seja: pedido com valor manda; sem valor, `datesPending` limpa; sem os
- * dois, o campo nem entra no update e o que está gravado permanece. Essa
- * terceira linha é a que faltava na validação — ela lia só o corpo, então
- * "mandei apenas o término" passava com o início antigo intacto.
+ * `datesPending: true` força limpar início e término juntos.
+ *
+ * Usar `!== undefined` (e não truthiness) é deliberado: `Boolean(null)`
+ * confundia "limpar o término" com "não mandei o campo", e o PATCH com
+ * `endDate: null` deixava a data antiga no Event.
  *
  * Preserva o valor original quando o campo não é tocado (devolve o `Date` do
  * Prisma, não um ISO reconstruído) para que a escrita continue não mexendo em
@@ -68,8 +68,8 @@ export function agendaResultante(
   gravado: AgendaGravada | null | undefined,
 ): AgendaResultante {
   const datasPendentes = pedido.datesPending === true;
-  const gravaStartDate = Boolean(pedido.startDate) || datasPendentes;
-  const gravaEndDate = Boolean(pedido.endDate) || datasPendentes;
+  const gravaStartDate = pedido.startDate !== undefined || datasPendentes;
+  const gravaEndDate = pedido.endDate !== undefined || datasPendentes;
 
   return {
     startDate: gravaStartDate ? (pedido.startDate ?? null) : (gravado?.startDate ?? null),

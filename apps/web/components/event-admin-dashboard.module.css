@@ -375,6 +375,70 @@
   font-size: var(--font-size-2xl);
 }
 
+.schedule {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-16);
+  margin-bottom: var(--space-20);
+  padding: var(--space-20);
+  border: 1px solid var(--color-on-dark-muted);
+  border-radius: var(--radius-card);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-soft);
+}
+
+.schedule h2 {
+  margin: var(--space-4) 0 0;
+  color: var(--color-text-strong);
+  font-size: var(--font-size-xl);
+  line-height: var(--line-height-heading);
+  overflow-wrap: anywhere;
+}
+
+.schedule p {
+  max-width: 70ch;
+  margin: 0;
+  color: var(--color-text-muted);
+}
+
+.scheduleFacts {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-12);
+  margin: 0;
+}
+
+.scheduleFacts div {
+  min-width: 0;
+}
+
+.scheduleFacts dt {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: var(--letter-spacing-label);
+  text-transform: uppercase;
+}
+
+.scheduleFacts dd {
+  margin: var(--space-4) 0 0;
+  color: var(--color-text-strong);
+  font-weight: var(--font-weight-bold);
+  overflow-wrap: anywhere;
+}
+
+.schedule .actionLinks .primaryButton,
+.schedule .actionLinks .secondaryButton {
+  flex: 1 1 12rem;
+  min-width: 0;
+  min-height: 44px;
+  padding: var(--space-8) var(--space-16);
+  overflow-wrap: anywhere;
+  text-align: center;
+  white-space: normal;
+}
+
 .metrics small {
   color: var(--color-text-muted);
 }
@@ -966,6 +1030,7 @@
     width: 100%;
   }
 
+  .scheduleFacts,
   .quickGrid,
   .metrics,
   .twoColumns,

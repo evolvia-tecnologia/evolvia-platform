@@ -17,7 +17,15 @@ const eventPayload = (profileCode = 'CORPORATE_TRAINING', eventType = 'Congresso
   answers: { eventType, capabilities: [] },
 });
 const text = (node) => node.children.map((child) => typeof child === 'string' ? child : text(child)).join('');
-const foundationHref = '/eventos/evento-qa/configuracao?review=foundation';
+const datesHref = '/eventos/evento-qa/configuracao?review=foundation&step=identity';
+const locationHref = '/eventos/evento-qa/configuracao?review=foundation&step=location';
+const profiles = [
+  ['CORPORATE_TRAINING', 'Convenção', /inscrições, o local nem o credenciamento/],
+  ['SCIENTIFIC_EVENT', 'Congresso', /janelas de submissão, avaliação nem a programação/],
+  ['FAIR_EXHIBITION', 'Feira', /prazos de expositores, CAEX nem credenciais/],
+  ['ENTERTAINMENT', 'Show ou entretenimento', /períodos de ingressos, categorias nem lotes/],
+  ['SOCIAL_COMMUNITY', 'Corrida', /modalidades, inscrições, kits nem camisetas/],
+];
 
 function loadComponents(api) {
   const cache = new Map();
@@ -65,59 +73,101 @@ async function withTree(api, mobile, render, run) {
   }
 }
 
-test('Geral oferece Informações do evento nos perfis, com destino canônico e sem outro item ativo', async () => {
-  for (const [profile, eventType] of [
-    ['CORPORATE_TRAINING', 'Convenção'], ['SCIENTIFIC_EVENT', 'Congresso'],
-    ['FAIR_EXHIBITION', 'Feira'], ['ENTERTAINMENT', 'Show ou entretenimento'],
-    ['SOCIAL_COMMUNITY', 'Corrida'],
-  ]) {
+test('Geral oferece Alterar datas / Prorrogar evento nos cinco perfis, sem atalho digitado', async () => {
+  for (const [profile, eventType] of profiles) {
     await withTree(async () => { throw new Error('Não deve buscar com payload autorizado'); }, false,
       ({ Workspace }) => React.createElement(Workspace, { eventId: 'evento-qa', section: 'overview', payload: eventPayload(profile, eventType) }, 'Conteúdo'),
       async (tree) => {
         const nav = tree.root.findByProps({ 'aria-label': 'Navegação do evento' });
         const links = nav.findAllByType('a');
-        const foundation = links.find((link) => link.props.href === foundationHref);
-        assert.ok(foundation, profile);
-        assert.equal(text(foundation), '✎Informações do eventoNome, datas, local e formato');
+        const dates = links.find((link) => link.props.href === datesHref);
+        const location = links.find((link) => link.props.href === locationHref);
+        assert.ok(dates, profile);
+        assert.ok(location, profile);
+        assert.equal(text(dates), '✎Alterar datas / Prorrogar eventoInício, término e fuso');
+        assert.equal(text(location), '⌂Local e endereçoPresencial, online ou híbrido');
         assert.equal(text(nav.findAllByType('span')[0]), 'Geral');
-        assert.equal(links[1], foundation);
-        assert.equal(foundation.props.tabIndex, undefined);
-        assert.equal(foundation.props['aria-current'], undefined);
+        assert.equal(links[1], dates);
+        assert.equal(links[2], location);
+        assert.equal(dates.props.tabIndex, undefined);
+        assert.equal(location.props.tabIndex, undefined);
+        assert.equal(dates.props['aria-current'], undefined);
         assert.equal(links.filter((link) => link.props['aria-current'] === 'page').length, 1);
       });
   }
 });
 
-test('menu móvel fecha após escolher Informações e links ocultos saem da ordem de tabulação', async () => {
+test('menu móvel fecha após escolher a prorrogação e links ocultos saem da ordem de tabulação', async () => {
   await withTree(async () => ({}), true,
     ({ Workspace }) => React.createElement(Workspace, { eventId: 'evento-qa', section: 'overview', payload: eventPayload() }, 'Conteúdo'),
     async (tree) => {
       const toggle = () => tree.root.findByProps({ 'aria-controls': 'event-admin-navigation' });
-      const foundation = () => tree.root.findByProps({ 'aria-label': 'Navegação do evento' }).findAllByType('a').find((link) => link.props.href === foundationHref);
+      const dates = () => tree.root.findByProps({ 'aria-label': 'Navegação do evento' }).findAllByType('a').find((link) => link.props.href === datesHref);
       assert.equal(toggle().props['aria-expanded'], false);
-      assert.equal(foundation().props.tabIndex, -1);
+      assert.equal(dates().props.tabIndex, -1);
       await act(async () => { toggle().props.onClick(); });
       assert.equal(toggle().props['aria-expanded'], true);
-      assert.equal(foundation().props.tabIndex, undefined);
-      await act(async () => { foundation().props.onClick(); });
+      assert.equal(dates().props.tabIndex, undefined);
+      await act(async () => { dates().props.onClick(); });
       assert.equal(toggle().props['aria-expanded'], false);
-      assert.equal(foundation().props.tabIndex, -1);
+      assert.equal(dates().props.tabIndex, -1);
     });
 });
 
-test('visão geral carregada oferece edição de informações sem gravar dados nem publicar', async () => {
-  const calls = [];
-  await withTree(async (path, options) => { calls.push({ path, method: options?.method }); return eventPayload(); }, false,
-    ({ Dashboard }) => React.createElement(Dashboard, { eventId: 'evento-qa', section: 'overview' }),
-    async (tree) => {
-      const card = tree.root.findAllByType('article').find((article) => article.findAllByType('h3').some((h3) => text(h3) === 'Informações do evento'));
-      assert.ok(card);
-      const link = card.findByType('a');
-      assert.equal(link.props.href, foundationHref);
-      assert.equal(text(link), 'Editar informações do evento');
-      assert.match(text(card), /nome, as datas, o local e o formato/);
-      assert.deepEqual(calls, [{ path: '/event-wizard/evento-qa', method: undefined }]);
-    });
+test('visão geral carregada mostra prorrogação, local, imagens e lotes sem gravar nem publicar', async () => {
+  for (const [profile, eventType, impact] of profiles) {
+    const calls = [];
+    await withTree(async (path, options) => { calls.push({ path, method: options?.method }); return eventPayload(profile, eventType); }, false,
+      ({ Dashboard }) => React.createElement(Dashboard, { eventId: 'evento-qa', section: 'overview' }),
+      async (tree) => {
+        const section = tree.root.findByProps({ 'aria-labelledby': 'event-dates-title' });
+        assert.equal(text(section.findByType('h2')), 'Alterar datas / Prorrogar evento');
+        assert.match(text(section), /Data de início não definida/);
+        assert.match(text(section), /Fuso não confirmado/);
+        assert.match(text(section), /Local não definido/);
+        assert.match(text(section), impact);
+        assert.deepEqual(section.findAllByType('a').map((link) => [text(link), link.props.href]), [
+          ['Alterar datas / Prorrogar evento', datesHref],
+          ['Local e endereço', locationHref],
+          ['Página e imagens', '/eventos/evento-qa/painel/divulgacao'],
+          ['Categorias e lotes', '/eventos/evento-qa/painel/inscricoes/categorias-lotes'],
+        ]);
+        assert.equal(tree.root.findAllByType('h3').some((heading) => text(heading) === 'Informações do evento'), false);
+        assert.deepEqual(calls, [{ path: '/event-wizard/evento-qa', method: undefined }]);
+      });
+  }
+});
+
+test('visão geral mostra a data já salva e a pendência sem nova gravação', async () => {
+  const saved = eventPayload('SOCIAL_COMMUNITY', 'Corrida');
+  saved.answers = {
+    ...saved.answers,
+    startDate: '2026-11-09T15:00:00.000Z',
+    endDate: '2026-11-10T15:00:00.000Z',
+    timeZone: 'America/Sao_Paulo',
+    datesPending: false,
+    venue: 'Centro de Convenções',
+    venuePending: false,
+  };
+  const pending = eventPayload('FAIR_EXHIBITION', 'Feira');
+  pending.answers = { ...pending.answers, datesPending: true, venuePending: true, timeZone: 'America/Sao_Paulo' };
+  for (const [payload, expected] of [[saved, /novembro de 2026/iu], [pending, /A definir/]]) {
+    const calls = [];
+    await withTree(async (path, options) => { calls.push({ path, method: options?.method }); return payload; }, false,
+      ({ Dashboard }) => React.createElement(Dashboard, { eventId: 'evento-qa', section: 'overview' }),
+      async (tree) => {
+        const section = tree.root.findByProps({ 'aria-labelledby': 'event-dates-title' });
+        assert.match(text(section), expected);
+        if (payload === saved) {
+          assert.match(text(section), /Centro de Convenções/);
+          assert.match(text(section), /Brasília/);
+          assert.match(text(section), /kits nem camisetas/);
+        } else {
+          assert.match(text(section), /CAEX/);
+        }
+        assert.deepEqual(calls, [{ path: '/event-wizard/evento-qa', method: undefined }]);
+      });
+  }
 });
 
 test('erro de autorização não oferece Informações no fallback do operador ou no painel negado', async () => {

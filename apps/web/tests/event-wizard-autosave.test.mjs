@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
-import { queueWizardSave } from '../lib/event-wizard-save.ts';
+import { queueWizardSave, saveCurrentDraftBeforeExit, wizardBlockedExitMessage, wizardDatesConfirmed, wizardSaveLabel, wizardScheduleRejection } from '../lib/event-wizard-save.ts';
 import ts from 'typescript';
 
 const apiSource = await readFile(new URL('../lib/api.ts', import.meta.url), 'utf8');
@@ -10,21 +10,22 @@ const apiModule = ts.transpileModule(apiSource, {
 }).outputText;
 const { ApiError } = await import('data:text/javascript;base64,' + Buffer.from(apiModule).toString('base64'));
 
-function harness(draft, response) {
+function harness(draft, response, extra = {}) {
   const state = {
     draftRef: { current: draft }, revisionRef: { current: 3 },
     catalogRef: { current: [] }, savedStepRef: { current: 'identity' },
-    saveQueueRef: { current: Promise.resolve() }, dirty: true,
-    requests: [], recovered: 0, saveState: 'idle',
+    saveQueueRef: { current: Promise.resolve() }, conflictEpochRef: { current: 0 },
+    dirty: true, requests: [], recovered: 0, saveState: 'idle', resumes: 0,
   };
-  const save = (targetStep, snapshot = state.draftRef.current) => queueWizardSave(targetStep, snapshot, {
+  const save = (targetStep, snapshot = state.draftRef.current, options) => queueWizardSave(targetStep, snapshot, {
     queue: state.saveQueueRef,
     savedStep: state.savedStepRef,
+    conflictEpoch: state.conflictEpochRef,
     getDirty: () => state.dirty,
     currentDraft: () => state.draftRef.current,
     request: async (currentStep, answers) => {
       state.requests.push({ currentStep, answers, revision: state.revisionRef.current });
-      return response(state.requests.length);
+      return response(state.requests.length, { currentStep, answers });
     },
     applyPayload: (payload, overwrite) => {
       state.revisionRef.current = payload.session.revision;
@@ -33,8 +34,20 @@ function harness(draft, response) {
     setDirty: value => { state.dirty = value; },
     setSaveState: value => { state.saveState = value; },
     isConflict: reason => reason instanceof ApiError && reason.status === 409,
-    recoverLatest: async () => { state.recovered += 1; },
-  });
+    recoverLatest: async () => {
+      state.recovered += 1;
+      if (extra.recoverDraft) {
+        state.draftRef.current = extra.recoverDraft;
+        state.revisionRef.current = extra.recoverRevision ?? state.revisionRef.current;
+      }
+    },
+    datesConfirmed: extra.datesConfirmed,
+    rejectionOf: extra.rejectionOf,
+    resume: () => {
+      state.resumes += 1;
+      extra.resume?.();
+    },
+  }, options);
   return { state, save };
 }
 
@@ -65,6 +78,7 @@ test('resposta tardia não apaga edição mais recente e mantém autosave penden
   assert.equal(state.draftRef.current.name, 'Congresso científico');
   assert.equal(state.draftRef.current.venue, 'São Paulo');
   assert.equal(state.dirty, true);
+  assert.equal(state.saveState, 'saving');
   assert.equal(state.revisionRef.current, 4);
 });
 
@@ -97,6 +111,37 @@ test('conflito 409 continua recuperando versão canônica e interrompe avanço',
   await assert.rejects(save('location'), /outra sessão/);
   assert.equal(state.recovered, 1);
   assert.equal(state.savedStepRef.current, 'identity');
+  assert.equal(state.conflictEpochRef.current, 1);
+});
+
+test('após 409, snapshot de outra etapa já enfileirado não grava a revisão antiga', async () => {
+  let releaseIdentity;
+  const identityGate = new Promise((done) => { releaseIdentity = done; });
+  const recovered = { name: 'Versão B', startDate: '2026-10-20T12:00:00.000Z', endDate: null, timeZone: 'America/Sao_Paulo' };
+  const { state, save } = harness(
+    { name: 'Versão A', startDate: '2026-10-16T12:00:00.000Z', endDate: '2026-10-17T12:00:00.000Z', timeZone: 'America/Sao_Paulo' },
+    async (number) => {
+      if (number === 1) {
+        await identityGate;
+        throw new ApiError('Conflito de versão', 409);
+      }
+      return { session: { revision: 9 }, answers: recovered };
+    },
+    { recoverDraft: recovered, recoverRevision: 2 },
+  );
+  const identitySave = save('identity');
+  await Promise.resolve();
+  // Navegação enfileirada ainda carrega o snapshot A/rev1.
+  const locationSave = save('location', state.draftRef.current);
+  releaseIdentity();
+  await assert.rejects(identitySave, /outra sessão/);
+  await locationSave;
+  assert.equal(state.recovered, 1);
+  assert.equal(state.conflictEpochRef.current, 1);
+  assert.equal(state.requests.length, 1);
+  assert.equal(state.requests[0].currentStep, 'identity');
+  assert.equal(state.revisionRef.current, 2);
+  assert.equal(state.draftRef.current.name, 'Versão B');
 });
 
 test('navegação com digitação durante PATCH preserva edição nova para próximo save', async () => {
@@ -111,6 +156,279 @@ test('navegação com digitação durante PATCH preserva edição nova para pró
   assert.equal(state.draftRef.current.name, 'Congresso Berg ');
   assert.equal(state.dirty, true);
   assert.equal(state.revisionRef.current, 4);
+});
+
+test('resposta tardia pede outro salvamento e não anuncia Tudo salvo', async () => {
+  let resolve;
+  const pending = new Promise((done) => { resolve = done; });
+  let resumed = 0;
+  const { state, save } = harness({ endDate: '2026-10-16T03:00:00.000Z' }, () => pending, { resume: () => { resumed += 1; } });
+  const operation = save('identity');
+  await Promise.resolve();
+  state.draftRef.current = { endDate: '2026-10-17T03:00:00.000Z' };
+  resolve({ session: { revision: 4 }, answers: { endDate: '2026-10-16T03:00:00.000Z' } });
+  await operation;
+  assert.equal(state.draftRef.current.endDate, '2026-10-17T03:00:00.000Z');
+  assert.equal(state.saveState, 'saving');
+  assert.equal(resumed, 1);
+});
+
+test('servidor que devolve a data anterior não marca o rascunho como salvo', async () => {
+  const typed = { startDate: '2026-10-16T03:00:00.000Z', endDate: '2026-10-17T03:00:00.000Z', timeZone: 'America/Sao_Paulo' };
+  const { state, save } = harness(typed, async () => ({
+    session: { revision: 4 },
+    answers: { ...typed, endDate: '2026-10-16T03:00:00.000Z' },
+  }), { datesConfirmed: (snapshot, payload) => wizardDatesConfirmed(snapshot, payload.answers) });
+  await assert.rejects(save('identity'), /manteve a data anterior/);
+  assert.equal(state.draftRef.current.endDate, '2026-10-17T03:00:00.000Z');
+  assert.equal(state.dirty, true);
+  assert.equal(state.saveState, 'error');
+  assert.equal(state.revisionRef.current, 4);
+});
+
+test('o mesmo instante confirmado pelo servidor pode anunciar Tudo salvo', async () => {
+  const typed = { startDate: '2026-10-16T03:00:00.000Z', endDate: '2026-10-17T03:00:00.000Z', timeZone: 'America/Sao_Paulo' };
+  const { state, save } = harness(typed, async () => ({
+    session: { revision: 4 },
+    answers: { ...typed, endDate: '2026-10-17T03:00:00Z' },
+  }), { datesConfirmed: (snapshot, payload) => wizardDatesConfirmed(snapshot, payload.answers) });
+  await save('identity');
+  assert.equal(state.dirty, false);
+  assert.equal(state.saveState, 'saved');
+});
+
+async function flush() {
+  for (let step = 0; step < 8; step += 1) await Promise.resolve();
+}
+
+test('salvar e sair durante o PATCH permanece até a edição nova ser confirmada', async () => {
+  let releaseFirst;
+  let releaseSecond;
+  const firstGate = new Promise((done) => { releaseFirst = done; });
+  const secondGate = new Promise((done) => { releaseSecond = done; });
+  const original = { startDate: '2026-10-16T03:00:00.000Z', endDate: '2026-10-16T03:00:00.000Z', timeZone: 'America/Sao_Paulo' };
+  const edited = { ...original, endDate: '2026-10-17T03:00:00.000Z' };
+  const { state, save } = harness(original, async (number) => {
+    if (number === 1) {
+      await firstGate;
+      return { session: { revision: 4 }, answers: original };
+    }
+    await secondGate;
+    return { session: { revision: 5 }, answers: edited };
+  }, { datesConfirmed: (snapshot, payload) => wizardDatesConfirmed(snapshot, payload.answers) });
+
+  let left = false;
+  const exiting = saveCurrentDraftBeforeExit({
+    currentDraft: () => state.draftRef.current,
+    save: (snapshot) => save('identity', snapshot, { resumeOnStale: false }),
+  }).then(() => { left = true; });
+
+  await flush();
+  assert.equal(state.requests.length, 1);
+  assert.equal(state.requests[0].answers.endDate, original.endDate);
+  state.draftRef.current = edited;
+  releaseFirst();
+  await flush();
+  assert.equal(left, false);
+  assert.equal(state.requests.length, 2);
+  assert.equal(state.requests[1].answers.endDate, edited.endDate);
+  assert.equal(state.draftRef.current.endDate, edited.endDate);
+  releaseSecond();
+  await exiting;
+  assert.equal(left, true);
+  assert.equal(state.dirty, false);
+  assert.equal(state.saveState, 'saved');
+  assert.equal(state.resumes, 0);
+});
+
+const schedule = { startDate: '2026-10-16T03:00:00.000Z', endDate: '2026-10-17T03:00:00.000Z', timeZone: 'America/Sao_Paulo' };
+const confirmSchedule = (snapshot, payload) => wizardScheduleRejection(snapshot, payload.answers);
+
+test('resposta 200 com o local anterior não anuncia Local salvo', async () => {
+  const typed = { ...schedule, venue: 'Centro novo', venuePending: false };
+  const { state, save } = harness(typed, async () => ({
+    session: { revision: 4 },
+    answers: { ...typed, venue: 'Auditório' },
+  }), { rejectionOf: confirmSchedule });
+  state.savedStepRef.current = 'location';
+  await assert.rejects(save('location'), /manteve o local anterior/);
+  assert.equal(state.draftRef.current.venue, 'Centro novo');
+  assert.equal(state.dirty, true);
+  assert.equal(state.saveState, 'error');
+});
+
+test('local equivalente depois da limpeza pode anunciar sucesso', async () => {
+  const typed = { ...schedule, venue: 'Centro novo ', venuePending: false };
+  const { state, save } = harness(typed, async () => ({
+    session: { revision: 4 },
+    answers: { ...schedule, venue: 'Centro novo', venuePending: false },
+  }), { rejectionOf: confirmSchedule });
+  state.savedStepRef.current = 'location';
+  await save('location');
+  assert.equal(state.dirty, false);
+  assert.equal(state.saveState, 'saved');
+  assert.equal(state.draftRef.current.venue, 'Centro novo ');
+});
+
+test('edição do local durante o PATCH só avisa depois da confirmação nova', async () => {
+  let releaseFirst;
+  let releaseSecond;
+  const firstGate = new Promise((done) => { releaseFirst = done; });
+  const secondGate = new Promise((done) => { releaseSecond = done; });
+  const typed = { ...schedule, venue: 'Centro novo', venuePending: false };
+  const edited = { ...schedule, venue: 'Centro definitivo', venuePending: false };
+  const { state, save } = harness(typed, async (number) => {
+    if (number === 1) {
+      await firstGate;
+      return { session: { revision: 4 }, answers: typed };
+    }
+    await secondGate;
+    return { session: { revision: 5 }, answers: edited };
+  }, { rejectionOf: confirmSchedule });
+  state.savedStepRef.current = 'location';
+  let notice = '';
+  const saving = saveCurrentDraftBeforeExit({
+    currentDraft: () => state.draftRef.current,
+    save: (snapshot) => save('location', snapshot, { resumeOnStale: false }),
+  }).then(() => { notice = 'Local salvo'; });
+  await flush();
+  state.draftRef.current = edited;
+  releaseFirst();
+  await flush();
+  assert.equal(notice, '');
+  assert.equal(state.dirty, true);
+  assert.notEqual(state.saveState, 'saved');
+  assert.equal(state.requests[1].answers.venue, 'Centro definitivo');
+  releaseSecond();
+  await saving;
+  assert.equal(notice, 'Local salvo');
+  assert.equal(state.dirty, false);
+  assert.equal(state.saveState, 'saved');
+  assert.equal(state.draftRef.current.venue, 'Centro definitivo');
+  assert.equal(state.resumes, 0);
+});
+
+test('Salvar datas só avisa depois que a edição feita durante o PATCH é confirmada', async () => {
+  let releaseFirst;
+  let releaseSecond;
+  const firstGate = new Promise((done) => { releaseFirst = done; });
+  const secondGate = new Promise((done) => { releaseSecond = done; });
+  const original = { startDate: '2026-10-16T03:00:00.000Z', endDate: '2026-10-16T03:00:00.000Z', timeZone: 'America/Sao_Paulo' };
+  const edited = { ...original, endDate: '2026-10-17T03:00:00.000Z' };
+  const { state, save } = harness(original, async (number) => {
+    if (number === 1) {
+      await firstGate;
+      return { session: { revision: 4 }, answers: original };
+    }
+    await secondGate;
+    return { session: { revision: 5 }, answers: edited };
+  }, { datesConfirmed: (snapshot, payload) => wizardDatesConfirmed(snapshot, payload.answers) });
+  let notice = '';
+  const saving = saveCurrentDraftBeforeExit({
+    currentDraft: () => state.draftRef.current,
+    save: (snapshot) => save('identity', snapshot, { resumeOnStale: false }),
+  }).then(() => { notice = 'Datas salvas'; });
+  await flush();
+  state.draftRef.current = edited;
+  releaseFirst();
+  await flush();
+  assert.equal(notice, '');
+  assert.equal(state.requests[1].answers.endDate, edited.endDate);
+  releaseSecond();
+  await saving;
+  assert.equal(notice, 'Datas salvas');
+  assert.equal(state.saveState, 'saved');
+  assert.equal(state.resumes, 0);
+});
+
+test('salvar e sair interrompe após três tentativas se o rascunho não estabilizar', async () => {
+  let tick = 0;
+  const { state, save } = harness(
+    { name: 'v0' },
+    async () => ({ session: { revision: 4 }, answers: { name: 'v0' } }),
+  );
+  await assert.rejects(
+    saveCurrentDraftBeforeExit({
+      currentDraft: () => state.draftRef.current,
+      save: async (snapshot) => {
+        await save('identity', snapshot, { resumeOnStale: false });
+        tick += 1;
+        // Simula edição do usuário: rascunho novo + dirty, senão a fila pula o PATCH.
+        state.draftRef.current = { name: `v${tick}` };
+        state.dirty = true;
+      },
+    }),
+    /mudou durante o salvamento/,
+  );
+  assert.equal(tick, 3);
+  assert.equal(state.requests.length, 3);
+  assert.equal(state.resumes, 0);
+});
+
+test('data limpa no cliente equivale a null no servidor', () => {
+  assert.equal(
+    wizardDatesConfirmed(
+      { startDate: '', endDate: '', timeZone: 'America/Sao_Paulo' },
+      { startDate: null, endDate: null, timeZone: 'America/Sao_Paulo' },
+    ),
+    true,
+  );
+  assert.equal(
+    wizardScheduleRejection(
+      { startDate: '   ', endDate: null, timeZone: 'America/Sao_Paulo', venue: 'Centro', venuePending: false },
+      { startDate: null, endDate: null, timeZone: 'America/Sao_Paulo', venue: 'Centro', venuePending: false },
+    ),
+    null,
+  );
+});
+
+test('Salvar e sair com data recusada permanece na tela e mostra o motivo', async () => {
+  assert.equal(
+    wizardBlockedExitMessage(new Error('O servidor manteve a data anterior. A alteração desta tela não foi gravada.')),
+    'O servidor manteve a data anterior. A alteração desta tela não foi gravada.',
+  );
+  assert.equal(wizardBlockedExitMessage('falha'), 'Não foi possível salvar. Os valores desta tela foram mantidos.');
+  const source = await readFile(new URL('../components/event-wizard.tsx', import.meta.url), 'utf8');
+  const exit = source.slice(source.indexOf('async function saveAndExit'), source.indexOf('function toggleCapability'));
+  assert.match(exit, /saveCurrentDraftBeforeExit\(/);
+  assert.match(exit, /setError\(wizardBlockedExitMessage\(reason\)\)/);
+  assert.match(exit, /resumeOnStale:\s*false/);
+  const dates = source.slice(source.indexOf('async function saveDates'), source.indexOf('async function saveVenue'));
+  assert.ok(dates.indexOf('saveCurrentDraftBeforeExit') < dates.indexOf("setDateNotice('Datas salvas"));
+  assert.match(dates, /resumeOnStale:\s*false/);
+  const venue = source.slice(source.indexOf('async function saveVenue'), source.indexOf('async function saveAndExit'));
+  assert.ok(venue.indexOf('saveCurrentDraftBeforeExit') < venue.indexOf("setVenueNotice('Local salvo"));
+  assert.match(venue, /resumeOnStale:\s*false/);
+  const goTo = source.slice(source.indexOf('async function goTo'), source.indexOf('async function finish'));
+  assert.ok(goTo.indexOf('saveCurrentDraftBeforeExit') < goTo.indexOf('setStepIndex(index)'));
+  assert.match(goTo, /resumeOnStale:\s*false/);
+  assert.match(exit, /return;/);
+  assert.ok(exit.indexOf('setError(wizardBlockedExitMessage(reason))') < exit.indexOf("router.push('/painel')"));
+});
+
+test('Tudo salvo não aparece com edição pendente ou sem confirmação', () => {
+  assert.equal(wizardSaveLabel({ hasEvent: true, saveState: 'saved', dirty: true }), 'Não salvo');
+  assert.equal(wizardSaveLabel({ hasEvent: true, saveState: 'idle', dirty: false }), 'Tudo salvo');
+  assert.equal(wizardSaveLabel({ hasEvent: true, saveState: 'error', dirty: false }), 'Não salvo');
+  assert.equal(wizardSaveLabel({ hasEvent: true, saveState: 'saving', dirty: true }), 'Salvando…');
+  assert.equal(wizardSaveLabel({ hasEvent: false, saveState: 'saved', dirty: false }), 'Rascunho local');
+});
+
+test('Alterar datas: rascunho usa Wizard; publicado usa PATCH /schedule com motivo e sem falso salvo', async () => {
+  const wizard = await readFile(new URL('../components/event-wizard.tsx', import.meta.url), 'utf8');
+  const flow = await readFile(new URL('../lib/event-flow.ts', import.meta.url), 'utf8');
+  const policy = await readFile(new URL('../../api/src/event-mutation-policy.service.ts', import.meta.url), 'utf8');
+  const schedule = await readFile(new URL('../lib/event-published-schedule.ts', import.meta.url), 'utf8');
+  assert.match(flow, /eventDateReviewHref[\s\S]*review=foundation&step=identity/u);
+  assert.match(wizard, /\/event-wizard\/\$\{currentEventId\}/u);
+  assert.match(wizard, /\/events\/\$\{currentEventId\}\/schedule/u);
+  assert.match(wizard, /isPublishedEventStatus\(eventStatusRef\.current\)/u);
+  assert.match(wizard, /Informe o motivo da alteração de agenda do evento publicado/u);
+  assert.match(wizard, /publishedScheduleUnavailableMessage/u);
+  assert.match(schedule, /expectedUpdatedAt/u);
+  assert.match(schedule, /motivo/u);
+  assert.match(policy, /FOUNDATION_MUTABLE_STATUSES[\s\S]*DRAFT[\s\S]*SETUP/u);
+  assert.match(policy, /INVALID_EVENT_STATE/u);
 });
 
 test('save sem nova edição na mesma etapa não repete PATCH', async () => {
