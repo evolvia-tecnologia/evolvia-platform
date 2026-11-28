@@ -1,9 +1,29 @@
 import { Body, Controller, Get, Param, Post, Query, Req, Res, UseGuards } from '@nestjs/common';
 import { AuthGuard, AuthenticatedRequest } from './auth.guard';
+import { OperatorCapabilityGuard, RotaDoBalcaoMarcada } from './operator-capability.guard';
 import { RegistrationCategoryProofService } from './registration-category-proof.service';
 import { RegistrationOperationsService } from './registration-operations.service';
 
-@UseGuards(AuthGuard)
+/**
+ * Operacoes de inscricao do organizador (CL01).
+ *
+ * `OperatorCapabilityGuard` entrou aqui porque este controller tinha APENAS
+ * `AuthGuard`, e o service autorizava por papel com uma lista que incluia
+ * OPERATOR. Efeito medido lendo o codigo: operador com concessao apenas de
+ * leitura alterava categoria de inscricao de fato, e baixava o arquivo do
+ * comprovante de categoria.
+ *
+ * O guard falha fechado: metodo sem `@RotaDoBalcaoMarcada(...)` e NEGADO, e
+ * rota fora de `ROTAS_IMPOSTAS` tambem. Entao acrescentar rota aqui sem
+ * registrar a exigencia la a faz nascer inacessivel, nao liberada.
+ *
+ * Todas as seis rotas estao marcadas como `organizador`. Nao e desleixo de
+ * granularidade: nao existe concessao definida para alterar categoria nem para
+ * revisar comprovante, e inventar uma seria criar politica por conta propria.
+ * Operador que precise LER inscricao usa as rotas do balcao, que sao
+ * concediveis e escopadas por evento.
+ */
+@UseGuards(AuthGuard, OperatorCapabilityGuard)
 @Controller('events/:eventId/registration-operations')
 export class RegistrationOperationsController {
   constructor(
@@ -12,6 +32,7 @@ export class RegistrationOperationsController {
   ) {}
 
   @Get()
+  @RotaDoBalcaoMarcada('GET /registration-operations')
   list(
     @Req() request: AuthenticatedRequest,
     @Param('eventId') eventId: string,
@@ -23,6 +44,7 @@ export class RegistrationOperationsController {
   }
 
   @Post('search')
+  @RotaDoBalcaoMarcada('POST /registration-operations/search')
   search(
     @Req() request: AuthenticatedRequest,
     @Param('eventId') eventId: string,
@@ -32,6 +54,7 @@ export class RegistrationOperationsController {
   }
 
   @Get(':protocol/category-options')
+  @RotaDoBalcaoMarcada('GET /registration-operations/:protocol/category-options')
   categoryOptions(
     @Req() request: AuthenticatedRequest,
     @Param('eventId') eventId: string,
@@ -41,6 +64,7 @@ export class RegistrationOperationsController {
   }
 
   @Post(':protocol/category')
+  @RotaDoBalcaoMarcada('POST /registration-operations/:protocol/category')
   changeCategory(
     @Req() request: AuthenticatedRequest,
     @Param('eventId') eventId: string,
@@ -51,6 +75,7 @@ export class RegistrationOperationsController {
   }
 
   @Post(':protocol/category-proof')
+  @RotaDoBalcaoMarcada('POST /registration-operations/:protocol/category-proof')
   reviewCategoryProof(
     @Req() request: AuthenticatedRequest,
     @Param('eventId') eventId: string,
@@ -61,6 +86,7 @@ export class RegistrationOperationsController {
   }
 
   @Get(':protocol/category-proof/file')
+  @RotaDoBalcaoMarcada('GET /registration-operations/:protocol/category-proof/file')
   async categoryProofFile(
     @Req() request: AuthenticatedRequest,
     @Param('eventId') eventId: string,
@@ -74,6 +100,3 @@ export class RegistrationOperationsController {
     response.end(result.bytes);
   }
 }
-
-
-
