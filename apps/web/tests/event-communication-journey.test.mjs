@@ -16,7 +16,7 @@ const compile = (path) => ts.transpileModule(
   readFileSync(new URL(path, import.meta.url), 'utf8'),
   { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX } },
 ).outputText;
-const jsxRuntime = data('export const jsx=(type,props)=>({type,props});export const jsxs=jsx;');
+const jsxRuntime = data('export const jsx=(type,props)=>({type,props});export const jsxs=jsx;export const Fragment="fragment";');
 const css = data('export default new Proxy({},{get:(_,k)=>k})');
 
 const audienceSource = compile('../components/event-communication-audience.tsx').replace(
@@ -38,6 +38,17 @@ const modules = {
   './event-communication-audience': data(audienceSource),
   './event-communication.module.css': css,
 };
+
+// Use the actual batch component, not an inert replacement of its controls.
+modules['./event-communication-batches'] = data(
+  compile('../components/event-communication-batches.tsx').replace(
+    /from ['"]([^'"]+)['"]/g,
+    (_, key) => {
+      assert.ok(Object.hasOwn(modules, key), `Unknown batch import: ${key}`);
+      return `from ${JSON.stringify(modules[key])}`;
+    },
+  ),
+);
 
 const parentSource = compile('../components/event-communication.tsx').replace(
   /from ['"]([^'"]+)['"]/g,
@@ -82,6 +93,9 @@ async function boot() {
   const categories = api.calls.find((call) => /audience\/categories$/.test(call.path));
   assert.ok(categories, 'deve carregar categorias da prévia');
   categories.resolve([{ id: 'cat-a', name: 'Categoria A' }]);
+  const batches = api.calls.filter(call => /communication\/batches$/.test(call.path));
+  assert.equal(batches.length, 1);
+  batches[0].resolve({ batches: [], sendingAvailable: false });
   await tick();
   return render();
 }
@@ -93,11 +107,22 @@ test('abas Escrever/Rascunhos/Prévia/Histórico sem falso enviado e role=status
     assert.ok(button(tree, 'Rascunhos (0)'));
     assert.ok(button(tree, 'Prévia do público'));
     assert.ok(button(tree, 'Histórico'));
-    assert.match(text(tree), /Envio em lote ainda indisponível/);
+    assert.match(text(tree), /Salvar rascunho não envia e-mail/);
+    assert.equal(button(tree, 'Preparar lote').props.disabled, true);
+    assert.equal(button(tree, 'Autorizar envio'), undefined);
 
     button(tree, 'Histórico').props.onClick();
     tree = render();
-    assert.match(text(tree), /A API ainda não publica histórico de disparos/);
+    hooks.run();
+    const requests = api.calls.filter(call => /communication\/batches$/.test(call.path));
+    assert.equal(requests.length, 2);
+    requests[1].resolve({ batches: [{ id: 'batch-a', draftId: 'draft-a', draftRevision: 1, recipientCount: 2, status: 'PREPARED', createdAt: '2026-11-24T12:00:00Z', receivedCount: 0 }], sendingAvailable: false });
+    await tick();
+    tree = render();
+    assert.match(text(tree), /Preparado · 2 destinatários/);
+    assert.match(text(tree), /Recebidos: 0/);
+    assert.equal(button(tree, 'Autorizar envio'), undefined);
+    assert.ok(button(tree, 'Cancelar lote'));
     assert.doesNotMatch(text(tree), /E-mail enviado com sucesso|Mensagem enviada|Nenhum envio registrado neste evento/);
     const historyCard = nodes(tree).find((n) => n.type === 'section' && n.props['aria-label'] === 'Histórico de envios');
     assert.ok(historyCard);
