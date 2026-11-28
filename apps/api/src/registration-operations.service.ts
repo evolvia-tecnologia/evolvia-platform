@@ -1,11 +1,22 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
-import { MembershipRole, Prisma, RegistrationReservationStatus } from '@prisma/client';
+import { Prisma, RegistrationReservationStatus } from '@prisma/client';
 import { AuthorizationService } from './authorization.service';
+import { EVENT_EDITOR_ROLES } from './membership-policy';
 import { PrismaService } from './prisma.service';
 import { categoryChangePatch, decidePaidCategoryChange, effectiveRegistrationStatus, normalizeCategoryChangeTarget, normalizeRegistrationPresence, type PaidCategoryChangeDecision, type RegistrationPresenceFilter, registrationDocumentHash, registrationEmailHash } from './registration-operations-policy';
 import { activeWaitlistOfferWhere } from './registration-reservations.service';
 
-const STAFF_ROLES = [MembershipRole.OWNER, MembershipRole.ADMIN, MembershipRole.MANAGER, MembershipRole.OPERATOR];
+/**
+ * Este service e de organizador, e passou a dizer isso (CL01).
+ *
+ * Era `[OWNER, ADMIN, MANAGER, OPERATOR]`, e com isso o papel OPERATOR sozinho
+ * autorizava `changeCategory`, que e mutacao. `OperatorCapabilityGuard` ja nega
+ * na borda; esta linha e a segunda camada, para o buraco nao reabrir em
+ * silencio se alguem remover um decorator. Mesma lista de
+ * `EVENT_EDITOR_ROLES`, importada em vez de repetida: duas listas iguais
+ * divergem com o tempo.
+ */
+const STAFF_ROLES = EVENT_EDITOR_ROLES;
 const PAGE_SIZE = 25;
 const PROTOCOL = /^EVO-[A-F0-9]{16}$/u;
 

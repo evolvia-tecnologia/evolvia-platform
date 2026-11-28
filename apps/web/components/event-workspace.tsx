@@ -19,6 +19,12 @@ import {
   type EventFlowSection,
 } from '../lib/event-flow';
 import { eventStatusLabel } from '../lib/event-status-labels';
+import type { RespostaDeCapacidades } from '../lib/operator-journey';
+import {
+  isPapelOperadorRestrito,
+  linksDoOperadorRestrito,
+  secaoPermitidaAoOperador,
+} from '../lib/operator-workspace-nav';
 import styles from './event-admin-dashboard.module.css';
 import AccessibilityPanel from './accessibility-panel';
 
@@ -119,6 +125,67 @@ function ClosedPanel({ message }: { message: string }) {
   </main>;
 }
 
+/** CL02 — shell do OPERATOR: só atalhos que o servidor já listou + minhas permissões. */
+function RestrictedOperatorFrame({
+  eventId,
+  pathname,
+  eventName,
+  orgName,
+  capabilities,
+  children,
+}: {
+  eventId: string;
+  pathname: string;
+  eventName: string;
+  orgName: string;
+  capabilities: RespostaDeCapacidades;
+  children: ReactNode;
+}) {
+  const links = linksDoOperadorRestrito(eventId, capabilities);
+  // `pathname`, nao `section`: ver a nota em `secaoPermitidaAoOperador`. A
+  // guarda solta de minhas-permissoes saiu porque esse atalho ja esta em
+  // `links`, e duas fontes para a mesma regra divergem com o tempo.
+  const permitted = secaoPermitidaAoOperador(pathname, links);
+  const fallback = links.find((link) => link.href.endsWith('/painel/check-in'))?.href
+    ?? `/eventos/${encodeURIComponent(eventId)}/painel/minhas-permissoes`;
+
+  return <div className={styles.page} data-shell="operator-restricted">
+    <a className={styles.skipLink} href="#event-admin-content">Pular para o conteúdo</a>
+    <header className={styles.operationBar}>
+      <Link className={styles.brand} href="/painel">EVOLVIA</Link>
+      <div className={styles.eventIdentity}>
+        <strong>{eventName}</strong>
+        <span>{orgName}</span>
+      </div>
+      <Link className={styles.secondaryButton} href="/painel">Voltar ao painel</Link>
+    </header>
+    <p className={styles.operationNote}>
+      Acesso de operador: só as ações concedidas neste evento. Configuração, cobrança e área de expositor ficam com o organizador.
+    </p>
+    <nav className={styles.navigation} aria-label="Operação restrita do evento">
+      {links.map((link) => {
+        const isCurrent = pathname === link.href || pathname.startsWith(`${link.href}/`);
+        return <Link
+          key={link.href}
+          className={`${styles.navItem} ${isCurrent ? styles.navItemActive : ''}`}
+          href={link.href}
+          aria-current={isCurrent ? 'page' : undefined}
+        >{link.rotulo}</Link>;
+      })}
+    </nav>
+    {!permitted ? (
+      <div className={styles.operationContent} role="alert">
+        <p>Esta área é do organizador. Use as ações liberadas para o seu posto.</p>
+        <Link className={styles.secondaryButton} href={fallback}>Ir para o posto</Link>
+      </div>
+    ) : (
+      <div id="event-admin-content" className={styles.operationContent} tabIndex={-1}>
+        {children}
+      </div>
+    )}
+  </div>;
+}
+
 function OperationalEventFrame({ section, children }: { section: EventFlowSection; children: ReactNode }) {
   return <div className={styles.page} data-shell="operation">
     <a className={styles.skipLink} href="#event-admin-content">Pular para o conteúdo</a>
@@ -161,6 +228,7 @@ export default function EventWorkspace({
   const [menuOpen, setMenuOpen] = useState(false);
   const [mobileNavigation, setMobileNavigation] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [operatorCapabilities, setOperatorCapabilities] = useState<RespostaDeCapacidades | null | undefined>(undefined);
 
   if (view.eventId !== eventId) {
     const next = providedPayload?.event.id === eventId && eventId
@@ -168,6 +236,7 @@ export default function EventWorkspace({
       : replaceWorkspaceEvent<WorkspacePayload>(eventId);
     setView(next);
     setMenuOpen(false);
+    setOperatorCapabilities(undefined);
   }
 
   useEffect(() => {
@@ -204,6 +273,23 @@ export default function EventWorkspace({
       });
     return () => { active = false; };
   }, [eventId, providedPayload, router]);
+
+  // CL02: papel e ações vêm do servidor; troca de evento zera o estado acima.
+  useEffect(() => {
+    if (!eventId || !getToken()) {
+      setOperatorCapabilities(null);
+      return;
+    }
+    let active = true;
+    api<RespostaDeCapacidades>(`/events/${encodeURIComponent(eventId)}/operators/me/capabilities`)
+      .then((resposta) => {
+        if (active) setOperatorCapabilities(resposta);
+      })
+      .catch(() => {
+        if (active) setOperatorCapabilities(null);
+      });
+    return () => { active = false; };
+  }, [eventId]);
 
   useEffect(() => {
     const media = window.matchMedia('(max-width: 900px)');
@@ -249,7 +335,7 @@ export default function EventWorkspace({
     const observer = new ResizeObserver(syncHeight);
     observer.observe(header);
     return () => observer.disconnect();
-  }, [shell]);
+  }, [shell, operatorCapabilities]);
 
   if (shell === 'loading') return <LoadingPanel />;
   if (shell === 'operation') {
@@ -257,6 +343,22 @@ export default function EventWorkspace({
   }
   if (shell === 'error' || !payload) {
     return <ClosedPanel message={view.eventId === eventId ? view.error : ''} />;
+  }
+
+  if (operatorCapabilities === undefined) return <LoadingPanel />;
+  if (!operatorCapabilities?.papel) {
+    return <ClosedPanel message="Não foi possível verificar suas permissões neste evento." />;
+  }
+  if (isPapelOperadorRestrito(operatorCapabilities.papel)) {
+    return <RestrictedOperatorFrame
+      eventId={eventId}
+      pathname={pathname}
+      eventName={payload.event.name}
+      orgName={payload.event.organization.name}
+      capabilities={operatorCapabilities}
+    >
+      <div key={eventId}>{children}</div>
+    </RestrictedOperatorFrame>;
   }
 
   const isScientific = showsScientificNavigation(payload.event.profileCode, payload.answers.capabilities);
@@ -476,6 +578,3 @@ export default function EventWorkspace({
     </div>
   </div>;
 }
-
-
-
