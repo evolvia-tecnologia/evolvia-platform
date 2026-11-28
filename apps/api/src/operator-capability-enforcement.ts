@@ -127,6 +127,31 @@ export const ROTAS_DE_OPERACOES = {
 } as const satisfies Record<string, ExigenciaDaRota>;
 
 /**
+ * Métodos só de organizador DESTE controller.
+ *
+ * Ficam aqui, e não em `METODOS_SO_DE_ORGANIZADOR`, porque aquela lista é dos
+ * métodos públicos de `EventDeskService` — e há teste que afirma exatamente
+ * isso: catálogo + organizador + `context` cobrem os 24 métodos do balcão.
+ * Enfiar método de `RegistrationOperationsService` lá dentro quebrava aquele
+ * invariante e, pior, o deixava impossível de restaurar: um método de balcão
+ * novo e não classificado passaria a caber na soma sem ninguém notar. A rede
+ * perdida é mais valiosa que a economia de uma lista.
+ */
+export const METODOS_SO_DE_ORGANIZADOR_DE_OPERACOES = [
+  'list',
+  'categoryOptions',
+  'changeCategory',
+  'review',
+  'readForOrganizer',
+] as const;
+
+/** O que a conferência aceita como método de organizador: a união das duas. */
+const METODOS_DE_ORGANIZADOR_IMPOSTOS: readonly string[] = [
+  ...METODOS_SO_DE_ORGANIZADOR,
+  ...METODOS_SO_DE_ORGANIZADOR_DE_OPERACOES,
+];
+
+/**
  * O que a imposição consulta: a união. Um mapa por controller, uma decisão só.
  * Acrescentar controller é acrescentar mapa e somá-lo aqui — não é abrir um
  * segundo caminho de decisão.
@@ -207,9 +232,15 @@ export function decidirRota(rota: unknown, contexto: ContextoDaRota): DecisaoDeR
  * Rotas que o operador consegue usar, para a interface limitada. Só rotas: a
  * interface não decide nada, ela apenas deixa de oferecer o que o backend
  * negaria de todo modo.
+ *
+ * Enumera `ROTAS_DO_BALCAO`, e não a união: as rotas de operações são todas
+ * `organizador` e nunca são permitidas a operador, então enumerá-las não daria
+ * nada a ninguém e mudaria a contagem que o teste do balcão afirma. A
+ * imposição não depende desta função: o portão é `decidirRota`, que consulta
+ * `ROTAS_IMPOSTAS`.
  */
 export function rotasPermitidas(contexto: ContextoDaRota): RotaDoBalcao[] {
-  return (Object.keys(ROTAS_IMPOSTAS) as RotaDoBalcao[]).filter((r) => decidirRota(r, contexto).permitido);
+  return (Object.keys(ROTAS_DO_BALCAO) as RotaDoBalcao[]).filter((r) => decidirRota(r, contexto).permitido);
 }
 
 /**
@@ -232,7 +263,7 @@ export function conferirCoerencia(rotas: Record<string, ExigenciaDaRota> = ROTAS
         problemas.push(`${rota}: ação "${e.acao}" é do método "${ACOES_DE_OPERADOR[e.acao].metodo}", não "${e.metodo}"`);
       }
     }
-    if (e.tipo === 'organizador' && !(METODOS_SO_DE_ORGANIZADOR as readonly string[]).includes(e.metodo)) {
+    if (e.tipo === 'organizador' && !METODOS_DE_ORGANIZADOR_IMPOSTOS.includes(e.metodo)) {
       problemas.push(`${rota}: "${e.metodo}" não está na lista de métodos só de organizador`);
     }
     if (e.tipo === 'staff' && e.metodo !== ACAO_SEMPRE_LIBERADA_PARA_STAFF) {

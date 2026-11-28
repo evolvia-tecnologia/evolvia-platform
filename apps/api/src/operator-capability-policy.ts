@@ -82,25 +82,9 @@ export const ACOES_DE_OPERADOR = {
 export type AcaoDeOperador = keyof typeof ACOES_DE_OPERADOR;
 
 /**
- * Métodos operacionais que NUNCA podem ser concedidos a um operador. Lista
- * explícita para que um teste detecte se alguém mover um deles para o catálogo
- * concedível — e para que `normalizarConcessao` recuse conceder qualquer um
- * deles com mensagem própria, em vez de "ação não existe".
- *
- * Os sete primeiros são do balcão e chamam `requireOrganizer`.
- *
- * Os cinco últimos são de `RegistrationOperationsController`
- * (`events/:eventId/registration-operations`), acrescentados no CL01. Eles NÃO
- * chamavam `requireOrganizer`: o controller tinha apenas `AuthGuard`, e o
- * service autorizava por papel com uma lista que incluía OPERATOR. Resultado
- * medido lendo o código: operador com concessão apenas de leitura alterava
- * categoria de inscrição de fato, e baixava o arquivo do comprovante de
- * categoria — documento pessoal de terceiro.
- *
- * Entram como exclusivos de organizador, e não como ação concedível, porque NÃO
- * existe concessão definida para alterar categoria nem para revisar
- * comprovante. Inventar uma aqui seria criar política por conta própria; a
- * decisão formal de criar essas concessões é do proprietário. Até lá, nega.
+ * Métodos do balcão que hoje chamam `requireOrganizer` e portanto NUNCA podem
+ * ser concedidos a um operador. Lista explícita para que um teste detecte se
+ * alguém mover um deles para o catálogo concedível.
  */
 export const METODOS_SO_DE_ORGANIZADOR = [
   'updateCategoryLabel',
@@ -110,11 +94,6 @@ export const METODOS_SO_DE_ORGANIZADOR = [
   'revokeTotemLink',
   'saveKit',
   'exportKitReport',
-  'list',
-  'categoryOptions',
-  'changeCategory',
-  'review',
-  'readForOrganizer',
 ] as const;
 
 /**

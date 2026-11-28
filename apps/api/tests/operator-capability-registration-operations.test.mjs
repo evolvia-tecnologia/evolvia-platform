@@ -25,6 +25,7 @@ import test from 'node:test';
 import {
   conferirCoerencia,
   decidirRota,
+  METODOS_SO_DE_ORGANIZADOR_DE_OPERACOES,
   ROTAS_DE_OPERACOES,
   ROTAS_DO_BALCAO,
   ROTAS_IMPOSTAS,
@@ -132,11 +133,31 @@ test('OWNER, ADMIN e MANAGER conservam acesso às seis', () => {
   }
 });
 
-test('os cinco métodos entraram na lista de exclusivos de organizador', () => {
-  // `normalizarConcessao` usa esta lista para recusar conceder com mensagem
-  // própria, em vez de "ação não existe".
+test('os cinco métodos são exclusivos de organizador, na lista DE OPERACOES', () => {
+  // Ficam em `METODOS_SO_DE_ORGANIZADOR_DE_OPERACOES`, e NÃO em
+  // `METODOS_SO_DE_ORGANIZADOR`: aquela é dos métodos públicos de
+  // `EventDeskService`, e `operator-capability-policy.test.mjs` afirma que
+  // catálogo + organizador + `context` cobrem os 24 do balcão. Misturar as duas
+  // quebrava aquele invariante e o tornava irrecuperável — método de balcão
+  // novo e não classificado passaria a caber na soma sem ninguém notar.
   for (const metodo of ['list', 'categoryOptions', 'changeCategory', 'review', 'readForOrganizer']) {
-    assert.ok(METODOS_SO_DE_ORGANIZADOR.includes(metodo), `${metodo} fora da lista`);
+    assert.ok(METODOS_SO_DE_ORGANIZADOR_DE_OPERACOES.includes(metodo), `${metodo} fora da lista de operações`);
+    assert.equal(METODOS_SO_DE_ORGANIZADOR.includes(metodo), false,
+      `${metodo} voltou a poluir a lista do balcão`);
+  }
+});
+
+test('nenhum método de operações fica sem rota, e nenhuma rota sem método', () => {
+  // Esta é a recíproca que saiu de `conferirCoerencia`: lá o laço percorre
+  // `METODOS_SO_DE_ORGANIZADOR` (o balcão), e passou a não cobrir estes cinco.
+  // Sem este caso, acrescentar método à lista e esquecer a rota não acusaria.
+  const metodosComRota = new Set(Object.values(ROTAS_DE_OPERACOES).map((e) => e.metodo));
+  for (const metodo of METODOS_SO_DE_ORGANIZADOR_DE_OPERACOES) {
+    assert.ok(metodosComRota.has(metodo), `método "${metodo}" sem rota em ROTAS_DE_OPERACOES`);
+  }
+  for (const metodo of metodosComRota) {
+    assert.ok(METODOS_SO_DE_ORGANIZADOR_DE_OPERACOES.includes(metodo),
+      `rota exige "${metodo}", que não está em METODOS_SO_DE_ORGANIZADOR_DE_OPERACOES`);
   }
 });
 
