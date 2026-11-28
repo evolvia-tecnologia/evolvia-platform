@@ -2,6 +2,7 @@
 
 import { ChangeEvent, useEffect, useRef, useState } from 'react';
 import { ApiError, api, apiBlob } from '../lib/api';
+import PublicationPlainTextField from './publication-plain-text-field';
 import styles from './publication-media-editor.module.css';
 
 type Usage = 'LOGO' | 'COVER' | 'SOCIAL_SHARE';
@@ -199,8 +200,15 @@ export default function PublicationMediaEditor({
             <input type="checkbox" checked={decorative} onChange={(event) => setDecorative(event.target.checked)} disabled={!canEdit || Boolean(busy) || hasUnsavedChanges} />
             A capa é apenas decorativa
           </label>}
-          <label htmlFor={altId}>Texto alternativo{isDecorative ? ' (dispensado para capa decorativa)' : ''}</label>
-          <input id={altId} value={altTexts[config.usage] ?? ''} onChange={(event) => setAltTexts((currentValue) => ({ ...currentValue, [config.usage]: event.target.value }))} maxLength={300} disabled={!canEdit || Boolean(busy) || hasUnsavedChanges || isDecorative} placeholder={current?.altText ?? 'Descreva a informação visual relevante'} />
+          <PublicationPlainTextField
+            id={altId}
+            label={isDecorative ? 'Texto alternativo (dispensado para capa decorativa)' : 'Texto alternativo'}
+            value={altTexts[config.usage] ?? ''}
+            onChange={value => setAltTexts(currentValue => ({ ...currentValue, [config.usage]: value }))}
+            maxLength={300}
+            disabled={!canEdit || Boolean(busy) || hasUnsavedChanges || isDecorative}
+            placeholder={current?.altText ?? 'Descreva a informação visual relevante'}
+          />
           <div className={styles.actions}>
             <button type="button" onClick={() => void upload(config.usage)} disabled={!canEdit || !files[config.usage] || Boolean(busy) || hasUnsavedChanges}>{busy === config.usage ? 'Processando...' : 'Enviar imagem'}</button>
             {current && <button className={styles.remove} type="button" onClick={() => void remove(config.usage)} disabled={!canEdit || Boolean(busy) || hasUnsavedChanges}>Remover</button>}

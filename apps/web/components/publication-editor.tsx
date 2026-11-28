@@ -9,6 +9,7 @@ import { eventTimeZoneLabel } from '../lib/event-flow';
 import PublicationEvaGuidance, { PublicationEvaGuidanceData } from './publication-eva-guidance';
 import PublicationReleaseGate from './publication-release-gate';
 import PublicationMediaEditor from './publication-media-editor';
+import PublicationPlainTextField from './publication-plain-text-field';
 import PublicationRichTextField from './publication-rich-text-field';
 import PublicationSectionsEditor, { PublicationSection } from './publication-sections-editor';
 import SportsModalitiesEditor from './sports-modalities-editor';
@@ -480,15 +481,22 @@ export default function PublicationEditor({
       <section className={styles.card} aria-labelledby="presentation-title">
         <div className={styles.cardHeading}>
           <div><p className={styles.eyebrow}>1 · APRESENTAÇÃO</p><h2 id="presentation-title">Explique o evento sem sobrecarregar</h2><p>A descrição curta é o resumo principal. A apresentação completa aceita título, negrito, lista e link para a página organizar o texto.</p></div>
-          <span className={styles.counter}>{form.shortDescription.length}/280</span>
+          
         </div>
 
-        <label className={styles.field} htmlFor="publication-shortDescription">
-          <span>Descrição curta <strong aria-hidden="true">*</strong></span>
-          <small id="publication-shortDescription-help">Uma frase objetiva que ajude a pessoa a entender rapidamente o evento.</small>
-          <textarea id="publication-shortDescription" value={form.shortDescription} onChange={(event) => update('shortDescription', event.target.value)} maxLength={280} rows={3} placeholder="Ex.: Congresso de atualização clínica, de 10 a 12 de outubro, em São Paulo." disabled={!canEdit || saving} required aria-invalid={Boolean(fieldErrors.shortDescription)} aria-describedby={`publication-shortDescription-help${fieldErrors.shortDescription ? ' publication-shortDescription-error' : ''}`} />
-          {fieldErrors.shortDescription && <small id="publication-shortDescription-error" className={styles.fieldError}>{fieldErrors.shortDescription}</small>}
-        </label>
+        <PublicationPlainTextField
+          id="publication-shortDescription"
+          label="Descrição curta"
+          value={form.shortDescription}
+          onChange={value => update('shortDescription', value)}
+          maxLength={280}
+          placeholder="Ex.: Congresso de atualização clínica, de 10 a 12 de outubro, em São Paulo."
+          disabled={!canEdit || saving}
+          error={fieldErrors.shortDescription}
+          rows={3}
+          help="Uma frase objetiva que ajude a pessoa a entender rapidamente o evento."
+          required
+        />
 
         <PublicationRichTextField
           id="publication-fullDescription"
@@ -521,28 +529,45 @@ export default function PublicationEditor({
       </section>
 
       <section className={styles.card} aria-labelledby="accessibility-title">
-        <div className={styles.cardHeading}><div><p className={styles.eyebrow}>3 · ACESSIBILIDADE</p><h2 id="accessibility-title">Informações públicas de acessibilidade</h2><p>Descreva apenas recursos efetivamente oferecidos pelo evento ou local.</p></div><span className={styles.counter}>{form.accessibilitySummary.length}/4000</span></div>
-        <label className={styles.field} htmlFor="publication-accessibilitySummary">
-          <span>O que o público precisa saber?</span>
-          <textarea id="publication-accessibilitySummary" value={form.accessibilitySummary} onChange={(event) => update('accessibilitySummary', event.target.value)} maxLength={4000} rows={5} placeholder="Ex.: entrada sem degraus, banheiros acessíveis e canal para solicitar apoio com antecedência." disabled={!canEdit || saving} aria-invalid={Boolean(fieldErrors.accessibilitySummary)} aria-describedby={fieldErrors.accessibilitySummary ? 'publication-accessibilitySummary-error' : undefined} />
-          {fieldErrors.accessibilitySummary && <small id="publication-accessibilitySummary-error" className={styles.fieldError}>{fieldErrors.accessibilitySummary}</small>}
-        </label>
+        <div className={styles.cardHeading}><div><p className={styles.eyebrow}>3 · ACESSIBILIDADE</p><h2 id="accessibility-title">Informações públicas de acessibilidade</h2><p>Descreva apenas recursos efetivamente oferecidos pelo evento ou local.</p></div></div>
+        <PublicationPlainTextField
+          id="publication-accessibilitySummary"
+          label="O que o público precisa saber?"
+          value={form.accessibilitySummary}
+          onChange={value => update('accessibilitySummary', value)}
+          maxLength={4000}
+          placeholder="Ex.: entrada sem degraus, banheiros acessíveis e canal para solicitar apoio com antecedência."
+          disabled={!canEdit || saving}
+          error={fieldErrors.accessibilitySummary}
+          rows={5}
+        />
       </section>
 
       <section className={styles.card} aria-labelledby="seo-title">
-        <div className={styles.cardHeading}><div><p className={styles.eyebrow}>4 · BUSCA E COMPARTILHAMENTO</p><h2 id="seo-title">Como a página será descrita fora do Evolvia?</h2><p>Esses campos são opcionais. Se ficarem vazios, o renderer poderá usar dados públicos canônicos como fallback no Lote 4.</p></div></div>
-        <label className={styles.field} htmlFor="publication-seoTitle">
-          <span>Título para buscadores <em>opcional</em></span>
-          <input id="publication-seoTitle" value={form.seoTitle} onChange={(event) => update('seoTitle', event.target.value)} maxLength={120} placeholder={payload.event.name} disabled={!canEdit || saving} aria-invalid={Boolean(fieldErrors.seoTitle)} aria-describedby={fieldErrors.seoTitle ? 'publication-seoTitle-error' : undefined} />
-          <span className={styles.fieldCounter}>{form.seoTitle.length}/120</span>
-          {fieldErrors.seoTitle && <small id="publication-seoTitle-error" className={styles.fieldError}>{fieldErrors.seoTitle}</small>}
-        </label>
-        <label className={styles.field} htmlFor="publication-seoDescription">
-          <span>Descrição para buscadores e compartilhamento <em>opcional</em></span>
-          <textarea id="publication-seoDescription" value={form.seoDescription} onChange={(event) => update('seoDescription', event.target.value)} maxLength={320} rows={3} placeholder="Resumo objetivo para mecanismos de busca e prévias de compartilhamento." disabled={!canEdit || saving} aria-invalid={Boolean(fieldErrors.seoDescription)} aria-describedby={fieldErrors.seoDescription ? 'publication-seoDescription-error' : undefined} />
-          <span className={styles.fieldCounter}>{form.seoDescription.length}/320</span>
-          {fieldErrors.seoDescription && <small id="publication-seoDescription-error" className={styles.fieldError}>{fieldErrors.seoDescription}</small>}
-        </label>
+        <div className={styles.cardHeading}><div><p className={styles.eyebrow}>4 · BUSCA E COMPARTILHAMENTO</p><h2 id="seo-title">Como a página será descrita fora do Evolvia?</h2><p>Esses campos são opcionais. Use um título e uma descrição que identifiquem o evento nos resultados de busca.</p></div></div>
+        <PublicationPlainTextField
+          id="publication-seoTitle"
+          label="Título para buscadores"
+          value={form.seoTitle}
+          onChange={value => update('seoTitle', value)}
+          maxLength={120}
+          placeholder={payload.event.name}
+          disabled={!canEdit || saving}
+          error={fieldErrors.seoTitle}
+          optional
+        />
+        <PublicationPlainTextField
+          id="publication-seoDescription"
+          label="Descrição para buscadores e compartilhamento"
+          value={form.seoDescription}
+          onChange={value => update('seoDescription', value)}
+          maxLength={320}
+          placeholder="Resumo objetivo para mecanismos de busca e prévias de compartilhamento."
+          disabled={!canEdit || saving}
+          error={fieldErrors.seoDescription}
+          rows={3}
+          optional
+        />
       </section>
 
       <section className={styles.card} aria-labelledby="visual-title">

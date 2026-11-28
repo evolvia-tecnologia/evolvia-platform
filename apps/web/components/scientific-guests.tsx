@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { api, getToken } from '../lib/api';
 import ScientificEvaHelp from './scientific-eva-help';
+import PublicationPlainTextField from './publication-plain-text-field';
 import styles from './scientific-guests.module.css';
 
 type ParticipationType = 'SPEAKER' | 'GUEST' | 'MODERATOR' | 'DEBATER' | 'SESSION_CHAIR' | 'OTHER';
@@ -377,19 +378,37 @@ export default function ScientificGuests({ eventId }: { eventId: string }) {
                   <span className={styles.fieldHelp}>Use quando essa informação deve aparecer no perfil ou ajudar a identificar o convidado. Ex.: Professora Titular de Cardiologia.</span>
                   <input placeholder="Ex.: Professora Titular de Cardiologia" value={guest.professionalTitle} onChange={(e) => setGuest({ ...guest, professionalTitle: e.target.value })} />
                 </label>
-                <label>Mini bio <small>opcional</small>
-                  <span className={styles.fieldHelp}>Use para apresentar o membro ao público. Prefira 2 a 4 frases objetivas. Ex.: Cardiologista, pesquisadora em insuficiência cardíaca e professora da UFMG.</span>
-                  <textarea placeholder="Ex.: Cardiologista, pesquisadora em insuficiência cardíaca e professora da UFMG." value={guest.miniBio} onChange={(e) => setGuest({ ...guest, miniBio: e.target.value })} />
-                </label>
+                <PublicationPlainTextField
+                  id="guest-mini-bio"
+                  label="Minibiografia"
+                  value={guest.miniBio}
+                  onChange={value => setGuest(current => ({ ...current, miniBio: value }))}
+                  help="Use para apresentar o membro ao público. Prefira 2 a 4 frases objetivas. Ex.: Cardiologista, pesquisadora em insuficiência cardíaca e professora da UFMG."
+                  placeholder="Ex.: Cardiologista, pesquisadora em insuficiência cardíaca e professora da UFMG."
+                  rows={3}
+                  optional
+                />
                 <div className={styles.row}>
-                  <label>Acessibilidade <small>opcional</small>
-                    <span className={styles.fieldHelp}>Preencha somente quando houver uma necessidade operacional. Ex.: acesso sem escadas, intérprete de Libras ou assento adaptado.</span>
-                    <textarea placeholder="Ex.: Necessita acesso sem escadas e assento adaptado." value={guest.accessibilityNotes} onChange={(e) => setGuest({ ...guest, accessibilityNotes: e.target.value })} />
-                  </label>
-                  <label>Apoio técnico <small>opcional</small>
-                    <span className={styles.fieldHelp}>Use para necessidades de apresentação ou palco. Ex.: notebook próprio, entrada HDMI, microfone de lapela e retorno de vídeo.</span>
-                    <textarea placeholder="Ex.: Notebook próprio, HDMI e microfone de lapela." value={guest.technicalSupportNotes} onChange={(e) => setGuest({ ...guest, technicalSupportNotes: e.target.value })} />
-                  </label>
+                  <PublicationPlainTextField
+                    id="guest-accessibility-notes"
+                    label="Acessibilidade"
+                    value={guest.accessibilityNotes}
+                    onChange={value => setGuest(current => ({ ...current, accessibilityNotes: value }))}
+                    help="Preencha somente quando houver uma necessidade operacional. Ex.: acesso sem escadas, intérprete de Libras ou assento adaptado."
+                    placeholder="Ex.: Necessita acesso sem escadas e assento adaptado."
+                    rows={3}
+                    optional
+                  />
+                  <PublicationPlainTextField
+                    id="guest-technical-notes"
+                    label="Apoio técnico"
+                    value={guest.technicalSupportNotes}
+                    onChange={value => setGuest(current => ({ ...current, technicalSupportNotes: value }))}
+                    help="Use para necessidades de apresentação ou palco. Ex.: notebook próprio, entrada HDMI, microfone de lapela e retorno de vídeo."
+                    placeholder="Ex.: Notebook próprio, HDMI e microfone de lapela."
+                    rows={3}
+                    optional
+                  />
                 </div>
               </div>
             </details>
@@ -401,14 +420,25 @@ export default function ScientificGuests({ eventId }: { eventId: string }) {
         <section className={styles.card}>
           <div className={styles.cardHead}><div><span>2</span><h2>Modelo de convite</h2></div><p>Defina um texto-base uma única vez. Depois, a Evolvia reaproveita o modelo para cada convite individual.</p></div>
           <form className={styles.form} onSubmit={saveTemplate}>
-            <label>Assunto
-              <span className={styles.fieldHelp}>É o título do convite que o organizador usará no envio. Ex.: Convite para participar do Congresso Brasileiro de Cardiologia 2026.</span>
-              <input placeholder="Ex.: Convite para participar do Congresso Brasileiro de Cardiologia 2026" value={template.subject} onChange={(e) => setTemplate({ ...template, subject: e.target.value })} required />
-            </label>
-            <label>Mensagem
-              <span className={styles.fieldHelp}>Use as tags para não digitar os dados de cada convidado: {'{NOME}'}, {'{EVENTO}'} e {'{FUNCAO}'}. Ex.: Olá {'{NOME}'}, convidamos você para participar do {'{EVENTO}'} como {'{FUNCAO}'}.</span>
-              <textarea className={styles.bigText} placeholder="Ex.: Olá {NOME}, convidamos você para participar do {EVENTO} como {FUNCAO}. Acesse o link para confirmar." value={template.body} onChange={(e) => setTemplate({ ...template, body: e.target.value })} required />
-            </label>
+            <PublicationPlainTextField
+              id="guest-invitation-subject"
+              label="Assunto"
+              value={template.subject}
+              onChange={value => setTemplate(current => ({ ...current, subject: value }))}
+              help="É o título do convite que o organizador usará no envio. Ex.: Convite para participar do Congresso Brasileiro de Cardiologia 2026."
+              placeholder="Ex.: Convite para participar do Congresso Brasileiro de Cardiologia 2026"
+              required
+            />
+            <PublicationPlainTextField
+              id="guest-invitation-body"
+              label="Mensagem"
+              value={template.body}
+              onChange={value => setTemplate(current => ({ ...current, body: value }))}
+              help="Use as tags para não digitar os dados de cada convidado: {NOME}, {EVENTO} e {FUNCAO}. Ex.: Olá {NOME}, convidamos você para participar do {EVENTO} como {FUNCAO}."
+              placeholder="Ex.: Olá {NOME}, convidamos você para participar do {EVENTO} como {FUNCAO}. Acesse o link para confirmar."
+              rows={7}
+              required
+            />
             <label>Validade do link em dias
               <span className={styles.fieldHelp}>Define por quantos dias o link de confirmação ficará válido. Ex.: 14 dias para dar duas semanas de prazo ao convidado.</span>
               <input type="number" min={1} max={90} value={template.expiresInDays} onChange={(e) => setTemplate({ ...template, expiresInDays: Number(e.target.value) })} />
