@@ -81,10 +81,62 @@ export const ROTAS_DO_BALCAO = {
   'POST /registrations': { tipo: 'acao', metodo: 'registrationTarget', acao: 'inscricao_criar' },
 } as const satisfies Record<string, ExigenciaDaRota>;
 
-export type RotaDoBalcao = keyof typeof ROTAS_DO_BALCAO;
+/**
+ * Rotas de `RegistrationOperationsController` (`events/:eventId/registration-operations`),
+ * acrescentadas no CL01.
+ *
+ * POR QUE UM MAPA SEPARADO, e não entradas em `ROTAS_DO_BALCAO`
+ * ------------------------------------------------------------
+ * Duas razões, e a primeira é mecânica: as chaves do balcão são relativas a
+ * `events/:eventId/desk`, então `'GET /'` e `'POST /search'` JÁ EXISTEM lá com
+ * outro significado. Misturar colidiria.
+ *
+ * A segunda é que `operator-capability-wiring.test.mjs` afirma que o conjunto
+ * de chaves de `ROTAS_DO_BALCAO` é EXATAMENTE o conjunto de rotas marcadas em
+ * `event-desk.controller.ts`. Esse invariante é do balcão e está certo;
+ * acrescentar rota de outro controller ali o quebraria — e quebraria um teste
+ * de segurança, não um teste de forma. Mapas separados preservam o invariante
+ * do balcão e dão ao novo controller o seu próprio, no teste do CL01.
+ *
+ * TODAS como `organizador`, de propósito: esse tipo NÃO consulta `escopado` e
+ * NÃO passa por `decidirAcaoDeOperador`, então nega OPERATOR em evento escopado
+ * e não escopado igualmente. É o que torna isto deny-by-default de verdade —
+ * uma exigência do tipo `acao` seria liberada pelo atalho
+ * `if (!escopado) return { permitido: true }`, que existe para preservar o
+ * comportamento do balcão na migração e aqui deixaria o buraco aberto.
+ *
+ * O buraco, medido lendo o código: o controller tinha apenas `AuthGuard`, e o
+ * service autorizava por papel com uma lista que incluía OPERATOR. Operador com
+ * concessão somente de leitura alterava categoria de inscrição de fato, e
+ * baixava o arquivo do comprovante de categoria — documento pessoal de
+ * terceiro. Entram como exclusivas de organizador, e não como ação concedível,
+ * porque NÃO existe concessão definida para alterar categoria nem para revisar
+ * comprovante; inventar uma aqui seria criar política por conta própria.
+ *
+ * Operador que precise LER inscrição tem as rotas do balcão
+ * (`GET /registrations/:reservationId`, ação `inscricao_ler`), que são
+ * concedíveis e escopadas por evento.
+ */
+export const ROTAS_DE_OPERACOES = {
+  'GET /registration-operations': { tipo: 'organizador', metodo: 'list' },
+  'POST /registration-operations/search': { tipo: 'organizador', metodo: 'list' },
+  'GET /registration-operations/:protocol/category-options': { tipo: 'organizador', metodo: 'categoryOptions' },
+  'POST /registration-operations/:protocol/category': { tipo: 'organizador', metodo: 'changeCategory' },
+  'POST /registration-operations/:protocol/category-proof': { tipo: 'organizador', metodo: 'review' },
+  'GET /registration-operations/:protocol/category-proof/file': { tipo: 'organizador', metodo: 'readForOrganizer' },
+} as const satisfies Record<string, ExigenciaDaRota>;
+
+/**
+ * O que a imposição consulta: a união. Um mapa por controller, uma decisão só.
+ * Acrescentar controller é acrescentar mapa e somá-lo aqui — não é abrir um
+ * segundo caminho de decisão.
+ */
+export const ROTAS_IMPOSTAS = { ...ROTAS_DO_BALCAO, ...ROTAS_DE_OPERACOES } as const;
+
+export type RotaDoBalcao = keyof typeof ROTAS_IMPOSTAS;
 
 export function ehRotaDoBalcao(valor: unknown): valor is RotaDoBalcao {
-  return typeof valor === 'string' && Object.prototype.hasOwnProperty.call(ROTAS_DO_BALCAO, valor);
+  return typeof valor === 'string' && Object.prototype.hasOwnProperty.call(ROTAS_IMPOSTAS, valor);
 }
 
 export type MotivoDeNegativaDeRota = 'rota_nao_mapeada' | 'rota_exige_organizador';
@@ -118,7 +170,7 @@ export function decidirRota(rota: unknown, contexto: ContextoDaRota): DecisaoDeR
   if (!ehRotaDoBalcao(rota)) {
     return { permitido: false, motivo: 'rota_nao_mapeada', escopado, acaoExigida: null };
   }
-  const exigencia: ExigenciaDaRota = ROTAS_DO_BALCAO[rota];
+  const exigencia: ExigenciaDaRota = ROTAS_IMPOSTAS[rota];
 
   if (exigencia.tipo === 'organizador') {
     const ehOrganizador = (PAPEIS_DE_ORGANIZADOR as readonly string[]).includes(contexto.papel);
@@ -157,7 +209,7 @@ export function decidirRota(rota: unknown, contexto: ContextoDaRota): DecisaoDeR
  * negaria de todo modo.
  */
 export function rotasPermitidas(contexto: ContextoDaRota): RotaDoBalcao[] {
-  return (Object.keys(ROTAS_DO_BALCAO) as RotaDoBalcao[]).filter((r) => decidirRota(r, contexto).permitido);
+  return (Object.keys(ROTAS_IMPOSTAS) as RotaDoBalcao[]).filter((r) => decidirRota(r, contexto).permitido);
 }
 
 /**
@@ -169,7 +221,7 @@ export function rotasPermitidas(contexto: ContextoDaRota): RotaDoBalcao[] {
  * passa mapas quebrados de propósito e confere que ela acusa. Sem isso, um
  * `return []` dentro dela passaria despercebido.
  */
-export function conferirCoerencia(rotas: Record<string, ExigenciaDaRota> = ROTAS_DO_BALCAO): string[] {
+export function conferirCoerencia(rotas: Record<string, ExigenciaDaRota> = ROTAS_IMPOSTAS): string[] {
   const problemas: string[] = [];
   const exigencias = Object.values(rotas);
 
