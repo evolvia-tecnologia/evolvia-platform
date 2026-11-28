@@ -6,12 +6,22 @@ import ts from 'typescript';
 // Exercise the rendered JSX props, rather than only matching source strings.
 // No browser login, participant data, printer, or physical print is simulated.
 const asModule = (source) => 'data:text/javascript;base64,' + Buffer.from(source).toString('base64');
+const compile = (p) => ts.transpileModule(readFileSync(new URL(p, import.meta.url), 'utf8'), {
+  compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX },
+}).outputText;
 const dependencies = {
   react: asModule('export const useEffect=()=>{}; export const useRef=v=>({current:v}); export const useState=v=>[v,()=>{}];'),
   'react/jsx-runtime': asModule('export const Fragment=Symbol.for("react.fragment");export const jsx=(type,props)=>({type,props});export const jsxs=jsx;'),
   './print-surface': asModule('export default "print-surface";'),
   './credential-barcode': asModule('export default "barcode";'),
   './credential-qr': asModule('export default "qr";'),
+  '../lib/credential-label-layout': (() => {
+    const metrics = asModule(compile('../lib/label-text-metrics.ts'));
+    const code128 = asModule(compile('../lib/code128.ts'));
+    return asModule(compile('../lib/credential-label-layout.ts')
+      .replace(/from ['"]\.\/label-text-metrics['"]/g, `from ${JSON.stringify(metrics)}`)
+      .replace(/from ['"]\.\/code128['"]/g, `from ${JSON.stringify(code128)}`));
+  })(),
 };
 const source = readFileSync(new URL('../components/credential-label.tsx', import.meta.url), 'utf8');
 const js = ts.transpileModule(source, {
@@ -46,7 +56,7 @@ function inspect(preview) {
   const sheet = nodes(tree).find((node) => node.type === 'section');
   assert.ok(sheet, 'a etiqueta precisa renderizar em ambos os modos');
   const rows = nodes(sheet).filter((node) => node.type === 'p');
-  const qr = nodes(sheet).find((node) => node.props?.className === 'orderedQr');
+  const qr = nodes(sheet).find((node) => node.props?.className === 'orderedQr' || node.props?.className === 'codes');
   return { tree, sheet, rows, qr };
 }
 
@@ -80,7 +90,7 @@ test('QR sem estilo salvo mantém alinhamento padrão, sem inventar um estilo de
     { code: 'qr', kind: 'qr', value: '' },
   ] };
   const tree = CredentialLabel({ label, preview: true });
-  const qr = nodes(tree).find((node) => node.props?.className === 'orderedQr');
+  const qr = nodes(tree).find((node) => node.props?.className === 'orderedQr' || node.props?.className === 'codes');
   assert.ok(qr);
   assert.equal(qr.props.style, undefined);
   assert.equal(nodes(tree).find((node) => node.type === 'section').props['data-fit-warning'], false);
@@ -173,4 +183,31 @@ test('modelo por categoria vazio ou sem dados preenchidos avisa e nunca imprime 
   assert.equal(nodes(CredentialLabel({ label: populated, preview: true }))
     .find((node) => node.type === 'section').props['data-fit-warning'], false,
     'modelo com conteúdo continua imprimível mesmo sem QR opcional');
+});
+
+test('QR de categoria ocupa coluna própria com a mesma largura medida na prévia e impressão', () => {
+  for (const preview of [true, false]) {
+    const { sheet, qr } = inspect(preview);
+    const children = sheet.props.children.filter(Boolean);
+    assert.deepEqual(children.map(node => node.props.className), ['copy', 'orderedQr']);
+    assert.equal(children[1], qr);
+    assert.equal(nodes(children[0]).includes(qr), false);
+    assert.equal(sheet.props.style['--label-qr-size'], sheet.props.style['--ordered-qr-size']);
+    assert.equal(sheet.props['data-qr'], true);
+    assert.equal(sheet.props['data-barcode'], false);
+  }
+});
+
+test('ordem relativa de QR e barras segue a categoria nos dois modos', () => {
+  for (const kinds of [['barcode', 'qr'], ['qr', 'barcode']]) {
+    const label = { ...base, widthMm: 90, heightMm: 40, barcode: 'EVB1.preview', qr: 'EVQ1.preview',
+      orderedContent: kinds.map(kind => ({ code: kind, kind, value: '' })) };
+    for (const preview of [true, false]) {
+      const row = nodes(CredentialLabel({ label, preview })).find(n => n.props?.className === 'codesRow');
+      assert.ok(row);
+      assert.equal(row.props['data-barcode-first'], kinds[0] === 'barcode');
+      assert.deepEqual(row.props.children.filter(Boolean).map(n => n.props.className),
+        kinds.map(k => k === 'barcode' ? 'barcode' : 'codes'));
+    }
+  }
 });

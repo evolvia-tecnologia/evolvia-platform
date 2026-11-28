@@ -50,15 +50,18 @@ test('busca e lista para impressão exibem nome, inscrição, ações e confirma
 });
 
 test('a credencial respeita ordem do modelo e mantém implementação antiga para legado', async () => {
-  const [label, service, policy] = await Promise.all([
+  const [label, layout, service, policy] = await Promise.all([
     read('../components/credential-label.tsx'),
+    read('../lib/credential-label-layout.ts'),
     read('../../api/src/event-desk.service.ts'),
     read('../../api/src/credential-category-template.policy.ts'),
   ]);
-  assert.match(label, /orderedContent\?: Array/u);
-  assert.match(label, /ordered\.map\(\(item, index\)/u);
+  assert.match(layout, /orderedContent\?: Array/u);
+  assert.match(label, /ordered\.forEach\(\(item, index\)/u);
+  assert.match(label, /styles\.codesRow/u);
   assert.match(label, /<CredentialQr code=\{label\.qr\} compact/u);
   assert.match(label, /: \[[\s\S]*label\.name/u);
+  assert.match(layout, /reduceToFit/u);
   assert.match(service, /const template = categoryLabelTemplates\(config\?\.config\)\.find/u);
   assert.match(service, /if \(!template\) return \{ \.\.\.credential, emissao: \{ sequence, concluida: false \} \};/u,
     'categoria sem modelo explícito deve conservar a impressão histórica');
@@ -90,25 +93,31 @@ test('formatação permite centro/esquerda/direita, negrito, cor e prévia sincr
 });
 
 test('QR alinha horizontalmente e o primeiro texto mantém destaque mesmo após QR', async () => {
-  const label = await read('../components/credential-label.tsx');
-  assert.match(label, /const firstTextIndex = ordered\?\.findIndex\(\(item\) => item\.kind === 'text'\) \?\? -1;/u);
+  const [label, layout] = await Promise.all([
+    read('../components/credential-label.tsx'),
+    read('../lib/credential-label-layout.ts'),
+  ]);
+  assert.match(layout, /const firstTextIndex = ordered\?\.findIndex\(\(item\) => item\.kind === 'text'\) \?\? -1;/u);
   assert.match(label, /className=\{index === firstTextIndex \? styles\.orderedFirst : styles\.line\}/u);
-  assert.match(label, /justifySelf: item\.style\.align === 'center' \? 'center' : item\.style\.align === 'right' \? 'end' : 'start'/u);
+  assert.match(label, /orderedQrAlign === 'left' \? 'start' : orderedQrAlign === 'right' \? 'end' : 'center'/u);
+  assert.match(label, /justifySelf: qrJustify as/u);
   assert.doesNotMatch(label, /alignSelf: item\.style\.align/u);
   assert.equal([{ kind: 'qr' }, { kind: 'text' }].findIndex((item) => item.kind === 'text'), 1);
 });
 
 test('QR sem formatação explícita mostra centralizado no editor e preserva alinhamento da impressão legada', async () => {
-  const [editor, label] = await Promise.all([
+  const [editor, label, css] = await Promise.all([
     read('../components/credential-category-templates.tsx'),
     read('../components/credential-label.tsx'),
+    read('../components/credential-label.module.css'),
   ]);
   assert.ok(editor.includes("const DEFAULT_QR_STYLE: LabelFieldStyle = { ...DEFAULT_STYLE, align: 'center' };"));
   assert.ok(editor.includes("code === 'qr' || code === 'barcode' ? DEFAULT_QR_STYLE : DEFAULT_STYLE"));
   assert.match(editor, /style: Object\.prototype\.hasOwnProperty\.call\(visibleTemplate\.styles \?\? \{\}, code\)/u,
     'a prévia aplicada deve preservar o estilo persistido por categoria');
-  assert.ok(label.includes('style={item.style?.align ? { justifySelf:'));
-  assert.ok(label.includes(': undefined}><CredentialQr'));
+  assert.match(css, /\.codes \{[\s\S]*?justify-self: center;/u);
+  assert.match(label, /styles\.codesRow/u);
+  assert.match(label, /CredentialQr code=\{label\.qr\} compact/u);
 });
 
 test('prévia e impressão mantêm fundo branco e paleta de texto com contraste WCAG AA', async () => {
@@ -136,10 +145,11 @@ test('QR legado sem estilo fica centralizado na prévia e na impressão; alinham
     read('../components/credential-label.module.css'),
     read('../components/credential-label.tsx'),
   ]);
-  assert.ok(css.includes('.orderedQr { justify-self: center;'), 'QR legado deve centralizar no grid da etiqueta');
-  assert.ok(label.includes("style={item.style?.align ? { justifySelf:"), 'alinhamento explícito deve sobrescrever o CSS');
-  assert.ok(label.includes("item.style.align === 'right' ? 'end' : 'start'"), 'direita e esquerda continuam funcionais');
-  assert.ok(label.includes(': undefined}><CredentialQr'), 'ausência de estilo preserva fallback centralizado');
+  assert.match(css, /\.orderedQr\s*\{[^}]*justify-self:\s*center/u, 'QR legado deve centralizar no grid da etiqueta');
+  assert.match(label, /orderedQrAlign === 'left' \? 'start'/u, 'alinhamento explícito deve sobrescrever o CSS');
+  assert.match(label, /orderedQrAlign === 'right' \? 'end' : 'center'/u, 'direita e esquerda continuam funcionais');
+  assert.match(label, /const qrAlignStyle = orderedQrAlign/u,
+    'ausência de estilo preserva fallback centralizado na faixa');
 });
 
 test('campos customizados com nome constructor não herdam amostras ou estilos do protótipo', async () => {
@@ -327,7 +337,8 @@ test('código de barras ocupa largura útil e não promete alinhamento horizonta
     read('../components/credential-label.module.css'),
   ]);
   assert.match(editor, /code !== 'barcode' && <label>Alinhamento/u);
-  assert.match(editor, /usa toda a largura disponível/u);
-  assert.doesNotMatch(renderer, /className=\{styles\.orderedBarcode\}[^>]*style=/u);
-  assert.match(css, /\.orderedBarcode \{[^}]*width: 100%/u);
+  assert.match(editor, /lado a lado com o QR|largura útil reservada|proporção do Code128/u);
+  assert.match(renderer, /codesRow/u);
+  assert.match(css, /\.codesRow\[data-codes="both"\]/u);
+  assert.match(css, /--label-barcode-width/u);
 });
