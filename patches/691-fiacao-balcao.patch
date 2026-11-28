@@ -1,0 +1,168 @@
+--- a/apps/api/src/event-desk.service.ts
++++ b/apps/api/src/event-desk.service.ts
+@@ -7,6 +7,7 @@
+ } from './credential-raffle-policy';
+ import { AuthorizationService } from './authorization.service';
+ import { OperatorCapabilityRepository } from './operator-capability.repository';
++import { podeOperar } from './platform-moderation-enforcement';
+ import {
+   activeCheckedInAt,
+   activeDeliveredAt,
+@@ -137,15 +138,47 @@
+     });
+     if (!event?.organizationId) throw new NotFoundException('Evento não encontrado.');
+     const membership = await this.authorization.requireRole(userId, event.organizationId, STAFF_ROLES);
+-    return { ...event, role: membership.role };
++    // O estado de moderação vem junto do evento, numa leitura só, porque todo
++    // método do balcão passa por aqui. Buscá-lo em cada operação multiplicaria
++    // a consulta e abriria a chance de alguém esquecer de buscá-lo.
++    const moderacao = await this.prisma.platformEventModeration.findUnique({
++      where: { eventId },
++      select: { state: true },
++    });
++    return { ...event, role: membership.role, moderacao };
+   }
+ 
+   private requireCapability(codes: string[], capability: OperationalCapability) {
+     if (!deskAllows(codes, capability)) throw new NotFoundException('Evento não encontrado.');
+   }
+ 
+-  private requirePublished(status: EventStatus) {
+-    if (status !== EventStatus.PUBLISHED) throw new NotFoundException('Evento não encontrado.');
++  /**
++   * O balcão pode operar neste evento?
++   *
++   * Confere DUAS coisas independentes, e o nome mudou por isso: o nome anterior
++   * descrevia uma só, e um guarda que checa duas e se chama pela primeira é
++   * exatamente a confusão entre ciclo de vida e restrição administrativa que
++   * esta frente passou a semana desfazendo.
++   *
++   *  - `status` é ciclo de vida: evento fora de PUBLISHED não tem balcão;
++   *  - a linha de moderação é restrição da plataforma, e é independente do
++   *    status — para evento FINISHED ou CANCELLED a moderação nunca escreve
++   *    `Event.status`, então a linha é o único guarda que resta.
++   *
++   * Recusa com a MESMA frase de evento inexistente, que é o que os outros
++   * guardas deste arquivo já fazem: quem está no balcão não precisa saber que
++   * há moderação em curso, e a plataforma não acusa ninguém pela mensagem.
++   *
++   * Só as OPERAÇÕES passam por aqui. `context`, `search`, `report` e os
++   * relatórios de kit não chamam este guarda e continuam legíveis — é por onde
++   * a organização e a própria plataforma investigam o que aconteceu, e barrar a
++   * leitura apagaria a prova junto com a operação.
++   */
++  private requireBalcaoOperavel(event: { status: EventStatus; moderacao: { state: unknown } | null }) {
++    if (event.status !== EventStatus.PUBLISHED) throw new NotFoundException('Evento não encontrado.');
++    if (!podeOperar(event.moderacao, 'acesso_operacional').permitido) {
++      throw new NotFoundException('Evento não encontrado.');
++    }
+   }
+ 
+   private requireOrganizer(role: MembershipRole) {
+@@ -366,7 +399,7 @@
+ 
+   async checkInReservation(userId: string, eventId: string, input: { reservationId?: unknown }) {
+     const event = await this.eventFor(userId, eventId);
+-    this.requirePublished(event.status);
++    this.requireBalcaoOperavel(event);
+     this.requireCapability(event.capabilities.map((item) => item.code), 'access_control');
+     let reservationId: string;
+     try { reservationId = normalizeReservationId(input?.reservationId); } catch (error) { policyError(error); }
+@@ -383,7 +416,7 @@
+ 
+   async reverseCheckIn(userId: string, eventId: string, input: { reservationId?: unknown; reason?: unknown }) {
+     const event = await this.eventFor(userId, eventId);
+-    this.requirePublished(event.status);
++    this.requireBalcaoOperavel(event);
+     this.requireCapability(event.capabilities.map((item) => item.code), 'access_control');
+     let reservationId: string;
+     let reason: string;
+@@ -401,7 +434,7 @@
+ 
+   async badge(userId: string, eventId: string, input: { reservationId?: unknown }) {
+     const event = await this.eventFor(userId, eventId);
+-    this.requirePublished(event.status);
++    this.requireBalcaoOperavel(event);
+     this.requireCapability(event.capabilities.map((item) => item.code), 'credential');
+     let reservationId: string;
+     try { reservationId = normalizeReservationId(input?.reservationId); } catch (error) { policyError(error); }
+@@ -579,7 +612,7 @@
+ 
+   async deliverMaterial(userId: string, eventId: string, input: { reservationId?: unknown; sizeId?: unknown; confirmSizeChange?: unknown }) {
+     const event = await this.eventFor(userId, eventId);
+-    this.requirePublished(event.status);
++    this.requireBalcaoOperavel(event);
+     this.requireCapability(event.capabilities.map((item) => item.code), 'material_delivery');
+     let reservationId: string;
+     try { reservationId = normalizeReservationId(input?.reservationId); } catch (error) { policyError(error); }
+@@ -621,7 +654,7 @@
+ 
+   async reverseMaterial(userId: string, eventId: string, input: { reservationId?: unknown; reason?: unknown }) {
+     const event = await this.eventFor(userId, eventId);
+-    this.requirePublished(event.status);
++    this.requireBalcaoOperavel(event);
+     this.requireCapability(event.capabilities.map((item) => item.code), 'material_delivery');
+     let reservationId: string;
+     let reason: string;
+@@ -639,7 +672,7 @@
+ 
+   async markDayPresence(userId: string, eventId: string, input: { reservationId?: unknown }) {
+     const event = await this.eventFor(userId, eventId);
+-    this.requirePublished(event.status);
++    this.requireBalcaoOperavel(event);
+     this.requireCapability(event.capabilities.map((item) => item.code), 'access_control');
+     let reservationId: string;
+     try { reservationId = normalizeReservationId(input?.reservationId); } catch (error) { policyError(error); }
+@@ -660,7 +693,7 @@
+ 
+   async reverseDayPresence(userId: string, eventId: string, input: { reservationId?: unknown; reason?: unknown }) {
+     const event = await this.eventFor(userId, eventId);
+-    this.requirePublished(event.status);
++    this.requireBalcaoOperavel(event);
+     this.requireCapability(event.capabilities.map((item) => item.code), 'access_control');
+     let reservationId: string;
+     let reason: string;
+@@ -681,7 +714,7 @@
+ 
+   async recordActivityAccess(userId: string, eventId: string, input: { reservationId?: unknown; activityId?: unknown }) {
+     const event = await this.eventFor(userId, eventId);
+-    this.requirePublished(event.status);
++    this.requireBalcaoOperavel(event);
+     this.requireCapability(event.capabilities.map((item) => item.code), 'access_control');
+     let reservationId: string;
+     let activityId: string;
+@@ -834,14 +867,14 @@
+ 
+   async registrationTarget(userId: string, eventId: string) {
+     const event = await this.eventFor(userId, eventId);
+-    this.requirePublished(event.status);
++    this.requireBalcaoOperavel(event);
+     this.requireCapability(event.capabilities.map((item) => item.code), 'registration');
+     return { slug: event.slug, organizationId: event.organizationId! };
+   }
+ 
+   async registrationRecord(userId: string, eventId: string, reservationIdValue: string) {
+     const event = await this.eventFor(userId, eventId);
+-    this.requirePublished(event.status);
++    this.requireBalcaoOperavel(event);
+     this.requireDeskEdit(event.capabilities.map((item) => item.code));
+     let reservationId: string;
+     try { reservationId = normalizeReservationId(reservationIdValue); } catch (error) { policyError(error); }
+@@ -869,7 +902,7 @@
+     inputValue: unknown,
+   ) {
+     const event = await this.eventFor(userId, eventId);
+-    this.requirePublished(event.status);
++    this.requireBalcaoOperavel(event);
+     this.requireDeskEdit(event.capabilities.map((item) => item.code));
+     let reservationId: string;
+     let idempotencyKey: string;
+@@ -1386,7 +1419,7 @@
+ 
+   async draw(userId: string, eventId: string, input: unknown) {
+     const event = await this.eventFor(userId, eventId);
+-    this.requirePublished(event.status);
++    this.requireBalcaoOperavel(event);
+     this.requireOperational(event.capabilities.map((item) => item.code));
+     let request;
+     try { request = normalizeRaffle(input); } catch (error) {

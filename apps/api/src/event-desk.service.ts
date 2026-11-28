@@ -7,6 +7,7 @@ import {
 } from './credential-raffle-policy';
 import { AuthorizationService } from './authorization.service';
 import { OperatorCapabilityRepository } from './operator-capability.repository';
+import { podeOperar } from './platform-moderation-enforcement';
 import {
   activeCheckedInAt,
   activeDeliveredAt,
@@ -137,15 +138,31 @@ export class EventDeskService {
     });
     if (!event?.organizationId) throw new NotFoundException('Evento não encontrado.');
     const membership = await this.authorization.requireRole(userId, event.organizationId, STAFF_ROLES);
-    return { ...event, role: membership.role };
+    // A autorização é anterior à consulta de moderação: não revelar estado de outro tenant.
+    // As leituras administrativas continuam possíveis; apenas comandos com guard são barrados.
+    const moderacao = await this.prisma.platformEventModeration.findUnique({
+      where: { eventId: event.id },
+      select: { state: true },
+    });
+    return { ...event, role: membership.role, moderacao };
   }
 
   private requireCapability(codes: string[], capability: OperationalCapability) {
     if (!deskAllows(codes, capability)) throw new NotFoundException('Evento não encontrado.');
   }
 
-  private requirePublished(status: EventStatus) {
-    if (status !== EventStatus.PUBLISHED) throw new NotFoundException('Evento não encontrado.');
+  /**
+   * O estado do evento e a moderação da plataforma são restrições independentes.
+   * Permitir a leitura de registros e auditoria não autoriza novas operações:
+   * os caminhos mutáveis do balcão chamam este guard antes da primeira escrita.
+   *
+   * Retorno uniforme evita revelar classificação ou motivo de moderação.
+   */
+  private requireBalcaoOperavel(event: { status: EventStatus; moderacao: { state: unknown } | null }) {
+    if (event.status !== EventStatus.PUBLISHED
+      || !podeOperar(event.moderacao, 'acesso_operacional').permitido) {
+      throw new NotFoundException('Evento não encontrado.');
+    }
   }
 
   private requireOrganizer(role: MembershipRole) {
@@ -366,7 +383,7 @@ export class EventDeskService {
 
   async checkInReservation(userId: string, eventId: string, input: { reservationId?: unknown }) {
     const event = await this.eventFor(userId, eventId);
-    this.requirePublished(event.status);
+    this.requireBalcaoOperavel(event);
     this.requireCapability(event.capabilities.map((item) => item.code), 'access_control');
     let reservationId: string;
     try { reservationId = normalizeReservationId(input?.reservationId); } catch (error) { policyError(error); }
@@ -383,7 +400,7 @@ export class EventDeskService {
 
   async reverseCheckIn(userId: string, eventId: string, input: { reservationId?: unknown; reason?: unknown }) {
     const event = await this.eventFor(userId, eventId);
-    this.requirePublished(event.status);
+    this.requireBalcaoOperavel(event);
     this.requireCapability(event.capabilities.map((item) => item.code), 'access_control');
     let reservationId: string;
     let reason: string;
@@ -401,7 +418,7 @@ export class EventDeskService {
 
   async badge(userId: string, eventId: string, input: { reservationId?: unknown }) {
     const event = await this.eventFor(userId, eventId);
-    this.requirePublished(event.status);
+    this.requireBalcaoOperavel(event);
     this.requireCapability(event.capabilities.map((item) => item.code), 'credential');
     let reservationId: string;
     try { reservationId = normalizeReservationId(input?.reservationId); } catch (error) { policyError(error); }
@@ -581,7 +598,7 @@ export class EventDeskService {
 
   async deliverMaterial(userId: string, eventId: string, input: { reservationId?: unknown; sizeId?: unknown; confirmSizeChange?: unknown }) {
     const event = await this.eventFor(userId, eventId);
-    this.requirePublished(event.status);
+    this.requireBalcaoOperavel(event);
     this.requireCapability(event.capabilities.map((item) => item.code), 'material_delivery');
     let reservationId: string;
     try { reservationId = normalizeReservationId(input?.reservationId); } catch (error) { policyError(error); }
@@ -623,7 +640,7 @@ export class EventDeskService {
 
   async reverseMaterial(userId: string, eventId: string, input: { reservationId?: unknown; reason?: unknown }) {
     const event = await this.eventFor(userId, eventId);
-    this.requirePublished(event.status);
+    this.requireBalcaoOperavel(event);
     this.requireCapability(event.capabilities.map((item) => item.code), 'material_delivery');
     let reservationId: string;
     let reason: string;
@@ -641,7 +658,7 @@ export class EventDeskService {
 
   async markDayPresence(userId: string, eventId: string, input: { reservationId?: unknown }) {
     const event = await this.eventFor(userId, eventId);
-    this.requirePublished(event.status);
+    this.requireBalcaoOperavel(event);
     this.requireCapability(event.capabilities.map((item) => item.code), 'access_control');
     let reservationId: string;
     try { reservationId = normalizeReservationId(input?.reservationId); } catch (error) { policyError(error); }
@@ -662,7 +679,7 @@ export class EventDeskService {
 
   async reverseDayPresence(userId: string, eventId: string, input: { reservationId?: unknown; reason?: unknown }) {
     const event = await this.eventFor(userId, eventId);
-    this.requirePublished(event.status);
+    this.requireBalcaoOperavel(event);
     this.requireCapability(event.capabilities.map((item) => item.code), 'access_control');
     let reservationId: string;
     let reason: string;
@@ -683,7 +700,7 @@ export class EventDeskService {
 
   async recordActivityAccess(userId: string, eventId: string, input: { reservationId?: unknown; activityId?: unknown }) {
     const event = await this.eventFor(userId, eventId);
-    this.requirePublished(event.status);
+    this.requireBalcaoOperavel(event);
     this.requireCapability(event.capabilities.map((item) => item.code), 'access_control');
     let reservationId: string;
     let activityId: string;
@@ -836,14 +853,14 @@ export class EventDeskService {
 
   async registrationTarget(userId: string, eventId: string) {
     const event = await this.eventFor(userId, eventId);
-    this.requirePublished(event.status);
+    this.requireBalcaoOperavel(event);
     this.requireCapability(event.capabilities.map((item) => item.code), 'registration');
     return { slug: event.slug, organizationId: event.organizationId! };
   }
 
   async registrationRecord(userId: string, eventId: string, reservationIdValue: string) {
     const event = await this.eventFor(userId, eventId);
-    this.requirePublished(event.status);
+    this.requireBalcaoOperavel(event);
     this.requireDeskEdit(event.capabilities.map((item) => item.code));
     let reservationId: string;
     try { reservationId = normalizeReservationId(reservationIdValue); } catch (error) { policyError(error); }
@@ -871,7 +888,7 @@ export class EventDeskService {
     inputValue: unknown,
   ) {
     const event = await this.eventFor(userId, eventId);
-    this.requirePublished(event.status);
+    this.requireBalcaoOperavel(event);
     this.requireDeskEdit(event.capabilities.map((item) => item.code));
     let reservationId: string;
     let idempotencyKey: string;
@@ -1388,7 +1405,7 @@ export class EventDeskService {
 
   async draw(userId: string, eventId: string, input: unknown) {
     const event = await this.eventFor(userId, eventId);
-    this.requirePublished(event.status);
+    this.requireBalcaoOperavel(event);
     this.requireOperational(event.capabilities.map((item) => item.code));
     let request;
     try { request = normalizeRaffle(input); } catch (error) {

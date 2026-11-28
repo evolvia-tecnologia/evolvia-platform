@@ -38,6 +38,10 @@ function fixture(conflicts) {
         status: 'PUBLISHED', capabilities: [{ code: 'credential' }],
       };
     } },
+    platformEventModeration: { findUnique: async ({ where }) => {
+      assert.equal(where.eventId, eventId);
+      return null; // evento ativo sem linha de moderação
+    } },
     eventCapability: { findFirst: async () => {
       outsideReads += 1;
       throw new Error('Reading JSON outside the serializable transaction can lose concurrent edits');

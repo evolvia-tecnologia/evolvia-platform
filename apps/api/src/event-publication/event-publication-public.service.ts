@@ -1,6 +1,7 @@
 import { Injectable, Optional } from '@nestjs/common';
 import { EventFormat, EventProfileCode, EventStatus, OrganizationLegalKind, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma.service';
+import { estadosQuePermitem, podeOperar } from '../platform-moderation-enforcement';
 import { buildPublicEventDto, PublicEventDto } from './event-publication.public-contract';
 import { EventPublicationMediaService } from './event-publication-media.service';
 import { recordPublicPageView } from '../event-page-view';
@@ -62,6 +63,32 @@ export class EventPublicationPublicService {
     @Optional() private readonly media?: EventPublicationMediaService,
   ) {}
 
+  /**
+   * Os eventos que a moderação tira da listagem pública.
+   *
+   * Consulta separada, e não um join, porque `platform-moderation.prisma`
+   * declara as tabelas SEM relação com `Event` — decisão do corte, já que
+   * `schema.prisma` é compartilhado e o Work coordena. Sem relação não há
+   * `where` aninhado possível.
+   *
+   * O recorte é pequeno por natureza: só existe linha para evento que já foi
+   * moderado alguma vez, então o `notIn` recebe poucos ids e não cresce com o
+   * catálogo.
+   *
+   * A formulação é NEGATIVA de propósito — "tudo que não está entre os
+   * permitidos" — porque falha fechado: um estado novo na política some da
+   * vitrine até alguém decidir que ele pode aparecer, em vez de aparecer até
+   * alguém lembrar de escondê-lo.
+   */
+  private async eventosForaDaListagem(): Promise<string[]> {
+    const permitidos = estadosQuePermitem('listagem_publica');
+    const linhas = await this.prisma.platformEventModeration.findMany({
+      where: { NOT: { state: { in: permitidos } } },
+      select: { eventId: true },
+    });
+    return linhas.map((linha) => linha.eventId);
+  }
+
   async discover(input: {
     query?: string;
     format?: EventFormat;
@@ -96,8 +123,13 @@ export class EventPublicationPublicService {
     if (area) conditions.push(area);
     if (region) conditions.push(region);
 
+    // Lido ANTES do `where` para que a contagem e a página usem o mesmo recorte:
+    // total e conteúdo divergirem é pior que qualquer dos dois estar velho.
+    const ocultos = await this.eventosForaDaListagem();
+
     const where: Prisma.EventWhereInput = {
       status: EventStatus.PUBLISHED,
+      ...(ocultos.length > 0 ? { id: { notIn: ocultos } } : {}),
       ...(input.format ? { format: input.format } : {}),
       ...(input.profileCode ? { profileCode: input.profileCode } : {}),
       ...(conditions.length > 0 ? { AND: conditions } : {}),
@@ -153,8 +185,15 @@ export class EventPublicationPublicService {
   }
 
   async listForSitemap(): Promise<PublicEventSitemapEntry[]> {
+    // O sitemap é listagem pública como qualquer outra: deixar o evento
+    // removido aqui o devolveria aos buscadores pela porta dos fundos.
+    const ocultos = await this.eventosForaDaListagem();
+
     const events = await this.prisma.event.findMany({
-      where: { status: EventStatus.PUBLISHED },
+      where: {
+        status: EventStatus.PUBLISHED,
+        ...(ocultos.length > 0 ? { id: { notIn: ocultos } } : {}),
+      },
       select: {
         slug: true,
         updatedAt: true,
@@ -239,6 +278,18 @@ export class EventPublicationPublicService {
     });
 
     if (!event?.organizationId || event.status !== EventStatus.PUBLISHED) return null;
+
+    // A moderação entra DEPOIS do status e devolve o MESMO `null`, que o
+    // controller transforma em 404. De propósito: a apresentação pública nunca
+    // conta que há moderação em curso, nem a classificação, o motivo ou a
+    // referência do caso. Uma resposta diferente para evento suspenso já seria a
+    // acusação pública que o corte evita.
+    const moderacao = await this.prisma.platformEventModeration.findUnique({
+      where: { eventId: event.id },
+      select: { state: true },
+    });
+    if (!podeOperar(moderacao, 'divulgacao_publica').permitido) return null;
+
     const media = this.media
       ? await this.media.publicDescriptors(event.id, event.organizationId, event.slug, event.eventPublication)
       : [];

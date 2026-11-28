@@ -1,9 +1,23 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { EventPublicationPublicService } from '../dist/event-publication/event-publication-public.service.js';
+import { estadosQuePermitem } from '../dist/platform-moderation-enforcement.js';
 
-function createPrisma({ total = 0, events = [] } = {}) {
-  const calls = { count: [], findMany: [] };
+/**
+ * `moderados` são os ids que a moderação tirou da listagem pública.
+ *
+ * O padrão é lista vazia, e isso não é descuido: o serviço só acrescenta
+ * `id: { notIn: ... }` ao `where` quando há algum oculto, então os casos que
+ * afirmam o `where` inteiro continuam valendo sem ajuste. Há caso próprio
+ * prendendo essa ausência.
+ *
+ * `platformEventModeration` precisa existir aqui porque
+ * `eventosForaDaListagem()` o consulta em `discover` e em `listForSitemap`.
+ * Sem ele a chamada é `undefined` e o TypeError derruba todos os casos deste
+ * arquivo — foi exatamente o que aconteceu quando a fiação entrou.
+ */
+function createPrisma({ total = 0, events = [], moderados = [], moderacaoDoEvento = null } = {}) {
+  const calls = { count: [], findMany: [], moderacao: [], moderacaoUnica: [] };
   const prisma = {
     event: {
       count: async (args) => {
@@ -13,6 +27,21 @@ function createPrisma({ total = 0, events = [] } = {}) {
       findMany: async (args) => {
         calls.findMany.push(args);
         return events;
+      },
+    },
+    platformEventModeration: {
+      findMany: async (args) => {
+        calls.moderacao.push(args);
+        // A forma que o serviço consome: ele faz `select: { eventId: true }` e
+        // mapeia `linha.eventId`.
+        return moderados.map((eventId) => ({ eventId }));
+      },
+      // Nenhum caso deste arquivo chama `findBySlug`, mas é a outra consulta de
+      // moderação do serviço. Deixá-la fora reservaria o mesmo TypeError
+      // enigmático para quem escrever o próximo teste.
+      findUnique: async (args) => {
+        calls.moderacaoUnica.push(args);
+        return moderacaoDoEvento;
       },
     },
     $transaction: async (operations) => Promise.all(operations),
@@ -262,4 +291,90 @@ test('cards usam capa, logo ou ausência explícita, sem expor IDs e sem leitura
   assert.equal(calls.findMany.length,1);
   assert.equal(calls.findMany[0].where.status,'PUBLISHED');
   assert.doesNotMatch(JSON.stringify(result),/private-cover-id|private-logo-id|storageKey|organizationId/);
+});
+
+// ---------------------------------------------------------------------------
+// O bloqueio da moderação na vitrine pública.
+//
+// Os quatro casos abaixo existem porque a correção FÁCIL das 11 falhas acima
+// era devolver sempre lista vazia na consulta de moderação. Isso deixaria tudo
+// verde e não exerceria o corte uma única vez — silenciar o erro e chamar de
+// conserto. Cada um destes reprova se `eventosForaDaListagem()` ou o `notIn`
+// desaparecerem.
+// ---------------------------------------------------------------------------
+
+test('a listagem pergunta à moderação pelos estados que NÃO podem aparecer', async () => {
+  const { prisma, calls } = createPrisma();
+
+  await new EventPublicationPublicService(prisma).discover({});
+
+  assert.equal(calls.moderacao.length, 1,
+    'a listagem não consultou a moderação: o corte não existe, e os outros casos deste bloco não provariam nada');
+  assert.deepEqual(calls.moderacao[0], {
+    where: { NOT: { state: { in: estadosQuePermitem('listagem_publica') } } },
+    select: { eventId: true },
+  });
+
+  // A formulação NEGATIVA é o que faz o corte falhar FECHADO: um estado novo na
+  // política some da vitrine até alguém decidir que ele pode aparecer, em vez de
+  // aparecer até alguém lembrar de escondê-lo. A lista de permitidos vem da
+  // mesma `permite()` que o resto da aplicação usa — comparo contra a função, e
+  // não contra uma cópia do catálogo, porque duas definições do mesmo efeito é
+  // como elas divergem.
+  //
+  // O número abaixo é afirmado de propósito: SUSPENSO continua listado, e isso é
+  // desenho. Evento suspenso permanece na vitrine e a página responde a
+  // indisponibilidade, porque desaparecer sem explicação é pior para quem já
+  // comprou inscrição. Só REMOVIDO sai.
+  assert.deepEqual(estadosQuePermitem('listagem_publica'), ['ATIVO', 'SUSPENSO'],
+    'os estados que podem aparecer na vitrine mudaram: reveja o efeito para quem já se inscreveu antes de ajustar este caso');
+});
+
+test('evento fora da listagem é cortado, e a CONTAGEM usa o mesmo recorte', async () => {
+  const ocultos = ['evt-removido-1', 'evt-removido-2'];
+  const { prisma, calls } = createPrisma({ total: 0, moderados: ocultos });
+
+  await new EventPublicationPublicService(prisma).discover({ query: 'congresso' });
+
+  assert.deepEqual(calls.count[0].where.id, { notIn: ocultos },
+    'a contagem não cortou os eventos fora da listagem');
+  assert.deepEqual(calls.findMany[0].where.id, { notIn: ocultos },
+    'a página não cortou os eventos fora da listagem');
+  // O serviço lê os ocultos ANTES de montar o `where` justamente para isto:
+  // total e conteúdo divergirem é pior que qualquer dos dois estar velho.
+  assert.deepEqual(calls.count[0].where, calls.findMany[0].where,
+    'contagem e página usaram recortes diferentes');
+  // E o corte não atropela o resto do filtro.
+  assert.equal(calls.count[0].where.status, 'PUBLISHED');
+  assert.ok(calls.count[0].where.AND, 'o filtro de texto desapareceu junto com o corte');
+});
+
+test('sem evento moderado o recorte não entra no where, e é por isso que os casos acima valem', async () => {
+  const { prisma, calls } = createPrisma({ moderados: [] });
+
+  await new EventPublicationPublicService(prisma).discover({});
+
+  // A ausência é deliberada, e prendê-la protege os onze casos anteriores, que
+  // afirmam o `where` inteiro. Montar `notIn: []` sempre os quebraria todos.
+  assert.equal(calls.count[0].where.id, undefined,
+    'um recorte vazio entrou no where: os casos que afirmam o where inteiro quebram com isso');
+  assert.deepEqual(calls.count[0].where, { status: 'PUBLISHED' });
+  assert.equal(calls.moderacao.length, 1, 'a consulta de moderação tem de acontecer mesmo sem resultado');
+});
+
+test('o sitemap também corta: evento removido não volta pelos buscadores', async () => {
+  const atualizado = new Date('2026-08-15T00:00:00.000Z');
+  const { prisma, calls } = createPrisma({
+    events: [{ slug: 'visivel', updatedAt: atualizado, eventPublication: null, eventPublicationSections: [] }],
+    moderados: ['evt-removido-1'],
+  });
+
+  const result = await new EventPublicationPublicService(prisma).listForSitemap();
+
+  assert.equal(calls.moderacao.length, 1, 'o sitemap não consultou a moderação');
+  assert.deepEqual(calls.findMany[0].where, {
+    status: 'PUBLISHED',
+    id: { notIn: ['evt-removido-1'] },
+  }, 'o sitemap entregaria aos buscadores um evento que a vitrine esconde');
+  assert.deepEqual(result, [{ slug: 'visivel', updatedAt: atualizado }]);
 });

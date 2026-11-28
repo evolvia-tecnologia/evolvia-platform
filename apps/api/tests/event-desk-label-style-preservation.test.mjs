@@ -38,6 +38,10 @@ function fixture(conflictOnce = false) {
         capabilities: [{ code: 'credential' }],
       };
     } },
+    platformEventModeration: { findUnique: async ({ where }) => {
+      assert.equal(where.eventId, eventId);
+      return null; // evento ativo sem linha de moderação
+    } },
     eventRegistrationCategory: { findFirst: async ({ where }) => {
       assert.equal(where.eventId, eventId);
       assert.equal(where.organizationId, organizationId);

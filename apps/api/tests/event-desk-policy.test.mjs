@@ -64,7 +64,11 @@ test('autoatendimento e posto exigem recurso ativo, evento publicado e lote grat
   assert.match(context, /logoAlt: logoReady \? logo\.altText : null/u);
   assert.doesNotMatch(context, /storageKey|contentBase64/u);
   assert.match(checkIn, /logoAsset: \{ select: \{ altText: true, state: true, usage: true \} \}/u);
-  assert.match(desk, /requirePublished/u);
+  const guard = desk.match(/private requireBalcaoOperavel\([^]*?\n  \}/u)?.[0] ?? '';
+  assert.match(guard, /event\.status !== EventStatus\.PUBLISHED/u);
+  assert.match(guard, /!podeOperar\(event\.moderacao, 'acesso_operacional'\)\.permitido/u);
+  assert.match(guard, /throw new NotFoundException/u);
+  assert.match(desk, /this\.requireBalcaoOperavel\(event\)/u);
   assert.match(desk, /'credential'/u);
   assert.match(desk, /'material_delivery'/u);
   assert.match(desk, /'registration'/u);

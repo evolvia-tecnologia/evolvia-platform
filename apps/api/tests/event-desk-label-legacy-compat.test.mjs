@@ -14,6 +14,10 @@ function setup(config, data, reservationProtocol = 'EVO-TEST-001') {
       id: where.id, name: 'Congresso', slug: 'congresso', status: 'PUBLISHED',
       organizationId: 'tenant_1', capabilities: [{ code: 'credential' }],
     }) },
+    platformEventModeration: { findUnique: async ({ where }) => {
+      assert.equal(where.eventId, 'event_1');
+      return null; // evento ativo sem linha de moderação
+    } },
     eventRegistrationReservation: { findFirst: async ({ where }) => {
       assert.equal(where.id, reservationId);
       assert.equal(where.eventId, 'event_1');
