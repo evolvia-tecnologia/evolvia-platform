@@ -72,6 +72,18 @@ export class ParticipantAreaController {
     return this.participantArea.updateEditableRegistration(slug, authorization, idempotencyKey, input);
   }
 
+  @Get('communication-consent')
+  communicationConsent(@Param('slug') slug: string, @Headers('authorization') authorization?: string) {
+    return this.participantArea.eventCommunicationConsent(slug, authorization);
+  }
+
+  // Revocation is intentionally one-way: consent cannot be granted by replaying
+  // a GET/PATCH from this endpoint; explicit new consent requires its own flow.
+  @Delete('communication-consent')
+  revokeCommunicationConsent(@Param('slug') slug: string, @Headers('authorization') authorization?: string) {
+    return this.participantArea.revokeEventCommunicationConsent(slug, authorization);
+  }
+
   @Delete('sessions/current')
   revoke(@Param('slug') slug: string, @Headers('authorization') authorization?: string) {
     return this.participantArea.revoke(slug, authorization);

@@ -445,6 +445,7 @@ model OrganizationMembership {
 
 model Event {
   communicationDrafts EventCommunicationDraft[]
+  communicationBatches EventCommunicationBatch[]
 exhibitorCompanies             EventExhibitorCompany[]
   exhibitorCredentials           EventExhibitorCredential[]
   exhibitorRepresentatives       EventExhibitorRepresentative[]
@@ -2557,6 +2558,7 @@ model EventExhibitorFormVisit {
 
 
 model EventCommunicationDraft {
+  batches        EventCommunicationBatch[]
   id             String   @id @db.Uuid
   organizationId String
   eventId        String
@@ -2585,4 +2587,51 @@ model SandboxRefundOperation {
   nextCheckAt    DateTime                  @default(now()) @db.Timestamptz(6)
 
   @@index([organizationId, status, nextCheckAt, paymentId], map: "SandboxRefundOperation_recovery_idx")
+}
+
+
+// PREPARED snapshots are deliberately not sent: recipient consent and a separately
+// authorized transport must be checked before any future delivery worker is enabled.
+model EventCommunicationBatch {
+  id                  String   @id @db.Uuid
+  organizationId      String
+  eventId             String
+  event               Event    @relation(fields: [eventId, organizationId], references: [id, organizationId], onDelete: Restrict, onUpdate: NoAction, map: "EventCommunicationBatch_event_fkey")
+  draftId             String   @db.Uuid
+  draft               EventCommunicationDraft @relation(fields: [draftId, eventId, organizationId], references: [id, eventId, organizationId], onDelete: Restrict, onUpdate: NoAction, map: "EventCommunicationBatch_draft_fkey")
+  draftRevision       Int
+  payloadHash         String   @db.Char(64)
+  subject             String   @db.VarChar(180)
+  body                String   @db.VarChar(20000)
+  audienceFilters     Json
+  recipientCount      Int
+  status              String   @default("PREPARED") @db.VarChar(24)
+  requestedByUserId   String
+  startedByUserId     String?
+  createdAt           DateTime @default(now()) @db.Timestamptz(6)
+  recipients          EventCommunicationRecipient[]
+
+  @@unique([id, eventId, organizationId], map: "EventCommunicationBatch_scope_key")
+  @@index([organizationId, eventId, createdAt], map: "EventCommunicationBatch_scope_created_idx")
+}
+
+model EventCommunicationRecipient {
+  id                  String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  batchId             String   @db.Uuid
+  organizationId      String
+  eventId             String
+  batch               EventCommunicationBatch @relation(fields: [batchId, eventId, organizationId], references: [id, eventId, organizationId], onDelete: Restrict, onUpdate: NoAction, map: "EventCommunicationRecipient_batch_fkey")
+  emailFingerprint    String   @db.Char(64)
+  emailEnvelope       String   @db.Text
+  attemptCount        Int      @default(0)
+  claimToken          String?  @db.Uuid
+  claimUntil          DateTime? @db.Timestamptz(6)
+  nextAttemptAt       DateTime? @db.Timestamptz(6)
+  receiptHash         String?  @db.Char(64)
+  status              String   @default("PENDING") @db.VarChar(24)
+  createdAt           DateTime @default(now()) @db.Timestamptz(6)
+
+  @@unique([batchId, emailFingerprint], map: "EventCommunicationRecipient_batch_email_key")
+  @@index([organizationId, eventId, batchId, status], map: "EventCommunicationRecipient_scope_status_idx")
+  @@index([organizationId, eventId, status, nextAttemptAt], map: "EventCommunicationRecipient_dispatch_idx")
 }

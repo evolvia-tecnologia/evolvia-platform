@@ -3,7 +3,7 @@ import { Prisma } from '@prisma/client';
 import { AuthorizationService } from './authorization.service';
 import { EVENT_EDITOR_ROLES } from './membership-policy';
 import { PrismaService } from './prisma.service';
-import { COMMUNICATION_SCIENTIFIC_STATUSES, communicationAudienceInput, uniqueCommunicationContacts } from './event-communication-audience.policy';
+import { COMMUNICATION_SCIENTIFIC_STATUSES, communicationAudienceInput, uniqueCommunicationContacts, hasCommunicationOptIn } from './event-communication-audience.policy';
 
 @Injectable()
 export class EventCommunicationAudienceService {
@@ -19,11 +19,14 @@ export class EventCommunicationAudienceService {
     // Includes inactive categories: existing registrations may still belong to them.
     return this.prisma.eventRegistrationCategory.findMany({ where: scope, select: { id: true, name: true }, orderBy: [{ name: 'asc' }, { id: 'asc' }] });
   }
-  async preview(userId: string, eventId: string, raw: unknown) {
+  // Server-side complete audience snapshot for durable outbox preparation. Never
+  // expose this full contact list through a public controller.
+  async snapshot(userId: string, eventId: string, raw: unknown, consentOnly = false) {
     const scope = await this.scope(userId, eventId);
     let input;
     try { input = communicationAudienceInput(raw); } catch (error) { throw new BadRequestException((error as Error).message); }
     if (input.audience !== 'CONFIRMED_REGISTRATIONS') {
+      if (consentOnly) throw new BadRequestException('Autores exigem base legal e consentimento de comunicação específicos antes do envio em lote.');
       const rows = await this.prisma.scientificSubmissionAuthor.findMany({
         where: { ...scope, ...(input.audience === 'CORRESPONDING_AUTHORS' ? { isCorresponding: true } : {}),
           submission: { is: { ...scope, submittedAt: { not: null }, status: input.submissionStatus === 'ALL' ? { in: [...COMMUNICATION_SCIENTIFIC_STATUSES] } : input.submissionStatus } },
@@ -34,7 +37,7 @@ export class EventCommunicationAudienceService {
       });
       if (rows.length > 5000) throw new ConflictException('Esta prévia suporta até 5000 autorias científicas. Restrinja a situação científica. Nenhuma lista parcial foi gerada.');
       const { contacts, missingEmail, duplicates } = uniqueCommunicationContacts(rows.map(row => ({ registrationData: { full_name: row.nameSnapshot ?? row.person.name, email: row.person.email } })));
-      return { eventId, audience: input.audience, filters: input, total: contacts.length, matchedAuthors: rows.length, matchedRegistrations: 0, missingEmail, duplicates, page: input.page, pageSize: 50, items: contacts.slice((input.page - 1) * 50, input.page * 50), sendingAvailable: false };
+      return { eventId, audience: input.audience, filters: input, contacts, matchedAuthors: rows.length, matchedRegistrations: 0, missingEmail, duplicates };
     }
     if (input.categoryIds.length) {
       const categories = await this.prisma.eventRegistrationCategory.count({ where: { ...scope, id: { in: input.categoryIds } } });
@@ -66,7 +69,28 @@ export class EventCommunicationAudienceService {
       select: { registrationData: true }, orderBy: { id: 'asc' }, take: 5001,
     });
     if (rows.length > 5000) throw new ConflictException('Esta prévia suporta até 5000 inscrições. Selecione categorias para reduzir o público. Nenhuma lista parcial foi gerada.');
-    const { contacts, missingEmail, duplicates } = uniqueCommunicationContacts(rows);
-    return { eventId, audience: 'CONFIRMED_REGISTRATIONS', filters: input, total: contacts.length, matchedRegistrations: rows.length, missingEmail, duplicates, page: input.page, pageSize: 50, items: contacts.slice((input.page - 1) * 50, input.page * 50), sendingAvailable: false };
+    const eligible = consentOnly ? rows.filter(row => hasCommunicationOptIn(row.registrationData)) : rows;
+    const { contacts: listed, missingEmail, duplicates: initialDuplicates } = uniqueCommunicationContacts(eligible);
+    // The outbox indexes canonical lowercase addresses; deduplicate on that
+    // exact same representation before createMany, including historic mixed-case emails.
+    const seenEmails = new Set<string>();
+    const contacts: typeof listed = [];
+    let foldedDuplicates = 0;
+    for (const contact of listed) {
+      const email = contact.email.trim().toLowerCase();
+      if (seenEmails.has(email)) { foldedDuplicates++; continue; }
+      seenEmails.add(email);
+      contacts.push({ ...contact, email });
+    }
+    return { eventId, audience: 'CONFIRMED_REGISTRATIONS', filters: input, contacts,
+      matchedRegistrations: rows.length, missingEmail,
+      duplicates: initialDuplicates + foldedDuplicates, excludedWithoutConsent: rows.length - eligible.length };
+  }
+
+  async preview(userId: string, eventId: string, raw: unknown) {
+    const { contacts, ...summary } = await this.snapshot(userId, eventId, raw);
+    const page = summary.filters.page;
+    return { ...summary, total: contacts.length, page, pageSize: 50,
+      items: contacts.slice((page - 1) * 50, page * 50), sendingAvailable: false };
   }
 }
