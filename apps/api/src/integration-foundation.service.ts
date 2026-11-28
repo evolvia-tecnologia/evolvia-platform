@@ -7,12 +7,15 @@ import {
   hashEventApiKey,
   issueEventApiKey,
   normalizeApiKeyLabel,
+  normalizePreparationAccountLabel,
   normalizeWebhookUrl,
   publicEventUrl,
+  refuseProviderDelivery,
   registrationConfirmedPayload,
   websitePresenceSnippet,
   webhookSignatureHeader,
 } from './integration-foundation.policy';
+import { INTEGRATION_CATALOG } from './integrations-catalog';
 import { EVENT_EDITOR_ROLES } from './membership-policy';
 import { PrismaService } from './prisma.service';
 import { RegistrationConfirmationMailService } from './registration-confirmation-mail.service';
@@ -129,6 +132,64 @@ export class IntegrationFoundationService {
     if (updated.count !== 1) throw new NotFoundException('Chave não encontrada.');
     await this.audit(event, userId, 'integration.api_key_revoked', keyId, {});
     return { id: keyId, revoked: true };
+  }
+
+  async listPreparations(userId: string, eventId: string) {
+    const event = await this.requireEvent(userId, eventId);
+    const items = await this.prisma.eventIntegrationPreparation.findMany({
+      where: { eventId: event.id, organizationId: event.organizationId, withdrawnAt: null },
+      orderBy: { updatedAt: 'desc' },
+      select: { code: true, accountLabel: true, createdAt: true, updatedAt: true },
+    });
+    return { items, outbound: false as const };
+  }
+
+  async openPreparation(userId: string, eventId: string, input: { code?: string; accountLabel?: string }) {
+    const event = await this.requireEvent(userId, eventId);
+    const code = this.preparationCode(input.code);
+    let accountLabel: string;
+    try { accountLabel = normalizePreparationAccountLabel(input.accountLabel); }
+    catch (error) { this.policy(error); }
+    const existing = await this.prisma.eventIntegrationPreparation.findFirst({
+      where: { eventId: event.id, organizationId: event.organizationId, code },
+      select: { id: true, accountLabel: true, withdrawnAt: true },
+    });
+    const reopened = Boolean(existing);
+    const previousLabelKept = existing ? existing.accountLabel === accountLabel : false;
+    await this.prisma.eventIntegrationPreparation.upsert({
+      where: { eventId_code: { eventId: event.id, code } },
+      create: {
+        organizationId: event.organizationId,
+        eventId: event.id,
+        code,
+        accountLabel,
+        createdByUserId: userId,
+      },
+      update: { accountLabel, withdrawnAt: null, createdByUserId: userId },
+    });
+    await this.audit(event, userId, 'integration.preparation_opened', event.id, {
+      code,
+      reopened,
+      labelChanged: reopened ? !previousLabelKept : false,
+      wasWithdrawn: Boolean(existing?.withdrawnAt),
+    });
+    return { code, accountLabel, ...refuseProviderDelivery(), message: 'Preparação registrada. Nenhum dado é enviado ao provedor.' };
+  }
+
+  async withdrawPreparation(userId: string, eventId: string, rawCode: string) {
+    const event = await this.requireEvent(userId, eventId);
+    const code = this.preparationCode(rawCode);
+    const current = await this.prisma.eventIntegrationPreparation.findFirst({
+      where: { eventId: event.id, organizationId: event.organizationId, code, withdrawnAt: null },
+      select: { id: true },
+    });
+    if (!current) throw new NotFoundException('Preparação não encontrada.');
+    await this.prisma.eventIntegrationPreparation.update({
+      where: { id: current.id },
+      data: { withdrawnAt: new Date() },
+    });
+    await this.audit(event, userId, 'integration.preparation_withdrawn', event.id, { code });
+    return { code, withdrawn: true, ...refuseProviderDelivery() };
   }
 
   async presence(userId: string, eventId: string) {
@@ -266,6 +327,17 @@ export class IntegrationFoundationService {
   private policy(error: unknown): never {
     if (error instanceof IntegrationFoundationPolicyError) throw new BadRequestException(error.message);
     throw error;
+  }
+
+  private preparationCode(value: unknown): string {
+    if (typeof value !== 'string' || !/^[a-z0-9_]{2,40}$/u.test(value)) {
+      throw new BadRequestException('Esta integração não aceita preparação.');
+    }
+    const item = INTEGRATION_CATALOG.find((entry) => entry.code === value);
+    if (!item || item.foundation !== 'preparation') {
+      throw new BadRequestException('Esta integração não aceita preparação.');
+    }
+    return item.code;
   }
 
   private async audit(

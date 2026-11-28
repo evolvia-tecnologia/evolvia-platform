@@ -40,7 +40,7 @@ export type IntegrationCatalogItemView = {
     statusLabel: string;
   }>;
   connectable: false;
-  foundation: 'api' | 'webhook' | 'presence' | null;
+  foundation: 'api' | 'webhook' | 'presence' | 'preparation' | null;
   documentationUrl?: string;
 };
 
@@ -65,7 +65,7 @@ export class EventIntegrationsService {
       guidance: {
         title: 'A EVA explica o que cada integração fará',
         summary:
-          'As ferramentas de terceiros continuam somente leitura. API, webhooks e presença em sites já podem ser configurados neste evento, sem enviar dados cadastrais.',
+          'As ferramentas de terceiros continuam somente leitura no envio: a preparação guarda o nome da conta neste evento e não dispara chamada externa. API, webhooks e presença em sites já podem ser configurados, sem enviar dados cadastrais.',
       },
       categories: INTEGRATION_CATEGORIES.map((code) => ({
         code,

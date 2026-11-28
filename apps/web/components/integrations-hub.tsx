@@ -40,7 +40,7 @@ type IntegrationItem = {
   objectives: IntegrationObjectiveView[];
   recipes: IntegrationRecipeView[];
   connectable: false;
-  foundation: 'api' | 'webhook' | 'presence' | null;
+  foundation: 'api' | 'webhook' | 'presence' | 'preparation' | null;
   documentationUrl?: string;
 };
 
@@ -62,11 +62,12 @@ function normalize(value: string): string {
 }
 
 type FoundationKind = 'api' | 'webhook' | 'presence';
+type PreparationRow = { code: string; accountLabel: string; createdAt: string };
 type WebhookRow = { id: string; url: string; enabled: boolean };
 type KeyRow = { id: string; label: string; prefix: string; expiresAt: string; revokedAt: string | null };
 type PresenceView = { publicUrl: string | null; snippet: string | null; note: string };
 
-function FoundationDesk({ eventId, kind }: { eventId: string; kind: FoundationKind }) {
+function FoundationDesk({ eventId, kind, onChanged }: { eventId: string; kind: FoundationKind; onChanged?: () => void }) {
   const [webhooks, setWebhooks] = useState<WebhookRow[] | null>(null);
   const [keys, setKeys] = useState<KeyRow[] | null>(null);
   const [presence, setPresence] = useState<PresenceView | null>(null);
@@ -111,19 +112,19 @@ function FoundationDesk({ eventId, kind }: { eventId: string; kind: FoundationKi
     finally { setBusy(false); }
   }
 
-  async function copySnippet(value: string) {
+  async function copyValue(value: string, successNotice: string) {
     try {
       await navigator.clipboard.writeText(value);
-      setNotice('Trecho copiado.');
+      setNotice(successNotice);
       setError('');
     } catch {
-      setError('Não foi possível copiar. Selecione o trecho e copie manualmente.');
+      setError('Não foi possível copiar. Selecione o valor e copie manualmente.');
     }
   }
 
   return <section className={styles.foundation} aria-label={kind === 'webhook' ? 'Webhooks deste evento' : kind === 'api' ? 'Chaves de leitura deste evento' : 'Trecho para o site'}>
     {error && <p className={styles.error} role="alert">{error}</p>}
-    {notice && <p role="status">{notice}</p>}
+    {notice && <p role="status" aria-live="polite">{notice}</p>}
     {kind === 'webhook' && <>
       <form onSubmit={(event) => {
         event.preventDefault();
@@ -135,6 +136,7 @@ function FoundationDesk({ eventId, kind }: { eventId: string; kind: FoundationKi
           setSecret(created.secret);
           setUrl('');
           setWebhooks((current) => [{ id: created.id, url: created.url, enabled: true }, ...(current ?? [])]);
+          onChanged?.();
         });
       }}>
         <label htmlFor="webhook-url">URL HTTPS
@@ -142,9 +144,12 @@ function FoundationDesk({ eventId, kind }: { eventId: string; kind: FoundationKi
         </label>
         <button type="submit" disabled={busy}>Criar endpoint</button>
       </form>
-      {secret && <label htmlFor="webhook-secret">Segredo, exibido uma única vez
-        <input id="webhook-secret" readOnly value={secret} />
-      </label>}
+      {secret && <>
+        <label htmlFor="webhook-secret">Segredo, exibido uma única vez
+          <input id="webhook-secret" readOnly value={secret} />
+        </label>
+        <button type="button" onClick={() => void copyValue(secret, 'Segredo copiado.')}>Copiar segredo</button>
+      </>}
       <ul>
         {(webhooks ?? []).map((item) => <li key={item.id}>
           <span>{item.url}</span>
@@ -152,6 +157,7 @@ function FoundationDesk({ eventId, kind }: { eventId: string; kind: FoundationKi
           {item.enabled && <button type="button" disabled={busy} onClick={() => void run(async () => {
             await api(`/events/${eventId}/integrations/webhooks/${item.id}/disable`, { method: 'POST', body: '{}' });
             setWebhooks((current) => (current ?? []).map((row) => row.id === item.id ? { ...row, enabled: false } : row));
+            onChanged?.();
           })}>Desativar</button>}
         </li>)}
       </ul>
@@ -167,6 +173,7 @@ function FoundationDesk({ eventId, kind }: { eventId: string; kind: FoundationKi
           setToken(created.token);
           setLabel('');
           setKeys((current) => [{ id: created.id, label: created.label, prefix: created.prefix, expiresAt: created.expiresAt, revokedAt: null }, ...(current ?? [])]);
+          onChanged?.();
         });
       }}>
         <label htmlFor="api-key-label">Nome da chave
@@ -174,9 +181,12 @@ function FoundationDesk({ eventId, kind }: { eventId: string; kind: FoundationKi
         </label>
         <button type="submit" disabled={busy}>Emitir chave</button>
       </form>
-      {token && <label htmlFor="api-key-token">Chave, exibida uma única vez
-        <input id="api-key-token" readOnly value={token} />
-      </label>}
+      {token && <>
+        <label htmlFor="api-key-token">Chave, exibida uma única vez
+          <input id="api-key-token" readOnly value={token} />
+        </label>
+        <button type="button" onClick={() => void copyValue(token, 'Chave copiada.')}>Copiar chave</button>
+      </>}
       <ul>
         {(keys ?? []).map((item) => <li key={item.id}>
           <span>{item.label}</span>
@@ -185,6 +195,7 @@ function FoundationDesk({ eventId, kind }: { eventId: string; kind: FoundationKi
           {!item.revokedAt && <button type="button" disabled={busy} onClick={() => void run(async () => {
             await api(`/events/${eventId}/integrations/api-keys/${item.id}/revoke`, { method: 'POST', body: '{}' });
             setKeys((current) => (current ?? []).map((row) => row.id === item.id ? { ...row, revokedAt: new Date().toISOString() } : row));
+            onChanged?.();
           })}>Revogar</button>}
         </li>)}
       </ul>
@@ -195,21 +206,115 @@ function FoundationDesk({ eventId, kind }: { eventId: string; kind: FoundationKi
         <label htmlFor="presence-snippet">Trecho HTML
           <textarea id="presence-snippet" readOnly value={presence.snippet} rows={3} />
         </label>
-        <button type="button" onClick={() => void copySnippet(presence.snippet ?? '')}>Copiar trecho</button>
+        <button type="button" onClick={() => void copyValue(presence.snippet ?? '', 'Trecho copiado.')}>Copiar trecho</button>
       </>}
     </>}
   </section>;
 }
 
 
-function EventConnections({ eventId, items, onOpen }: {
+function PreparationDesk({ eventId, code, onChanged }: { eventId: string; code: string; onChanged?: () => void }) {
+  const [rows, setRows] = useState<PreparationRow[] | null>(null);
+  const [accountLabel, setAccountLabel] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
+  const [confirmWithdraw, setConfirmWithdraw] = useState(false);
+  const [loadAttempt, setLoadAttempt] = useState(0);
+  const loadVersion = useRef(0);
+
+  useEffect(() => {
+    let active = true;
+    const version = ++loadVersion.current;
+    api<{ items: PreparationRow[] }>(`/events/${eventId}/integrations/preparations`)
+      .then((result) => {
+        if (!active || version !== loadVersion.current) return;
+        if (!Array.isArray(result?.items) || !result.items.every((row) => typeof row?.code === 'string' && typeof row?.accountLabel === 'string')) {
+          throw new Error('Resposta inválida ao consultar preparações.');
+        }
+        setRows(result.items);
+      })
+      .catch((reason) => {
+        if (!active || version !== loadVersion.current) return;
+        // An unknown server state must never be presented as an empty list:
+        // block writes until the existing preparations are loaded successfully.
+        setRows(null);
+        setError('Não foi possível consultar as preparações. Recarregue o painel antes de registrar.');
+      });
+    return () => { active = false; };
+  }, [eventId, code, loadAttempt]);
+
+  const current = rows?.find((row) => row.code === code) ?? null;
+
+  async function run(action: () => Promise<void>) {
+    loadVersion.current += 1;
+    setBusy(true);
+    setError('');
+    setNotice('');
+    try { await action(); }
+    catch (reason) { setError(reason instanceof Error ? reason.message : 'Não foi possível concluir a operação.'); }
+    finally { setBusy(false); }
+  }
+
+  return <section className={styles.foundation} aria-label="Preparação deste conector" aria-busy={rows === null && !error}>
+    <p>O nome da conta fica só neste evento. Isto não instala o conector nem autoriza envio.</p>
+    {error && <p className={styles.error} role="alert">{error}</p>}
+    {rows === null && !error && <p role="status">Consultando preparações deste evento…</p>}
+    {rows === null && error && <button type="button" disabled={busy} onClick={() => { setError(''); setLoadAttempt((value) => value + 1); }}>Tentar carregar novamente</button>}
+    {notice && <p role="status" aria-live="polite">{notice}</p>}
+    {current && <p role="status">Preparação registrada para {current.accountLabel}. Nenhum dado é enviado ao provedor.</p>}
+    <form onSubmit={(event) => {
+      event.preventDefault();
+      if (rows === null || busy) return;
+      void run(async () => {
+        const created = await api<{ code: string; accountLabel: string }>(`/events/${eventId}/integrations/preparations`, {
+          method: 'POST',
+          body: JSON.stringify({ code, accountLabel }),
+        });
+        setAccountLabel('');
+        setConfirmWithdraw(false);
+        setNotice(current
+          ? 'Preparação atualizada. Nenhum dado é enviado ao provedor.'
+          : 'Preparação concluída. Nenhum dado é enviado ao provedor.');
+        setRows((existing) => {
+          if (!existing) return null;
+          const next = existing.filter((row) => row.code !== created.code);
+          return [{ code: created.code, accountLabel: created.accountLabel, createdAt: new Date().toISOString() }, ...next];
+        });
+        onChanged?.();
+      });
+    }}>
+      <label htmlFor={`preparation-account-${code}`}>Nome da conta na organização
+        <input id={`preparation-account-${code}`} value={accountLabel} onChange={(event) => setAccountLabel(event.target.value)} maxLength={80} autoComplete="off" required />
+      </label>
+      <button type="submit" disabled={busy || rows === null}>{current ? 'Atualizar preparação' : 'Registrar preparação'}</button>
+    </form>
+    {current && !confirmWithdraw && <button type="button" disabled={busy} onClick={() => { setNotice(''); setConfirmWithdraw(true); }}>Retirar preparação</button>}
+    {current && confirmWithdraw && <div role="group" aria-label="Confirmar retirada da preparação">
+      <p role="status">Retirar a preparação de {current.accountLabel}? Nenhum dado é enviado ao provedor.</p>
+      <button type="button" disabled={busy} onClick={() => void run(async () => {
+        await api(`/events/${eventId}/integrations/preparations/${encodeURIComponent(code)}/withdraw`, { method: 'POST', body: '{}' });
+        setRows((existing) => (existing ?? []).filter((row) => row.code !== code));
+        setConfirmWithdraw(false);
+        setNotice('Preparação retirada. Nenhum dado é enviado ao provedor.');
+        onChanged?.();
+      })}>Confirmar retirada</button>
+      <button type="button" disabled={busy} onClick={() => setConfirmWithdraw(false)}>Cancelar</button>
+    </div>}
+  </section>;
+}
+
+function EventConnections({ eventId, items, onOpen, refreshToken = 0 }: {
   eventId: string;
   items: IntegrationItem[];
   onOpen: (code: string) => void;
+  refreshToken?: number;
 }) {
   const [revision, setRevision] = useState(0);
   const [loading, setLoading] = useState(true);
   const [connections, setConnections] = useState<Array<{ kind: FoundationKind; label: string; status: string; failed: boolean }>>([]);
+  const [preparationNote, setPreparationNote] = useState('');
+  const [preparationFailed, setPreparationFailed] = useState(false);
   useEffect(() => {
     let active = true;
     setLoading(true);
@@ -235,7 +340,13 @@ function EventConnections({ eventId, items, onOpen }: {
         }
         return result;
       }),
-    ]).then(([keysResult, hooksResult, presenceResult]) => {
+      api<{ items: PreparationRow[] }>(`${base}/preparations`).then((result) => {
+        if (!Array.isArray(result?.items) || !result.items.every((row) => typeof row?.code === 'string' && typeof row?.accountLabel === 'string')) {
+          throw new Error('Resposta inválida ao consultar preparações.');
+        }
+        return result;
+      }),
+    ]).then(([keysResult, hooksResult, presenceResult, preparationsResult]) => {
       if (!active) return;
       const now = Date.now();
       const keyCount = keysResult.status === 'fulfilled'
@@ -250,10 +361,20 @@ function EventConnections({ eventId, items, onOpen }: {
         { kind: 'presence', label: 'Presença no seu site', failed: presenceResult.status === 'rejected',
           status: presenceResult.status === 'rejected' ? 'Não foi possível consultar o endereço.' : presenceResult.value.snippet ? 'Trecho do evento disponível' : 'Endereço público ainda não configurado' },
       ]);
+      if (preparationsResult.status === 'rejected') {
+        setPreparationFailed(true);
+        setPreparationNote('Não foi possível consultar as preparações.');
+      } else {
+        const count = preparationsResult.value.items.length;
+        setPreparationFailed(false);
+        setPreparationNote(count === 1
+          ? '1 preparação registrada. Nenhum dado é enviado ao provedor.'
+          : `${count} preparações registradas. Nenhum dado é enviado ao provedor.`);
+      }
       setLoading(false);
     });
     return () => { active = false; };
-  }, [eventId, revision]);
+  }, [eventId, revision, refreshToken]);
   return <section className={styles.connections} aria-labelledby="event-connections-title" aria-busy={loading}>
     <div className={styles.connectionsHeading}>
       <div><h2 id="event-connections-title">Conexões deste evento</h2>
@@ -269,6 +390,7 @@ function EventConnections({ eventId, items, onOpen }: {
           {item && <button type="button" className={styles.clearFilters} onClick={() => onOpen(item.code)}>Configurar {connection.label}</button>}
         </li>;
       })}</ul>}
+    {preparationNote && <p role={preparationFailed ? 'alert' : 'status'}>{preparationNote}</p>}
   </section>;
 }
 
@@ -287,9 +409,11 @@ export default function IntegrationsHub({ eventId }: { eventId: string }) {
   const [category, setCategory] = useState<IntegrationCategoryCode | 'ALL'>('ALL');
   const [objective, setObjective] = useState<string>('ALL');
   const [selectedCode, setSelectedCode] = useState<string | null>(null);
+  const [connectionsRefresh, setConnectionsRefresh] = useState(0);
   const [diagnosticBusy, setDiagnosticBusy] = useState(false);
   const [diagnosticError, setDiagnosticError] = useState('');
   const diagnosticRequest = useRef(0);
+  const refreshConnections = () => setConnectionsRefresh((value) => value + 1);
 
   useEffect(() => {
     let active = true;
@@ -400,7 +524,7 @@ export default function IntegrationsHub({ eventId }: { eventId: string }) {
       <div>
         <p className={styles.eyebrow}>CATÁLOGO DO EVENTO</p>
         <h1 id="integrations-title">Integrações</h1>
-        <p>Encontre a ferramenta pelo que deseja fazer. Consulte abaixo a configuração do Asaas. API, webhooks e presença em sites deste evento já podem ser configurados.</p>
+        <p>Encontre a ferramenta pelo que deseja fazer. Consulte abaixo a configuração do Asaas. API, webhooks e presença em sites deste evento já podem ser configurados. As demais fichas aceitam uma preparação local, sem chamada externa.</p>
       </div>
     </section>
 
@@ -414,7 +538,7 @@ export default function IntegrationsHub({ eventId }: { eventId: string }) {
       <p>A configuração não comprova criação de cobrança, pagamento ou recebimento de webhook.</p>
     </section>}
 
-    <EventConnections key={eventId} eventId={eventId} items={payload.items} onOpen={(code) => {
+    <EventConnections key={eventId} eventId={eventId} items={payload.items} refreshToken={connectionsRefresh} onOpen={(code) => {
       clearFilters();
       setSelectedCode(code);
     }} />
@@ -516,7 +640,9 @@ export default function IntegrationsHub({ eventId }: { eventId: string }) {
                     <dd><ul>{item.dataShared.map((entry) => <li key={entry}>{entry}</li>)}</ul></dd>
                   </div>
                 </dl>
-                {item.foundation && <FoundationDesk key={`${eventId}:${item.foundation}`} eventId={eventId} kind={item.foundation} />}
+                {item.foundation === 'preparation'
+                  ? <PreparationDesk key={`${eventId}:${item.code}`} eventId={eventId} code={item.code} onChanged={refreshConnections} />
+                  : item.foundation && <FoundationDesk key={`${eventId}:${item.foundation}`} eventId={eventId} kind={item.foundation} onChanged={refreshConnections} />}
               </div>}
             </li>;
           })}

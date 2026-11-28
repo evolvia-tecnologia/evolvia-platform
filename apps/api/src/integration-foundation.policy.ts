@@ -111,3 +111,32 @@ export function websitePresenceSnippet(name: string, publicUrl: string): string 
   return `<p><a href="${escapeHtml(publicUrl)}">${escapeHtml(name)}</a></p>`;
 }
 
+const SECRET_LABEL = /api[_ -]?key|client[_ -]?secret|access[_ -]?token|refresh[_ -]?token|\btoken\b|password|bearer|sk_(?:live|test)|evo_/iu
+
+export function normalizePreparationAccountLabel(value: unknown): string {
+  if (typeof value !== 'string') invalid('Informe o nome da conta na organização.');
+  const label = value.trim().replace(/\s+/gu, ' ');
+  const digits = label.replace(/\D/gu, '');
+  if (
+    label.length < 2
+    || label.length > 80
+    || /[<>@]/u.test(label)
+    || /https?:/iu.test(label)
+    || SECRET_LABEL.test(label)
+    || (label.length > 40 && !label.includes(' '))
+    || digits.length === 11
+    || digits.length === 14
+  ) {
+    invalid('Informe só o nome da conta, sem segredo, e-mail, documento ou endereço.');
+  }
+  return label;
+}
+
+export function refuseProviderDelivery(): { delivered: false; outbound: false; reason: string } {
+  return {
+    delivered: false,
+    outbound: false,
+    reason: 'Este conector ainda não envia dados.',
+  };
+}
+

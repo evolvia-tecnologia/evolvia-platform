@@ -2,13 +2,15 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 import { Prisma } from '@prisma/client';
-import { NotFoundException, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { IntegrationFoundationService } from '../dist/integration-foundation.service.js';
 import {
   hashEventApiKey,
   issueEventApiKey,
   normalizeApiKeyLabel,
+  normalizePreparationAccountLabel,
   normalizeWebhookUrl,
+  refuseProviderDelivery,
   publicEventUrl,
   registrationConfirmedPayload,
   verifyWebhookSignature,
@@ -263,5 +265,104 @@ test('três webhooks iniciam antes de qualquer resposta e falha isolada não blo
   await pending;
   assert.equal(simultaneous, 3);
   assert.equal(new Set(occurred).size, 1);
+});
+
+test('preparação externa guarda o nome da conta e recusa qualquer envio', async () => {
+  assert.equal(normalizePreparationAccountLabel('  Portal comercial  '), 'Portal comercial');
+  for (const value of ['sk_live_abc', 'token secreto', 'ana@empresa.com', 'https://hubspot.com', '12345678901', 'x'.repeat(41)]) {
+    assert.throws(() => normalizePreparationAccountLabel(value));
+  }
+  const refusal = refuseProviderDelivery();
+  assert.deepEqual(refusal, { delivered: false, outbound: false, reason: 'Este conector ainda não envia dados.' });
+
+  const rows = [];
+  const audits = [];
+  let clock = Date.parse('2026-11-06T15:00:00Z');
+  const tick = () => { clock += 60_000; return new Date(clock); };
+  const prisma = {
+    event: { findUnique: async () => ({ id: 'evt_1', organizationId: 'org_1' }) },
+    eventIntegrationPreparation: {
+      findMany: async ({ orderBy } = {}) => {
+        const active = rows.filter((row) => !row.withdrawnAt).map((row) => ({
+          code: row.code,
+          accountLabel: row.accountLabel,
+          createdAt: row.createdAt,
+          updatedAt: row.updatedAt,
+        }));
+        if (orderBy?.updatedAt === 'desc') {
+          return active.sort((left, right) => right.updatedAt - left.updatedAt);
+        }
+        return active;
+      },
+      upsert: async ({ where, create, update }) => {
+        const key = where.eventId_code;
+        const existing = rows.find((row) => row.eventId === key.eventId && row.code === key.code);
+        const now = tick();
+        if (existing) Object.assign(existing, update, { withdrawnAt: null, updatedAt: now });
+        else rows.push({ id: `prep_${rows.length + 1}`, ...create, withdrawnAt: null, createdAt: now, updatedAt: now });
+        return existing ?? rows.at(-1);
+      },
+      findFirst: async ({ where }) => {
+        const match = rows.find((row) => {
+          if (where.id) return row.id === where.id;
+          if (where.eventId !== undefined && row.eventId !== where.eventId) return false;
+          if (where.organizationId !== undefined && row.organizationId !== where.organizationId) return false;
+          if (where.code !== undefined && row.code !== where.code) return false;
+          if (where.withdrawnAt === null && row.withdrawnAt) return false;
+          return true;
+        });
+        return match ?? null;
+      },
+      update: async ({ where, data }) => {
+        const row = rows.find((entry) => entry.id === where.id);
+        Object.assign(row, data, { updatedAt: tick() });
+        return row;
+      },
+    },
+    auditLog: { create: async ({ data }) => { audits.push(data); return data; } },
+  };
+  const service = new IntegrationFoundationService(prisma, { requireRole: async () => {} });
+  await assert.rejects(
+    () => service.openPreparation('user_1', 'evt_1', { code: 'evolvia_webhooks', accountLabel: 'Site' }),
+    (error) => error instanceof BadRequestException,
+  );
+  await assert.rejects(
+    () => service.openPreparation('user_1', 'evt_1', { code: 'hubspot', accountLabel: 'sk_live_abc' }),
+    (error) => error instanceof BadRequestException,
+  );
+  const opened = await service.openPreparation('user_1', 'evt_1', { code: 'mailchimp', accountLabel: 'Audiência do evento' });
+  assert.equal(opened.delivered, false);
+  assert.equal(opened.outbound, false);
+  assert.equal(opened.accountLabel, 'Audiência do evento');
+  assert.equal(audits.at(-1).metadata.reopened, false);
+  const listed = await service.listPreparations('user_1', 'evt_1');
+  assert.deepEqual(listed.items.map((item) => item.code), ['mailchimp']);
+  assert.equal(JSON.stringify(listed).includes('org_1'), false);
+  await service.openPreparation('user_1', 'evt_1', { code: 'hubspot', accountLabel: 'CRM do evento' });
+  await service.openPreparation('user_1', 'evt_1', { code: 'mailchimp', accountLabel: 'Audiência revisada' });
+  const reopenedAudit = audits.filter((entry) => entry.action === 'integration.preparation_opened').at(-1);
+  assert.equal(reopenedAudit.metadata.reopened, true);
+  assert.equal(reopenedAudit.metadata.labelChanged, true);
+  assert.equal(reopenedAudit.metadata.accountLabel, undefined);
+  const ordered = await service.listPreparations('user_1', 'evt_1');
+  assert.deepEqual(ordered.items.map((item) => item.code), ['mailchimp', 'hubspot']);
+  assert.equal(ordered.items[0].accountLabel, 'Audiência revisada');
+  await service.withdrawPreparation('user_1', 'evt_1', 'mailchimp');
+  assert.deepEqual((await service.listPreparations('user_1', 'evt_1')).items.map((item) => item.code), ['hubspot']);
+  await assert.rejects(
+    () => service.withdrawPreparation('user_1', 'evt_1', 'mailchimp'),
+    (error) => error instanceof NotFoundException && error.message === 'Preparação não encontrada.',
+  );
+  assert.ok(audits.every((entry) => entry.metadata.code && !entry.metadata.accountLabel));
+  const source = await read('../src/integration-foundation.service.ts');
+  assert.match(source, /refuseProviderDelivery/u);
+  assert.match(source, /orderBy: \{ updatedAt: 'desc' \}/u);
+  const preparationStart = source.indexOf('async openPreparation');
+  const preparationEnd = source.indexOf('async presence');
+  assert.ok(preparationStart >= 0 && preparationEnd > preparationStart);
+  assert.doesNotMatch(
+    source.slice(preparationStart, preparationEnd),
+    /fetch\(|https\.request|axios|this\.post\(|postWebhook/u,
+  );
 });
 
