@@ -84,7 +84,11 @@ test('G2.10 PostgreSQL Serializable: two concurrent 2-entry orders never oversel
     const success = outcomes.filter((item) => item.status === 'fulfilled');
     assert.equal(success.length, 1, 'exactly one atomic order wins');
     const failed = outcomes.find((item) => item.status === 'rejected');
-    assert.equal(failed.reason.getStatus?.(), 409);
+    // A raw Prisma/transaction exception was previously reported only as
+    // "undefined !== 409"; identify the error class/code without PII.
+    const cause = failed.reason;
+    const diagnosis = [cause?.constructor?.name ?? 'unknown', typeof cause?.code === 'string' ? cause.code : 'no-code'].join('/');
+    assert.equal(cause?.getStatus?.(), 409, 'unexpected concurrent loser exception: ' + diagnosis);
     const rows = await prisma.eventRegistrationReservation.findMany({
       where: { eventId: ctx.event.id, organizationId: ctx.organization.id },
     });
