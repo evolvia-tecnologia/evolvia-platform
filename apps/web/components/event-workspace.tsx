@@ -363,7 +363,13 @@ export default function EventWorkspace({
   // `undefined` continua significando consulta em andamento, e so ela devolve
   // LoadingPanel; `null` (consulta falhou) cai adiante, no ClosedPanel.
   if (operatorCapabilities === undefined) return <LoadingPanel />;
-  if (isPapelOperadorRestrito(operatorCapabilities?.papel)) {
+  // `operatorCapabilities &&` nao e redundante: depois do retorno de
+  // `undefined` o tipo ainda e `RespostaDeCapacidades | null`, e `capabilities`
+  // da moldura exige nao-nulo. Sem este estreitamento o tsc reprova com
+  // TS2345 -- foi o que derrubou o CI em d119acd0. A guarda de `papel` que
+  // fazia esse estreitamento por acidente mudou de lugar na reordenacao, e com
+  // ela se foi a narrowing que ninguem tinha escrito de proposito.
+  if (operatorCapabilities && isPapelOperadorRestrito(operatorCapabilities.papel)) {
     const identidade = identidadeDoEvento(operatorCapabilities, payload?.event ?? null);
     return <RestrictedOperatorFrame
       eventId={eventId}
