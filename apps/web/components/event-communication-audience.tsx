@@ -3,10 +3,11 @@ import { useEffect, useRef, useState } from 'react';
 import { api } from '../lib/api';
 import styles from './event-communication.module.css';
 type Preview = { audience?: string; matchedAuthors?: number; total: number; matchedRegistrations: number; missingEmail: number; duplicates: number; page: number; pageSize: number; items: {name:string;email:string}[]; sendingAvailable?: boolean };
-export default function EventCommunicationAudience({eventId}:{eventId:string}) {
-  return <ScopedAudience key={eventId} eventId={eventId} />;
+type AudienceProps = { eventId: string; renderBatches?: (filters: {categoryIds: string[]; payment: string; filterMode: 'AND' | 'OR'} | null) => import('react').ReactNode };
+export default function EventCommunicationAudience({eventId, renderBatches}: AudienceProps) {
+  return <ScopedAudience key={eventId} eventId={eventId} renderBatches={renderBatches} />;
 }
-function ScopedAudience({eventId}:{eventId:string}) {
+function ScopedAudience({eventId, renderBatches}: AudienceProps) {
   const [categories,setCategories]=useState<{id:string;name:string}[]>([]);
   const [selected,setSelected]=useState<string[]>([]);
   const [payment,setPayment]=useState('ALL');
@@ -46,5 +47,6 @@ function ScopedAudience({eventId}:{eventId:string}) {
     <button type="button" disabled={!ready||busy} onClick={()=>void show()}>{busy?'Conferindo…':'Conferir público'}</button>
     {message&&<p role="status">{message}</p>}
     {preview&&<div role="region" aria-label="Prévia dos destinatários"><p role="status">{preview.total} e-mails únicos em {preview.audience === 'ALL_SCIENTIFIC_AUTHORS' ? `${preview.matchedAuthors ?? 0} autorias científicas` : preview.audience === 'CORRESPONDING_AUTHORS' ? `${preview.matchedAuthors ?? 0} autorias correspondentes` : `${preview.matchedRegistrations} inscrições`}; {preview.missingEmail} sem e-mail válido; {preview.duplicates} contatos repetidos agrupados.</p><p>Esta lista não é autorização nem confirmação de envio. A seleção será conferida novamente antes de um futuro disparo.</p>{preview.sendingAvailable === true ? <p role="status">A API sinalizou transporte disponível nesta prévia; aceite do gateway ainda não é e-mail recebido.</p> : <p>Envio em lote permanece indisponível nesta prévia (`sendingAvailable=false`).</p>}<ul className={styles.list}>{preview.items.map(item=><li key={item.email}><strong>{item.name}</strong><span>{item.email}</span></li>)}</ul><div className={styles.actions}><button type="button" disabled={busy||preview.page<=1} onClick={()=>void show(preview.page-1)}>Anterior</button><span>Página {preview.page}</span><button type="button" disabled={busy||preview.page*preview.pageSize>=preview.total} onClick={()=>void show(preview.page+1)}>Próxima</button></div></div>}
+    {renderBatches?.(preview && !scientificAudience && !busy && preview.total > 0 ? {categoryIds: selected, payment, filterMode} : null)}
   </section>;
 }

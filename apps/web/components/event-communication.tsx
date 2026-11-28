@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { api, getToken } from '../lib/api';
 import { communicationDraftId } from '../lib/event-communication-draft';
 import EventCommunicationAudience from './event-communication-audience';
+import EventCommunicationBatches from './event-communication-batches';
 import PublicationRichTextField from './publication-rich-text-field';
 import styles from './event-communication.module.css';
 
@@ -24,7 +25,6 @@ function ScopedCommunication({ eventId }: { eventId: string }) {
   const [busy, setBusy] = useState(false);
   const [dirty, setDirty] = useState(false);
   const [message, setMessage] = useState('');
-  const [sendingAvailable, setSendingAvailable] = useState(false);
   const [tab, setTab] = useState<Tab>('write');
   const current = useRef(false);
   const operation = useRef(false);
@@ -37,7 +37,7 @@ function ScopedCommunication({ eventId }: { eventId: string }) {
     api<Listing>(endpoint).then((result) => {
       if (!active) return;
       setDrafts(result.drafts);
-      setSendingAvailable(result.sendingAvailable === true);
+
       setReady(true);
       try { setDraft(newDraft()); }
       catch (error) { setMessage(error instanceof Error ? error.message : 'Não foi possível criar um rascunho seguro. Abra um existente.'); }
@@ -101,9 +101,7 @@ function ScopedCommunication({ eventId }: { eventId: string }) {
   const showAudience = tab === 'write' || tab === 'preview';
   return <main className={styles.page}>
     <header><p className={styles.eyebrow}>COMUNICAÇÃO</p><h1>Mensagens do evento</h1><p>Escreva e confira destinatários. Salvar rascunho não envia e-mail; aceite do servidor não é entrega na caixa.</p></header>
-    <p className={styles.notice}>{sendingAvailable
-      ? 'O transporte de envio está sinalizado para este evento. Mesmo assim, aceite do gateway não significa e-mail recebido.'
-      : 'Envio em lote ainda indisponível na API. Você pode escrever, salvar rascunhos e conferir destinatários. Salvar ou conferir não envia e-mail.'}</p>
+    <p className={styles.notice}>Prepare uma versão salva para o público conferido. A autorização de envio fica no histórico do lote.</p>
     <nav className={styles.actions} aria-label="Seções de comunicação">
       <button type="button" aria-pressed={tab === 'write'} onClick={() => setTab('write')}>Escrever</button>
       <button type="button" aria-pressed={tab === 'drafts'} onClick={() => setTab('drafts')}>Rascunhos ({drafts.length})</button>
@@ -129,12 +127,9 @@ function ScopedCommunication({ eventId }: { eventId: string }) {
     </section>}
     {/* Mantém a prévia montada ao trocar de aba para não perder filtros/seleção. */}
     <div hidden={!showAudience}>
-      <EventCommunicationAudience eventId={eventId} />
+      <EventCommunicationAudience eventId={eventId} renderBatches={filters => <EventCommunicationBatches eventId={eventId}
+        draft={ready && !busy && !dirty && draft?.revision ? draft : null} filters={filters} />} />
     </div>
-    {tab === 'history' && <section className={styles.card} aria-label="Histórico de envios">
-      <h2>Histórico de envios</h2>
-      <p>A API ainda não publica histórico de disparos. Esta tela não consulta envios e não afirma “enviado” ou “entregue”.</p>
-      <p>Prévia de destinatários e rascunho salvo não contam como mensagem enviada. Quando o transporte e o histórico existirem, falhas, retentativas e resultados reais aparecerão aqui.</p>
-    </section>}
+    {tab === 'history' && <EventCommunicationBatches eventId={eventId} draft={null} filters={null} history />}
   </main>;
 }
