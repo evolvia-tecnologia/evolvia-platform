@@ -1,3 +1,29 @@
+## Revisão técnica e acessos — 27/11/2026
+
+O fundador autorizou o Copilot Business como revisor técnico automatizado, com teto adicional de US$ 10. Antes de solicitar uma rodada, conferir revisão existente, autor, SHA e escopo. Uma revisão válida no mesmo SHA pode ser reutilizada. Após mudança, concentrar a revisão no diff e nas dependências atingidas; validar os checks exigidos no HEAD candidato. Evitar nova solicitação paga até confirmar saldo e necessidade. O proprietário controla o faturamento e o limite no GitHub. Gemini e Claude cobrem áreas independentes de sua autoria. O Work registra as evidências e integra conforme a política vigente. Aprovação do bot, independência humana e aceite funcional são registrados separadamente. [Decisão #717](https://github.com/evolvia-tecnologia/evolvia-platform/issues/717#issuecomment-7204277421).
+
+**Aprovação híbrida.** O Work classifica o diff completo. Documentação factual, fixtures e testes com cobertura preservada podem receber aprovação automatizada. Ajustes isolados também são elegíveis se preservarem o runtime, a autorização, os dados pessoais, o dinheiro, o fiscal e as integrações externas. Mudanças no CI só são elegíveis quando afetam exclusivamente a execução de testes e preservam gates, cobertura, permissões e controles de deploy.
+
+Para integrar uma mudança de baixo risco, o Work registra a análise técnica complementar independente da autoria, o `APPROVED` do Copilot vinculado ao HEAD integral, o CI oficial completo, zero discussões pendentes e a base atualizada. Executa um merge por vez com o SHA esperado e registra a validação pós-merge. Mudanças em segurança Master, permissões de operadores, pagamentos, fiscal, credenciais, comunicação externa, migrations de produção ou infraestrutura de deploy exigem revisão humana independente. [Decisão do fundador na #717](https://github.com/evolvia-tecnologia/evolvia-platform/issues/717#issuecomment-7228497214)
+
+O piloto #743 recebeu duas respostas de cota insuficiente e depois uma revisão técnica com dois achados no SHA a347f800. Na #723 o GitHub registrou APPROVED do Copilot em 0649427e. A comprovação de recebimento real da mensagem continua pendente. [Revisão #723](https://github.com/evolvia-tecnologia/evolvia-platform/pull/723#pullrequestreview-6080983082).
+
+[Inventário dos acessos, permissões e rotas no SHA integrado](ACESSOS_E_PERFIS.md).
+
+## Homologação pública em 26/11/2026
+
+O HEAD verificado de develop foi `ab02d8d859f29061ff45ec0ebfc27f17aa0ffe3a`. Os oito jobs da execução 45313903366 passaram, inclusive migration idempotente, fluxo funcional, PostgreSQL, ARM64 e publicação. O job de deploy registrou esse SHA em 24/11 e confirmou HTTPS 200, API e banco prontos. [Publicação](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/45313903366/job/138180865264).
+
+Em 26/11, as rotas de saúde da API responderam HTTP 200 com versão 0.2.0-alpha.3 e o readiness confirmou PostgreSQL. No navegador, a navegação do início até Eventos carregou o catálogo, e o link para TESTE QA 30102026 — Corporativo Gratuito abriu a página de detalhe com o título esperado. O catálogo também exibiu a Feira de Tecnologia de teste. Os ensaios foram públicos, sem criação de inscrições. [Evento utilizado](https://homologacao.evolviatecnologia.com/tq3cg-50f36b8cda0d).
+
+O SHA servido pelas imagens ativas, Redis, Nginx local, certificado de origem e as quatro variáveis WebAuthn dependem da coleta no host. Os comandos de verificação, backup e critérios de rollback foram disponibilizados ao responsável. A restauração e os testes autenticados por perfil estão pendentes. [Procedimento na #571](https://github.com/evolvia-tecnologia/evolvia-platform/issues/571#issuecomment-7200660810).
+
+
+## Reconciliação de #719 e #743 — 27/11/2026
+
+Implementação **96,9%**; conclusão comprovada **73,0%**; **89/93** unidades integradas; **0/11 Gates encerrados**.
+
+Na tentativa 2 da execução 45259500761, o publicador registrou `99a041a128ac6d8d3cd35c908d5e6e5bf01b1204`, contendo G5.8 e G7.4. A API e o PostgreSQL responderam prontos e o redirecionamento HTTP retornou 308. A matriz incorpora a publicação desses dois critérios uma única vez. O recebimento autorizado do aviso e o aceite da jornada autenticada das cartas continuam pendentes. O registro de 24/11 para `ab02d8d8` permanece como evidência de publicação posterior. A identificação das imagens em execução depende da coleta no host. [Publicação](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/45259500761/job/138127736334)
 
 ## Reconciliação G5.8 I/T — 23/11/2026 (PR #708 integrada)
 

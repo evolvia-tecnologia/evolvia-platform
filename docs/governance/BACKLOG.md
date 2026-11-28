@@ -1,4 +1,14 @@
 
+## Publicação verificada em 24/11/2026
+
+O deploy da `develop` em `ab02d8d859f29061ff45ec0ebfc27f17aa0ffe3a` passou na verificação pública do Nginx (#108), incluindo HTTPS, cabeçalhos e a ocultação da versão. A coleta das imagens atualmente ativas e o aceite autenticado por perfil continuam pendentes. [Job de publicação](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/45313903366/job/138180865264) · [Coleta no VPS](https://github.com/evolvia-tecnologia/evolvia-platform/issues/571#issuecomment-7200660810).
+
+## Reconciliação de #719 e #743 — 27/11/2026
+
+Implementação **96,9%**; conclusão comprovada **73,0%**; **89/93** unidades integradas; **0/11 Gates encerrados**.
+
+Na tentativa 2 da execução 45259500761, o publicador registrou `99a041a128ac6d8d3cd35c908d5e6e5bf01b1204`, contendo G5.8 e G7.4. A API e o PostgreSQL responderam prontos e o redirecionamento HTTP retornou 308. A matriz incorpora a publicação desses dois critérios uma única vez. O recebimento autorizado do aviso e o aceite da jornada autenticada das cartas continuam pendentes. O registro de 24/11 para `ab02d8d8` permanece como evidência de publicação posterior. A identificação das imagens em execução depende da coleta no host. [Publicação](https://github.com/evolvia-tecnologia/evolvia-platform/actions/runs/45259500761/job/138127736334)
+
 ## Reconciliação G5.8 I/T — 23/11/2026 (PR #708 integrada)
 
 Implementação **96,9%**; conclusão comprovada **72,3%**; **89/93** unidades integradas; **0/11 Gates encerrados**.
