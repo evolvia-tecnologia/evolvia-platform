@@ -16,6 +16,7 @@ const REQUIRED_CODES = [
   'evolvia_public_api',
   'evolvia_webhooks',
   'website_presence',
+  'custom_domain',
   'hubspot',
   'rd_station_crm',
   'ploomes',
@@ -55,6 +56,7 @@ const REQUIRED_NAMES = [
   'API pública da Evolvia',
   'Webhooks da Evolvia',
   'Presença em sites',
+  'Domínio próprio',
   'HubSpot',
   'RD Station CRM',
   'Ploomes',
@@ -245,7 +247,7 @@ test('organizador autorizado recebe o catálogo escopado ao evento', async () =>
     && INTEGRATION_RECIPE_DIRECTIONS.includes(entry.direction)
   ))));
   assert.match(payload.guidance.summary, /somente leitura/u);
-  assert.equal(payload.items.reduce((total, item) => total + item.recipes.length, 0), 38);
+  assert.equal(payload.items.reduce((total, item) => total + item.recipes.length, 0), 39);
 });
 
 test('evento inexistente, evento sem organização e IDOR devolvem 404 indistinguível', async () => {

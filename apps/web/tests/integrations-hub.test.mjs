@@ -39,6 +39,10 @@ test('busca por objetivo e detalhes locais reduzem texto sem prometer conexão',
   assert.match(hub, /item\.recipes\?\.flatMap/u);
   assert.match(hub, /integrations-category/u);
   assert.match(hub, /integrations-objective/u);
+  assert.match(hub, /integrations-availability/u);
+  assert.match(hub, /Disponíveis agora/u);
+  assert.match(hub, /disponível\(is\) neste evento/u);
+  assert.match(hub, /AVAILABILITY_RANK/u);
   assert.match(hub, /aria-expanded=\{expanded\}/u);
   assert.match(hub, /integration-detail-\$\{item\.code\}/u);
   assert.match(hub, /\{expanded && <div/u);
@@ -48,6 +52,10 @@ test('busca por objetivo e detalhes locais reduzem texto sem prometer conexão',
   assert.match(hub, /NFS-e exige regras do município/u);
   assert.match(hub, /item\.foundation/u);
   assert.match(hub, /Criar endpoint/u);
+  assert.match(hub, /Endpoint ativo não comprova entrega validada/u);
+  assert.match(hub, /lastUsedAt/u);
+  assert.match(hub, /Último uso em|Ainda sem uso registrado/u);
+  assert.match(hub, /Diagnóstico somente leitura/u);
   assert.match(hub, /Emitir chave/u);
   assert.match(hub, /Copiar trecho/u);
   assert.match(hub, /Desativar/u);

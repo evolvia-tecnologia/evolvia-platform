@@ -63,7 +63,14 @@ function normalize(value: string): string {
 
 type FoundationKind = 'api' | 'webhook' | 'presence';
 type WebhookRow = { id: string; url: string; enabled: boolean };
-type KeyRow = { id: string; label: string; prefix: string; expiresAt: string; revokedAt: string | null };
+type KeyRow = {
+  id: string;
+  label: string;
+  prefix: string;
+  expiresAt: string;
+  revokedAt: string | null;
+  lastUsedAt?: string | null;
+};
 type PresenceView = { publicUrl: string | null; snippet: string | null; note: string };
 
 function FoundationDesk({ eventId, kind }: { eventId: string; kind: FoundationKind }) {
@@ -125,6 +132,7 @@ function FoundationDesk({ eventId, kind }: { eventId: string; kind: FoundationKi
     {error && <p className={styles.error} role="alert">{error}</p>}
     {notice && <p role="status">{notice}</p>}
     {kind === 'webhook' && <>
+      <p role="note">Endpoint ativo não comprova entrega validada no destino. Confirme o recebimento na sua infraestrutura antes de operar em produção.</p>
       <form onSubmit={(event) => {
         event.preventDefault();
         void run(async () => {
@@ -182,6 +190,9 @@ function FoundationDesk({ eventId, kind }: { eventId: string; kind: FoundationKi
           <span>{item.label}</span>
           <span>{item.prefix}</span>
           <span>{item.revokedAt ? 'Revogada' : `Válida até ${new Date(item.expiresAt).toLocaleDateString('pt-BR')}`}</span>
+          <span>{item.lastUsedAt
+            ? `Último uso em ${new Date(item.lastUsedAt).toLocaleString('pt-BR')}`
+            : 'Ainda sem uso registrado'}</span>
           {!item.revokedAt && <button type="button" disabled={busy} onClick={() => void run(async () => {
             await api(`/events/${eventId}/integrations/api-keys/${item.id}/revoke`, { method: 'POST', body: '{}' });
             setKeys((current) => (current ?? []).map((row) => row.id === item.id ? { ...row, revokedAt: new Date().toISOString() } : row));
@@ -257,7 +268,7 @@ function EventConnections({ eventId, items, onOpen }: {
   return <section className={styles.connections} aria-labelledby="event-connections-title" aria-busy={loading}>
     <div className={styles.connectionsHeading}>
       <div><h2 id="event-connections-title">Conexões deste evento</h2>
-        <p>Consulte a configuração atual e abra o recurso que deseja preparar. Um endpoint ativo ainda precisa ter sua entrega validada.</p></div>
+        <p>Consulte a configuração atual e abra o recurso que deseja preparar. Disponível = fundação Evolvia configurável. Planejada = ficha explicativa, sem conector. Endpoint ativo ainda precisa ter a entrega validada no destino.</p></div>
       <button type="button" className={styles.clearFilters} disabled={loading} onClick={() => setRevision((value) => value + 1)}>Atualizar conexões</button>
     </div>
     {loading ? <p role="status">Consultando as configurações do evento…</p> :
@@ -279,6 +290,8 @@ function joinPt(parts: string[]): string {
   return `${parts.slice(0, -1).join(', ')} e ${parts[parts.length - 1]}`;
 }
 
+const AVAILABILITY_RANK = { READY: 0, PREPARING: 1, PLANNED: 2 } as const;
+
 export default function IntegrationsHub({ eventId }: { eventId: string }) {
   const [payload, setPayload] = useState<IntegrationsPayload | null>(null);
   const [error, setError] = useState('');
@@ -286,6 +299,7 @@ export default function IntegrationsHub({ eventId }: { eventId: string }) {
   const [query, setQuery] = useState('');
   const [category, setCategory] = useState<IntegrationCategoryCode | 'ALL'>('ALL');
   const [objective, setObjective] = useState<string>('ALL');
+  const [availability, setAvailability] = useState<'ALL' | 'READY' | 'PREPARING' | 'PLANNED'>('ALL');
   const [selectedCode, setSelectedCode] = useState<string | null>(null);
   const [diagnosticBusy, setDiagnosticBusy] = useState(false);
   const [diagnosticError, setDiagnosticError] = useState('');
@@ -346,6 +360,7 @@ export default function IntegrationsHub({ eventId }: { eventId: string }) {
     return payload.items.filter((item) => {
       if (category !== 'ALL' && item.category !== category) return false;
       if (objective !== 'ALL' && !item.objectives?.some((entry) => entry.code === objective)) return false;
+      if (availability !== 'ALL' && item.availability !== availability) return false;
       if (!needle) return true;
       const haystack = normalize([
         item.name,
@@ -358,8 +373,12 @@ export default function IntegrationsHub({ eventId }: { eventId: string }) {
         ...(item.recipes?.flatMap((entry) => [entry.trigger, entry.action]) ?? []),
       ].join(' '));
       return haystack.includes(needle);
+    }).sort((left, right) => {
+      const byAvailability = AVAILABILITY_RANK[left.availability] - AVAILABILITY_RANK[right.availability];
+      if (byAvailability !== 0) return byAvailability;
+      return left.name.localeCompare(right.name, 'pt-BR');
     });
-  }, [payload, query, category, objective]);
+  }, [payload, query, category, objective, availability]);
 
   const selected = filtered.find((item) => item.code === selectedCode) ?? null;
 
@@ -373,6 +392,7 @@ export default function IntegrationsHub({ eventId }: { eventId: string }) {
     setQuery('');
     setCategory('ALL');
     setObjective('ALL');
+    setAvailability('ALL');
   }
 
   if (loading || (payload && payload.event.id !== eventId)) {
@@ -394,6 +414,20 @@ export default function IntegrationsHub({ eventId }: { eventId: string }) {
     const label = payload.objectives?.find((entry) => entry.code === objective)?.label ?? objective;
     activeFilterParts.push(`o objetivo ${label}`);
   }
+  if (availability !== 'ALL') {
+    activeFilterParts.push(`a disponibilidade ${
+      availability === 'READY' ? 'Disponível' : availability === 'PREPARING' ? 'Em preparação' : 'Planejada'
+    }`);
+  }
+
+  let readyCount = 0;
+  let preparingCount = 0;
+  let plannedCount = 0;
+  for (const item of payload.items) {
+    if (item.availability === 'READY') readyCount += 1;
+    else if (item.availability === 'PREPARING') preparingCount += 1;
+    else plannedCount += 1;
+  }
 
   return <div className={styles.hub}>
     <section className={styles.hero} aria-labelledby="integrations-title">
@@ -401,6 +435,9 @@ export default function IntegrationsHub({ eventId }: { eventId: string }) {
         <p className={styles.eyebrow}>CATÁLOGO DO EVENTO</p>
         <h1 id="integrations-title">Integrações</h1>
         <p>Encontre a ferramenta pelo que deseja fazer. Consulte abaixo a configuração do Asaas. API, webhooks e presença em sites deste evento já podem ser configurados.</p>
+        <p role="status" className={styles.resultMeta}>
+          {readyCount} disponível(is) neste evento · {preparingCount} em preparação · {plannedCount} planejada(s). Itens planejados não disparam conexão externa.
+        </p>
       </div>
     </section>
 
@@ -411,7 +448,7 @@ export default function IntegrationsHub({ eventId }: { eventId: string }) {
       {diagnosticError && <p role="alert">{diagnosticError}</p>}
       <p>Ambiente: {payload.asaas.environment === 'local' ? 'simulação local' : payload.asaas.environment === 'production' ? 'produção' : 'sandbox de testes'}.</p>
       <p role={payload.asaas.state === 'BLOCKED' ? 'alert' : 'status'}>{payload.asaas.message}</p>
-      <p>A configuração não comprova criação de cobrança, pagamento ou recebimento de webhook.</p>
+      <p>Diagnóstico somente leitura: não ativa o conector Asaas neste Hub e não comprova criação de cobrança, pagamento ou recebimento de webhook.</p>
     </section>}
 
     <EventConnections key={eventId} eventId={eventId} items={payload.items} onOpen={(code) => {
@@ -450,6 +487,19 @@ export default function IntegrationsHub({ eventId }: { eventId: string }) {
           <select id="integrations-objective" value={objective} onChange={(event) => setObjective(event.target.value)}>
             <option value="ALL">Todos os objetivos</option>
             {payload.objectives?.map((item) => <option key={item.code} value={item.code}>{item.label}</option>)}
+          </select>
+        </label>
+        <label htmlFor="integrations-availability">
+          Disponibilidade
+          <select
+            id="integrations-availability"
+            value={availability}
+            onChange={(event) => setAvailability(event.target.value as 'ALL' | 'READY' | 'PREPARING' | 'PLANNED')}
+          >
+            <option value="ALL">Todas</option>
+            <option value="READY">Disponíveis agora</option>
+            <option value="PREPARING">Em preparação</option>
+            <option value="PLANNED">Planejadas</option>
           </select>
         </label>
       </div>
