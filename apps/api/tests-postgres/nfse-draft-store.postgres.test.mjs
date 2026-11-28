@@ -62,6 +62,8 @@ test('prévia fiscal HTTP persiste uma vez e revalida organização, recibo e pa
   assert.equal((await send(token)).status, 404);
   assert.equal((await send(token, {})).status, 400);
   assert.equal((await send(token, { ...setup, issuerId: outsider.org.id })).status, 400);
+  assert.equal((await send(token, { ...setup, serviceCode: '.-.' })).status, 400);
+  assert.equal(await db.fiscalReceiptDraft.count({ where: { receiptId: receipt.id } }), 0);
   const sibling = await db.event.create({ data: { organizationId: receipt.organizationId, ownerId: (await db.organization.findUniqueOrThrow({ where: { id: receipt.organizationId } })).createdById,
     name: 'Outro evento', slug: randomUUID(), eventType: 'Outro', registrationMode: 'PAID', format: 'IN_PERSON' } });
   const otherEventUrl = url.replace('/events/' + receipt.eventId + '/', '/events/' + sibling.id + '/');

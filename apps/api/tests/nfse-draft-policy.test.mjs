@@ -63,6 +63,7 @@ test('impede município, valor, serviço e referências inválidos', () => {
     { amountCents: 0 }, { amountCents: -1 },
     { amountCents: 1.5 }, { amountCents: Number.POSITIVE_INFINITY },
     { currency: 'USD' }, { serviceCode: '12.01;DROP TABLE' },
+    { serviceCode: '.' }, { serviceCode: '---' }, { serviceCode: '.-.' },
     { serviceCode: undefined }, { serviceCode: null }, { serviceCode: 123 },
     { serviceCode: false }, { serviceCode: {} },
     { municipalityIbgeCode: undefined }, { municipalityIbgeCode: null },

@@ -64,7 +64,7 @@ export function validateFiscalSetup(input: FiscalSetup): void {
     || !IBGE_UF.has(input.municipalityIbgeCode.slice(0, 2))
     || input.municipalityIbgeCode.slice(2) === '00000'
     || typeof input.serviceCode !== 'string'
-    || !SERVICE.test(input.serviceCode)) {
+    || !SERVICE.test(input.serviceCode) || !/[A-Za-z0-9]/u.test(input.serviceCode)) {
     throw new FiscalInvoicePolicyError('Município ou código de serviço inválido.');
   }
 }
