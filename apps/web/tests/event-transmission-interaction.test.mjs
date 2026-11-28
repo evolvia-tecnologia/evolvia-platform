@@ -5,6 +5,7 @@ import test from 'node:test';
 import React from 'react';
 import { act, create } from 'react-test-renderer';
 import ts from 'typescript';
+import { transmissionFieldFromApiMessage, transmissionUnavailable } from '../lib/transmission-availability.ts';
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 const require = createRequire(import.meta.url);
@@ -17,7 +18,9 @@ function load(api) {
   const result = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } });
   const module = { exports: {} };
   new Function('require', 'module', 'exports', result.outputText)((name) => {
+    if (name === 'next/link') return { __esModule: true, default(props) { return React.createElement('a', props); } };
     if (name === '../lib/api') return { api, ApiError };
+    if (name === '../lib/transmission-availability') return { transmissionFieldFromApiMessage, transmissionUnavailable };
     if (name.endsWith('.css')) return { __esModule: true, default: {} };
     return require(name);
   }, module, module.exports);
@@ -127,6 +130,20 @@ test('remoção duplicada e resposta perdida recuperam ausência sem outro PUT',
   });
 });
 
+test('evento presencial explica a indisponibilidade e não oferece salvar', async () => {
+  await mount(async () => {
+    throw new Error('Transmissão disponível somente para eventos online ou híbridos. Altere o formato na Fundação do evento.');
+  }, async (tree) => {
+    const view = JSON.stringify(tree.toJSON());
+    assert.match(view, /somente para eventos online ou híbridos/u);
+    const foundation = tree.root.findAllByType('a').find((item) => /Abrir a fundação/.test(item.children.join('')));
+    assert.equal(foundation.props.href, '/eventos/evt-qa/configuracao?review=foundation');
+    assert.equal(tree.root.findAllByType('form').length, 0);
+    assert.equal(button(tree, 'Salvar transmissão'), undefined);
+    assert.equal(button(tree, 'Remover link'), undefined);
+  });
+});
+
 test('validação recusada mantém mensagem útil e permite corrigir sem recarregar', async () => {
   await mount(async (_path, options) => {
     if (!options?.method) return { transmission: null };
@@ -135,6 +152,25 @@ test('validação recusada mantém mensagem útil e permite corrigir sem recarre
     await act(async () => { submit(tree); });
     assert.match(JSON.stringify(tree.toJSON()), /Informe um link https/);
     assert.equal(title(tree).props.disabled, false);
+    assert.equal(title(tree).props.value, '');
+    assert.equal(tree.root.findByProps({ type: 'url' }).props['aria-invalid'], true);
+  });
+});
+
+test('título digitado sobrevive à recusa de validação do título', async () => {
+  await mount(async (_path, options) => {
+    if (!options?.method) return { transmission: null };
+    throw new ApiError('O título da transmissão não pode conter marcação.', 400);
+  }, async (tree) => {
+    await act(async () => {
+      title(tree).props.onChange({ target: { value: 'Sala <b>principal</b>' } });
+    });
+    assert.equal(title(tree).props.value, 'Sala <b>principal</b>');
+    await act(async () => { submit(tree); });
+    assert.match(JSON.stringify(tree.toJSON()), /título da transmissão/iu);
+    assert.equal(title(tree).props.value, 'Sala <b>principal</b>');
+    assert.equal(title(tree).props.disabled, false);
+    assert.equal(title(tree).props['aria-invalid'], true);
   });
 });
 
